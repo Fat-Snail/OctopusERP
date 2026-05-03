@@ -1,0 +1,4 @@
+
+# ONNX 模型文件（体积大，通过 scripts/download-models.sh 获取）
+**/Models/*.onnx
+

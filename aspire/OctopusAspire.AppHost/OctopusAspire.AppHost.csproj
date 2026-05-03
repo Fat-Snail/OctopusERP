@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!--
+      .NET 10 + Aspire 13.x：不再需要 IsAspireHost（workload 已弃用）。
+      Aspire.Hosting.AppHost NuGet 包内置源码生成器，
+      自动将 ProjectReference 转换为 Projects.OctopusUMC_Api / Projects.OctopusOA_Api 类型。
+    -->
+    <RootNamespace>OctopusAspire.AppHost</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Aspire 13.x（与 .NET 10 SDK 对齐，无需 workload） -->
+    <PackageReference Include="Aspire.Hosting.AppHost"  Version="13.2.4" />
+    <PackageReference Include="Aspire.Hosting.JavaScript" Version="13.2.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      这两个 ProjectReference 不做二进制链接：
+      AppHost 的 MSBuild 目标将它们标记为 Aspire 资源，
+      源码生成器根据 AssemblyName 生成 Projects.* 类型。
+      IsAspireProjectResource="true" 触发 Aspire.Hosting.AppHost 内置的源码生成器。
+    -->
+    <ProjectReference Include="..\..\OctopusUMC\src\OctopusUMC.Api\OctopusUMC.Api.csproj">
+      <IsAspireProjectResource>true</IsAspireProjectResource>
+    </ProjectReference>
+    <ProjectReference Include="..\..\OctopusOA\src\OctopusOA.Api\OctopusOA.Api.csproj">
+      <IsAspireProjectResource>true</IsAspireProjectResource>
+    </ProjectReference>
+    <ProjectReference Include="..\..\OctopusPLM\src\OctopusPLM.Api\OctopusPLM.Api.csproj">
+      <IsAspireProjectResource>true</IsAspireProjectResource>
+    </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- macOS arm64（Apple Silicon）运行时依赖：DCP 协调器 + Aspire Dashboard 二进制 -->
+    <PackageReference Include="Aspire.Hosting.Orchestration.osx-arm64" Version="13.2.4" />
+    <PackageReference Include="Aspire.Dashboard.Sdk.osx-arm64" Version="13.2.4" />
+  </ItemGroup>
+
+</Project>
