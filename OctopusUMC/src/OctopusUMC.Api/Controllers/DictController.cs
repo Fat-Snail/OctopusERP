@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using OctopusUMC.Api.Attributes;
 using OctopusUMC.Api.DTOs;
 using OctopusUMC.Core.Domain.Entities;
 using OctopusUMC.Infrastructure.Persistence;
@@ -70,6 +71,7 @@ public class DictController : ControllerBase
     }
 
     /// <summary>新增字典类型</summary>
+    [Log("字典管理-类型新增")]
     [HttpPost("type")]
     public ApiResponse<DictTypeResponse> CreateType([FromBody] CreateDictTypeRequest req)
     {
@@ -90,6 +92,7 @@ public class DictController : ControllerBase
     }
 
     /// <summary>修改字典类型</summary>
+    [Log("字典管理-类型修改")]
     [HttpPut("type")]
     public ApiResponse<DictTypeResponse> UpdateType([FromBody] UpdateDictTypeRequest req)
     {
@@ -104,6 +107,7 @@ public class DictController : ControllerBase
     }
 
     /// <summary>批量删除字典类型（逗号分隔ID）</summary>
+    [Log("字典管理-类型删除")]
     [HttpDelete("type/{ids}")]
     public ApiResponse<object?> DeleteType(string ids)
     {
@@ -156,6 +160,7 @@ public class DictController : ControllerBase
     }
 
     /// <summary>新增字典数据</summary>
+    [Log("字典管理-数据新增")]
     [HttpPost("data")]
     public ApiResponse<DictDataResponse> CreateData([FromBody] CreateDictDataRequest req)
     {
@@ -176,6 +181,7 @@ public class DictController : ControllerBase
     }
 
     /// <summary>修改字典数据</summary>
+    [Log("字典管理-数据修改")]
     [HttpPut("data")]
     public ApiResponse<DictDataResponse> UpdateData([FromBody] UpdateDictDataRequest req)
     {
@@ -193,6 +199,7 @@ public class DictController : ControllerBase
     }
 
     /// <summary>批量删除字典数据（逗号分隔ID）</summary>
+    [Log("字典管理-数据删除")]
     [HttpDelete("data/{ids}")]
     public ApiResponse<object?> DeleteData(string ids)
     {

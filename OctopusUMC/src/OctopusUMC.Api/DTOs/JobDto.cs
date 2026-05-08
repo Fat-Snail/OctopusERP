@@ -35,3 +35,17 @@ public class UpdateJobRequest
     public int Status { get; set; } = 1;
     public string? Remark { get; set; }
 }
+
+/// <summary>任务日志响应</summary>
+public class JobLogResponse
+{
+    public long JobLogId { get; set; }
+    public long JobId { get; set; }
+    public string JobName { get; set; } = string.Empty;
+    public string JobGroup { get; set; } = string.Empty;
+    public string InvokeTarget { get; set; } = string.Empty;
+    public DateTime StartTime { get; set; }
+    public long ElapsedMs { get; set; }
+    public int Status { get; set; }
+    public string? ErrorMsg { get; set; }
+}

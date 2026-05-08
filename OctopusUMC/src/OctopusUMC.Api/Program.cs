@@ -1,8 +1,11 @@
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using OpenIddict.Abstractions;
+using OctopusUMC.Api.Services;
 using OctopusUMC.Infrastructure.Persistence;
 using Serilog;
 using System.Reflection;
+using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,7 +14,41 @@ builder.Host.UseSerilog((ctx, cfg) =>
     cfg.ReadFrom.Configuration(ctx.Configuration)
        .WriteTo.Console());
 
-builder.Services.AddControllers();
+builder.Services.AddMemoryCache();
+
+builder.Services.AddControllers(options =>
+    options.Filters.AddService<OctopusUMC.Api.Filters.OperLogFilter>());
+builder.Services.AddScoped<OctopusUMC.Api.Filters.OperLogFilter>();
+builder.Services.AddSingleton<OctopusUMC.Api.Services.OnlineUserService>();
+// JobSchedulerService 需要注入 Controller（非 Singleton 不能直接 DI），改为单例并通过 IServiceProvider 访问 Scoped 依赖
+builder.Services.AddSingleton<JobSchedulerService>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<JobSchedulerService>());
+builder.Services.AddSignalR();
+builder.Services.AddHttpContextAccessor();
+
+// 限流策略
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = 429;
+
+    // 登录接口：固定窗口 — 每个 IP 每分钟最多 10 次（防暴力破解）
+    options.AddFixedWindowLimiter("login", o =>
+    {
+        o.Window = TimeSpan.FromMinutes(1);
+        o.PermitLimit = 10;
+        o.QueueLimit = 0;
+        o.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+    });
+
+    // 全局默认：滑动窗口 — 每个 IP 每分钟 200 次
+    options.AddSlidingWindowLimiter("api", o =>
+    {
+        o.Window = TimeSpan.FromMinutes(1);
+        o.SegmentsPerWindow = 6;
+        o.PermitLimit = 200;
+        o.QueueLimit = 0;
+    });
+});
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -50,7 +87,7 @@ builder.Services.AddAuthorization();
 // CORS
 builder.Services.AddCors(options =>
     options.AddPolicy("OctopusPolicy", policy =>
-        policy.WithOrigins("http://localhost:5173", "http://localhost:5174", "http://localhost:5175")
+        policy.WithOrigins("http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:5176", "http://localhost:5177", "http://localhost:5178")
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials()));
@@ -183,9 +220,106 @@ using (var scope = app.Services.CreateScope())
             },
         });
     }
+
+    // 种入 OpenIddict CRM 客户端
+    if (await manager.FindByClientIdAsync("octopus-crm-web") is null)
+    {
+        await manager.CreateAsync(new OpenIddictApplicationDescriptor
+        {
+            ClientId = "octopus-crm-web",
+            ClientType = OpenIddictConstants.ClientTypes.Public,
+            DisplayName = "OctopusCRM Web",
+            RedirectUris          = { new Uri("http://localhost:5176/callback") },
+            PostLogoutRedirectUris = { new Uri("http://localhost:5176") },
+            Permissions =
+            {
+                OpenIddictConstants.Permissions.Endpoints.Authorization,
+                OpenIddictConstants.Permissions.Endpoints.Token,
+                OpenIddictConstants.Permissions.Endpoints.EndSession,
+                OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
+                OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
+                OpenIddictConstants.Permissions.ResponseTypes.Code,
+                OpenIddictConstants.Permissions.Scopes.Email,
+                OpenIddictConstants.Permissions.Scopes.Profile,
+                OpenIddictConstants.Permissions.Scopes.Roles,
+                OpenIddictConstants.Permissions.Prefixes.Scope + "offline_access",
+                OpenIddictConstants.Permissions.Prefixes.Scope + "roles",
+            },
+            Requirements =
+            {
+                OpenIddictConstants.Requirements.Features.ProofKeyForCodeExchange,
+            },
+        });
+    }
+
+    // 种入 OpenIddict WMS 客户端
+    if (await manager.FindByClientIdAsync("octopus-wms-web") is null)
+    {
+        await manager.CreateAsync(new OpenIddictApplicationDescriptor
+        {
+            ClientId = "octopus-wms-web",
+            ClientType = OpenIddictConstants.ClientTypes.Public,
+            DisplayName = "OctopusWMS Web",
+            RedirectUris          = { new Uri("http://localhost:5177/callback") },
+            PostLogoutRedirectUris = { new Uri("http://localhost:5177") },
+            Permissions =
+            {
+                OpenIddictConstants.Permissions.Endpoints.Authorization,
+                OpenIddictConstants.Permissions.Endpoints.Token,
+                OpenIddictConstants.Permissions.Endpoints.EndSession,
+                OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
+                OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
+                OpenIddictConstants.Permissions.ResponseTypes.Code,
+                OpenIddictConstants.Permissions.Scopes.Email,
+                OpenIddictConstants.Permissions.Scopes.Profile,
+                OpenIddictConstants.Permissions.Scopes.Roles,
+                OpenIddictConstants.Permissions.Prefixes.Scope + "offline_access",
+                OpenIddictConstants.Permissions.Prefixes.Scope + "roles",
+            },
+            Requirements =
+            {
+                OpenIddictConstants.Requirements.Features.ProofKeyForCodeExchange,
+            },
+        });
+    }
+
+    // 种入 OpenIddict MES 客户端
+    if (await manager.FindByClientIdAsync("octopus-mes-web") is null)
+    {
+        await manager.CreateAsync(new OpenIddictApplicationDescriptor
+        {
+            ClientId = "octopus-mes-web",
+            ClientType = OpenIddictConstants.ClientTypes.Public,
+            DisplayName = "OctopusMES Web",
+            RedirectUris          = { new Uri("http://localhost:5178/callback") },
+            PostLogoutRedirectUris = { new Uri("http://localhost:5178") },
+            Permissions =
+            {
+                OpenIddictConstants.Permissions.Endpoints.Authorization,
+                OpenIddictConstants.Permissions.Endpoints.Token,
+                OpenIddictConstants.Permissions.Endpoints.EndSession,
+                OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
+                OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
+                OpenIddictConstants.Permissions.ResponseTypes.Code,
+                OpenIddictConstants.Permissions.Scopes.Email,
+                OpenIddictConstants.Permissions.Scopes.Profile,
+                OpenIddictConstants.Permissions.Scopes.Roles,
+                OpenIddictConstants.Permissions.Prefixes.Scope + "offline_access",
+                OpenIddictConstants.Permissions.Prefixes.Scope + "roles",
+            },
+            Requirements =
+            {
+                OpenIddictConstants.Requirements.Features.ProofKeyForCodeExchange,
+            },
+        });
+    }
 }
 
+app.UseMiddleware<OctopusUMC.Api.Middleware.GlobalExceptionMiddleware>();
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.UseRateLimiter();
 app.UseCors("OctopusPolicy");
+app.MapHub<OctopusUMC.Api.Hubs.OnlineUserHub>("/hubs/online");
 app.UseSwagger();
 app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "OctopusUMC v1"));
 app.UseAuthentication();

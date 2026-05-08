@@ -8,7 +8,9 @@ var builder = WebApplication.CreateBuilder(args);
 // Serilog
 builder.Host.UseSerilog((ctx, cfg) => cfg.WriteTo.Console());
 
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(opt =>
+        opt.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles);
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
@@ -56,10 +58,12 @@ builder.Services.AddDbContext<PlmDbContext>(opt =>
 // 业务服务
 builder.Services.AddScoped<OctopusPLM.Api.Services.CategoryService>();
 builder.Services.AddScoped<OctopusPLM.Api.Services.ProductService>();
+builder.Services.AddScoped<OctopusPLM.Api.Services.ChannelService>();
 
 // 向量搜索服务（Singleton：CLIP ONNX Session + Qdrant 客户端复用，IDisposable 由 DI 托管）
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<OctopusPLM.Api.Services.VectorService>();
+builder.Services.AddSingleton<OctopusPLM.Api.Services.ModelDownloadService>();
 
 var app = builder.Build();
 
@@ -78,7 +82,19 @@ _ = Task.Run(async () =>
     catch { /* Qdrant 不可用时静默忽略 */ }
 });
 
+app.UseMiddleware<OctopusPLM.Api.Middleware.GlobalExceptionMiddleware>();
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.UseCors("OctopusPolicy");
+
+// 静态文件：上传图片（不需要认证）
+var uploadsPath = Path.Combine(AppContext.BaseDirectory, "uploads");
+Directory.CreateDirectory(uploadsPath);
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new Microsoft.Extensions.FileProviders.PhysicalFileProvider(uploadsPath),
+    RequestPath = "/uploads",
+});
+
 app.UseSwagger();
 app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "OctopusPLM v1"));
 app.UseAuthentication();

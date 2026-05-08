@@ -310,3 +310,15 @@ export interface FileResponse {
   createBy: string
   service: string
 }
+
+export interface JobLogResponse {
+  jobLogId: number
+  jobId: number
+  jobName: string
+  jobGroup: string
+  invokeTarget: string
+  startTime: string
+  elapsedMs: number
+  status: number
+  errorMsg: string | null
+}

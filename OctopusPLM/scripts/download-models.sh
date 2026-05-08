@@ -8,10 +8,10 @@ set -e
 
 MODEL_DIR="$(cd "$(dirname "$0")/.." && pwd)/src/OctopusPLM.Api/Models"
 MODEL_FILE="$MODEL_DIR/clip_vision.onnx"
-MODEL_SIZE_MB=59
+MODEL_SIZE_MB=82
 
-ORIGIN_URL="https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/vision_model_quantized.onnx"
-MIRROR_URL="https://hf-mirror.com/Xenova/clip-vit-base-patch32/resolve/main/onnx/vision_model_quantized.onnx"
+ORIGIN_URL="https://huggingface.co/Xenova/clip-vit-base-patch32/resolve/main/onnx/vision_model.onnx"
+MIRROR_URL="https://hf-mirror.com/Xenova/clip-vit-base-patch32/resolve/main/onnx/vision_model.onnx"
 
 # 解析参数
 USE_MIRROR=false

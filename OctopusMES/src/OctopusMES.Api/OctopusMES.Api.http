@@ -1,0 +1,6 @@
+@OctopusMES.Api_HostAddress = http://localhost:5247
+
+GET {{OctopusMES.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

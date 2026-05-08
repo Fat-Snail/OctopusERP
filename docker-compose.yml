@@ -1,0 +1,215 @@
+# OctopusERP — Docker Compose
+# Usage:
+#   docker compose up --build         # first run
+#   docker compose up -d              # background
+#   docker compose down -v            # stop + remove volumes
+#
+# OIDC NOTE: OA/PLM/CRM/WMS/MES all redirect users to UMC for login.
+# The authority URL (http://localhost:5001) must be reachable from the
+# end-user's browser.  For server-side JWT validation, each API container
+# uses the internal service name (http://umc-api:8080) via the
+# UMC_AUTHORITY env var below.
+
+services:
+  # ── UMC ────────────────────────────────────────────────────────────
+  umc-api:
+    build:
+      context: ./OctopusUMC
+      dockerfile: Dockerfile
+    ports:
+      - "5001:8080"
+    volumes:
+      - umc-data:/app
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  umc-web:
+    build:
+      context: ./OctopusUMC/web/OctopusUMC.Web
+      dockerfile: Dockerfile
+    ports:
+      - "5173:80"
+    depends_on:
+      umc-api:
+        condition: service_healthy
+
+  # ── OA ─────────────────────────────────────────────────────────────
+  oa-api:
+    build:
+      context: ./OctopusOA
+      dockerfile: Dockerfile
+    ports:
+      - "5002:8080"
+    volumes:
+      - oa-data:/app
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      # Override UMC authority for container-to-container JWT validation
+      - UMC_AUTHORITY=http://umc-api:8080
+    depends_on:
+      umc-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  oa-web:
+    build:
+      context: ./OctopusOA/web/OctopusOA.Web
+      dockerfile: Dockerfile
+    ports:
+      - "5174:80"
+    depends_on:
+      oa-api:
+        condition: service_healthy
+
+  # ── PLM ────────────────────────────────────────────────────────────
+  plm-api:
+    build:
+      context: ./OctopusPLM
+      dockerfile: Dockerfile
+    ports:
+      - "5003:8080"
+    volumes:
+      - plm-data:/app
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - UMC_AUTHORITY=http://umc-api:8080
+    depends_on:
+      umc-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  plm-web:
+    build:
+      context: ./OctopusPLM/web/OctopusPLM.Web
+      dockerfile: Dockerfile
+    ports:
+      - "5175:80"
+    depends_on:
+      plm-api:
+        condition: service_healthy
+
+  # ── CRM ────────────────────────────────────────────────────────────
+  crm-api:
+    build:
+      context: ./OctopusCRM
+      dockerfile: Dockerfile
+    ports:
+      - "5004:8080"
+    volumes:
+      - crm-data:/app
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - UMC_AUTHORITY=http://umc-api:8080
+    depends_on:
+      umc-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  crm-web:
+    build:
+      context: ./OctopusCRM/web/OctopusCRM.Web
+      dockerfile: Dockerfile
+    ports:
+      - "5176:80"
+    depends_on:
+      crm-api:
+        condition: service_healthy
+
+  # ── WMS ────────────────────────────────────────────────────────────
+  wms-api:
+    build:
+      context: ./OctopusWMS
+      dockerfile: Dockerfile
+    ports:
+      - "5005:8080"
+    volumes:
+      - wms-data:/app
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - UMC_AUTHORITY=http://umc-api:8080
+    depends_on:
+      umc-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  wms-web:
+    build:
+      context: ./OctopusWMS/web/OctopusWMS.Web
+      dockerfile: Dockerfile
+    ports:
+      - "5177:80"
+    depends_on:
+      wms-api:
+        condition: service_healthy
+
+  # ── MES ────────────────────────────────────────────────────────────
+  mes-api:
+    build:
+      context: ./OctopusMES
+      dockerfile: Dockerfile
+    ports:
+      - "5006:8080"
+    volumes:
+      - mes-data:/app
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - UMC_AUTHORITY=http://umc-api:8080
+    depends_on:
+      umc-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  mes-web:
+    build:
+      context: ./OctopusMES/web/OctopusMES.Web
+      dockerfile: Dockerfile
+    ports:
+      - "5178:80"
+    depends_on:
+      mes-api:
+        condition: service_healthy
+
+volumes:
+  umc-data:
+  oa-data:
+  plm-data:
+  crm-data:
+  wms-data:
+  mes-data:

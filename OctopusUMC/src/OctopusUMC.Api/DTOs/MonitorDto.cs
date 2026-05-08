@@ -88,3 +88,12 @@ public class SysFileInfo
     public string Used { get; set; } = string.Empty;
     public double Usage { get; set; }
 }
+
+/// <summary>工作台概览数据</summary>
+public class DashboardSummaryResponse
+{
+    public int OnlineUserCount { get; set; }
+    public int TodayLoginCount { get; set; }
+    public int NoticeCount { get; set; }
+    public int TotalUserCount { get; set; }
+}

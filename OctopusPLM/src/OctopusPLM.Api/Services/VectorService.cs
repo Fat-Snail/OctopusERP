@@ -15,8 +15,11 @@ public class VectorService : IDisposable
     private readonly QdrantClient _qdrant;
     private readonly IHttpClientFactory _http;
     private readonly ILogger<VectorService> _log;
-    private readonly InferenceSession _session;
-    private readonly string _embedOutputName;
+    private InferenceSession? _session;
+    private string? _embedOutputName;
+
+    public static string ModelPath => Path.Combine(AppContext.BaseDirectory, "Models", "clip_vision.onnx");
+    public bool IsModelLoaded => _session is not null;
 
     private const string Collection = "plm_products";
     private const uint VectorDim = 512; // CLIP ViT-B/32
@@ -33,26 +36,26 @@ public class VectorService : IDisposable
             host: config["Vector:QdrantHost"] ?? "localhost",
             port: int.Parse(config["Vector:QdrantPort"] ?? "6334"));
 
-        var modelPath = Path.Combine(AppContext.BaseDirectory, "Models", "clip_vision.onnx");
+        if (File.Exists(ModelPath))
+            LoadModel();
+        else
+            _log.LogWarning("CLIP 模型文件不存在，图搜功能不可用。请在管理页面手动下载模型。");
+    }
+
+    /// <summary>下载完成后由 ModelDownloadService 调用，热加载模型无需重启</summary>
+    public void LoadModel()
+    {
         var options = new OnnxSessionOptions();
-        try
-        {
-            options.AppendExecutionProvider_CoreML();
-            _log.LogInformation("CLIP：CoreML EP 已启用（Apple Silicon 加速）");
-        }
-        catch
-        {
-            _log.LogInformation("CLIP：CoreML 不可用，使用 CPU 推理");
-        }
+        try   { options.AppendExecutionProvider_CoreML(); _log.LogInformation("CLIP：CoreML EP 已启用"); }
+        catch { _log.LogInformation("CLIP：CoreML 不可用，使用 CPU 推理"); }
 
-        _session = new InferenceSession(modelPath, options);
-
-        // 找正确的输出节点名（优先 image_embeds，兜底取第一个）
+        _session?.Dispose();
+        _session = new InferenceSession(ModelPath, options);
         _embedOutputName = _session.OutputMetadata.Keys
             .FirstOrDefault(k => k.Contains("embed", StringComparison.OrdinalIgnoreCase))
             ?? _session.OutputMetadata.Keys.First();
 
-        _log.LogInformation("CLIP 模型加载完成，嵌入输出节点：{Name}，维度：{Dim}", _embedOutputName, VectorDim);
+        _log.LogInformation("CLIP 模型加载完成，输出节点：{Name}", _embedOutputName);
     }
 
     /// <summary>确保 Qdrant collection 存在且维度正确（自动重建）</summary>
@@ -90,6 +93,7 @@ public class VectorService : IDisposable
     public async Task<(bool ok, string description)> IndexProductAsync(
         long productId, string imageUrl, string productName)
     {
+        if (!IsModelLoaded) return (false, "CLIP 模型未加载，请先在系统设置中下载模型");
         try
         {
             var client = _http.CreateClient();
@@ -123,6 +127,7 @@ public class VectorService : IDisposable
     public async Task<(List<ImageSearchHit> Hits, string QueryDescription)> SearchByImageAsync(
         byte[] imageBytes, int limit = 10)
     {
+        if (!IsModelLoaded) return ([], "CLIP 模型未加载，请先在系统设置中下载模型");
         try
         {
             var vector = GetImageVector(imageBytes);
@@ -162,7 +167,7 @@ public class VectorService : IDisposable
         {
             var tensor = PreprocessImage(imageBytes);
             var inputs = new[] { NamedOnnxValue.CreateFromTensor("pixel_values", tensor) };
-            using var outputs = _session.Run(inputs);
+            using var outputs = _session!.Run(inputs);
 
             var embedOutput = outputs.FirstOrDefault(o => o.Name == _embedOutputName)
                 ?? outputs.First();
@@ -203,7 +208,7 @@ public class VectorService : IDisposable
         return new DenseTensor<float>(data, [1, 3, 224, 224]);
     }
 
-    public void Dispose() => _session.Dispose();
+    public void Dispose() => _session?.Dispose();
 }
 
 public class ImageSearchHit

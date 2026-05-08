@@ -62,6 +62,11 @@ public static class DbSeeder
             new Menu { MenuId = 1003, ParentId = 100, MenuName = "用户修改", MenuType = "F", Path = "", Permission = "system:user:edit",     OrderNum = 3, Status = 1, Visible = false },
             new Menu { MenuId = 1004, ParentId = 100, MenuName = "用户删除", MenuType = "F", Path = "", Permission = "system:user:delete",   OrderNum = 4, Status = 1, Visible = false },
             new Menu { MenuId = 1005, ParentId = 100, MenuName = "重置密码", MenuType = "F", Path = "", Permission = "system:user:resetPwd", OrderNum = 5, Status = 1, Visible = false },
+            // 机构管理按钮
+            new Menu { MenuId = 1011, ParentId = 101, MenuName = "机构查询", MenuType = "F", Path = "", Permission = "system:dept:list",   OrderNum = 1, Status = 1, Visible = false },
+            new Menu { MenuId = 1012, ParentId = 101, MenuName = "机构新增", MenuType = "F", Path = "", Permission = "system:dept:add",    OrderNum = 2, Status = 1, Visible = false },
+            new Menu { MenuId = 1013, ParentId = 101, MenuName = "机构修改", MenuType = "F", Path = "", Permission = "system:dept:edit",   OrderNum = 3, Status = 1, Visible = false },
+            new Menu { MenuId = 1014, ParentId = 101, MenuName = "机构删除", MenuType = "F", Path = "", Permission = "system:dept:delete", OrderNum = 4, Status = 1, Visible = false },
             // 角色管理按钮
             new Menu { MenuId = 1041, ParentId = 104, MenuName = "角色查询", MenuType = "F", Path = "", Permission = "system:role:list",   OrderNum = 1, Status = 1, Visible = false },
             new Menu { MenuId = 1042, ParentId = 104, MenuName = "角色新增", MenuType = "F", Path = "", Permission = "system:role:add",    OrderNum = 2, Status = 1, Visible = false },
@@ -140,6 +145,17 @@ public static class DbSeeder
             Status = 1,
             CreatedAt = baseTime.AddDays(-30)
         });
+        context.OidcClients.Add(new OidcClient
+        {
+            Id = "crm-client-001",
+            ClientId = "octopus-crm-web",
+            ClientName = "OctopusCRM Web",
+            ClientType = "public",
+            RedirectUris = new List<string> { "http://localhost:5176/callback" },
+            PostLogoutRedirectUris = new List<string> { "http://localhost:5176" },
+            Status = 1,
+            CreatedAt = baseTime.AddDays(-30)
+        });
 
         // ── 公告 ──────────────────────────────────────────────
         context.Notices.AddRange(
@@ -150,9 +166,9 @@ public static class DbSeeder
 
         // ── 任务调度 ───────────────────────────────────────────
         context.Jobs.AddRange(
-            new Job { JobId = 1, JobName = "清理过期Token", JobGroup = "SYSTEM", InvokeTarget = "CleanExpiredTokensJob", CronExpression = "0 0 2 * * ?",   Status = 1, CreateTime = baseTime },
-            new Job { JobId = 2, JobName = "同步用户缓存",  JobGroup = "SYSTEM", InvokeTarget = "SyncUserCacheJob",      CronExpression = "0 */30 * * * ?", Status = 1, CreateTime = baseTime },
-            new Job { JobId = 3, JobName = "生成月度报表",  JobGroup = "REPORT", InvokeTarget = "GenerateMonthlyReport", CronExpression = "0 0 6 1 * ?",    Status = 0, CreateTime = baseTime }
+            new Job { JobId = 1, JobName = "清理过期Token", JobGroup = "SYSTEM", InvokeTarget = "CleanExpiredTokensJob", CronExpression = "0 0 2 * * *",   Status = 1, CreateTime = baseTime },
+            new Job { JobId = 2, JobName = "同步用户缓存",  JobGroup = "SYSTEM", InvokeTarget = "SyncUserCacheJob",      CronExpression = "0 */30 * * * *", Status = 1, CreateTime = baseTime },
+            new Job { JobId = 3, JobName = "生成月度报表",  JobGroup = "REPORT", InvokeTarget = "GenerateMonthlyReport", CronExpression = "0 0 6 1 * *",    Status = 0, CreateTime = baseTime }
         );
 
         // ── 系统配置 ───────────────────────────────────────────
@@ -235,7 +251,7 @@ public static class DbSeeder
 
         // ── RoleMenu 关联 ──────────────────────────────────────
         // 超级管理员(RoleId=1)：所有关键菜单
-        var adminMenuIds = new long[] { 1,2,3,4,10,11,12,100,101,102,103,104,105,110,111,112,113,120,121,122,123,124,125,1001,1002,1003,1004,1005,1041,1042,1043,1044 };
+        var adminMenuIds = new long[] { 1,2,3,4,10,11,12,100,101,102,103,104,105,110,111,112,113,120,121,122,123,124,125,1001,1002,1003,1004,1005,1011,1012,1013,1014,1041,1042,1043,1044 };
         foreach (var menuId in adminMenuIds)
             context.RoleMenus.Add(new RoleMenu { RoleId = 1, MenuId = menuId });
 

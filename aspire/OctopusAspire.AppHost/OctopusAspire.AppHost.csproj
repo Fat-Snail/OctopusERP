@@ -35,12 +35,21 @@
     <ProjectReference Include="..\..\OctopusPLM\src\OctopusPLM.Api\OctopusPLM.Api.csproj">
       <IsAspireProjectResource>true</IsAspireProjectResource>
     </ProjectReference>
+    <ProjectReference Include="..\..\OctopusCRM\src\OctopusCRM.Api\OctopusCRM.Api.csproj">
+      <IsAspireProjectResource>true</IsAspireProjectResource>
+    </ProjectReference>
+    <ProjectReference Include="..\..\OctopusWMS\src\OctopusWMS.Api\OctopusWMS.Api.csproj">
+      <IsAspireProjectResource>true</IsAspireProjectResource>
+    </ProjectReference>
+    <ProjectReference Include="..\..\OctopusMES\src\OctopusMES.Api\OctopusMES.Api.csproj">
+      <IsAspireProjectResource>true</IsAspireProjectResource>
+    </ProjectReference>
   </ItemGroup>
 
   <ItemGroup>
-    <!-- macOS arm64（Apple Silicon）运行时依赖：DCP 协调器 + Aspire Dashboard 二进制 -->
-    <PackageReference Include="Aspire.Hosting.Orchestration.osx-arm64" Version="13.2.4" />
-    <PackageReference Include="Aspire.Dashboard.Sdk.osx-arm64" Version="13.2.4" />
+    <!-- 运行时依赖：自动匹配当前机器架构（osx-arm64 / osx-x64 / win-x64 等） -->
+    <PackageReference Include="Aspire.Hosting.Orchestration.$(NETCoreSdkRuntimeIdentifier)" Version="13.2.4" />
+    <PackageReference Include="Aspire.Dashboard.Sdk.$(NETCoreSdkRuntimeIdentifier)" Version="13.2.4" />
   </ItemGroup>
 
 </Project>

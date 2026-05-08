@@ -11,6 +11,8 @@ public class CreateProductRequest
     public Dictionary<string, string>? Attributes { get; set; }
     public List<CreateSkuRequest>? Skus { get; set; }
     public List<string>? Images { get; set; }
+    /// <summary>保存后自动将主图向量化入 Qdrant</summary>
+    public bool VectorizeAfterSave { get; set; }
 }
 
 public class CreateSkuRequest
@@ -32,6 +34,8 @@ public class UpdateProductRequest
     public Dictionary<string, string>? Attributes { get; set; }
     public List<CreateSkuRequest>? Skus { get; set; }
     public List<string>? Images { get; set; }
+    /// <summary>保存后自动将主图向量化入 Qdrant</summary>
+    public bool VectorizeAfterSave { get; set; }
 }
 
 // ── Response DTOs ──
@@ -82,4 +86,33 @@ public class ProductListRow
     public int TotalStock { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+}
+
+// ── 审核流程 DTOs ──
+
+public class ReviewActionRequest
+{
+    public string? Comment { get; set; }
+}
+
+public class ReviewHistoryItem
+{
+    public long ReviewId { get; set; }
+    public string Action { get; set; } = string.Empty;
+    public string ActionLabel { get; set; } = string.Empty;
+    public long ReviewerId { get; set; }
+    public string ReviewerName { get; set; } = string.Empty;
+    public string? Comment { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+public class ProductStatsResponse
+{
+    public int Total { get; set; }
+    public int Draft { get; set; }
+    public int PendingReview { get; set; }
+    public int Approved { get; set; }
+    public int Rejected { get; set; }
+    public int Active { get; set; }
+    public int Discontinued { get; set; }
 }

@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using OctopusUMC.Api.DTOs;
+using OctopusUMC.Api.Hubs;
+using OctopusUMC.Api.Services;
 using OctopusUMC.Infrastructure.Persistence;
 
 namespace OctopusUMC.Api.Controllers;
@@ -10,63 +13,72 @@ namespace OctopusUMC.Api.Controllers;
 public class MonitorController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
-    public MonitorController(ApplicationDbContext context) => _context = context;
+    private readonly OnlineUserService _onlineUserService;
+    private readonly IHubContext<OnlineUserHub> _hubContext;
 
-    /// <summary>在线用户列表（模拟：取最近登录成功的用户）</summary>
+    public MonitorController(ApplicationDbContext context, OnlineUserService onlineUserService, IHubContext<OnlineUserHub> hubContext)
+    {
+        _context = context;
+        _onlineUserService = onlineUserService;
+        _hubContext = hubContext;
+    }
+
+    /// <summary>在线用户列表（SignalR Hub 实时数据）</summary>
     [HttpGet("online/list")]
     public ApiResponse<PagedResult<OnlineUserResponse>> GetOnlineUsers(
+        [FromQuery] string? userName,
+        [FromQuery] string? ipaddr,
         [FromQuery] int pageNum = 1,
         [FromQuery] int pageSize = 10)
     {
-        // Step 2 模拟：取最近登录成功且有对应用户的日志
-        var onlineUsers = _context.LoginInfos
-            .Where(l => l.Status == 1 && l.Msg == "登录成功")
-            .ToList()
-            .GroupBy(l => l.UserName)
-            .Select(g => g.OrderByDescending(l => l.LoginTime).First())
-            .ToList();
+        var all = _onlineUserService.GetAll().AsEnumerable();
+        if (!string.IsNullOrEmpty(userName))
+            all = all.Where(u => u.UserName.Contains(userName, StringComparison.OrdinalIgnoreCase));
+        if (!string.IsNullOrEmpty(ipaddr))
+            all = all.Where(u => u.Ipaddr.Contains(ipaddr));
 
-        var rows = onlineUsers
-            .Select(l =>
-            {
-                var user = _context.Users.FirstOrDefault(u => u.UserName == l.UserName);
-                // 查主部门名称
-                var primaryDept = user != null
-                    ? _context.UserDepts
-                        .Where(ud => ud.UserId == user.UserId && ud.IsPrimary)
-                        .Join(_context.Depts, ud => ud.DeptId, d => d.DeptId, (_, d) => d.DeptName)
-                        .FirstOrDefault() ?? string.Empty
-                    : string.Empty;
-
-                return new OnlineUserResponse
-                {
-                    TokenId = (user?.UserId ?? 0).ToString(), // Step 4 stub: SignalR 接入后替换为真实 ConnectionId
-                    UserId = user?.UserId ?? 0,
-                    UserName = l.UserName,
-                    NickName = user?.NickName ?? l.UserName,
-                    DeptName = primaryDept,
-                    Ipaddr = l.Ipaddr,
-                    LoginLocation = l.LoginLocation,
-                    Browser = l.Browser,
-                    Os = l.Os,
-                    LoginTime = l.LoginTime,
-                };
-            })
+        var list = all.ToList();
+        var rows = list
             .Skip((pageNum - 1) * pageSize).Take(pageSize)
-            .ToList();
+            .Select(u => new OnlineUserResponse
+            {
+                TokenId = u.ConnectionId,
+                UserId = u.UserId,
+                UserName = u.UserName,
+                NickName = u.NickName,
+                DeptName = u.DeptName,
+                Ipaddr = u.Ipaddr,
+                LoginLocation = string.Empty,
+                Browser = string.Empty,
+                Os = string.Empty,
+                LoginTime = u.LoginTime,
+            }).ToList();
 
-        return ApiResponse<PagedResult<OnlineUserResponse>>.Success(new()
-        {
-            Rows = rows,
-            Total = onlineUsers.Count
-        });
+        return ApiResponse<PagedResult<OnlineUserResponse>>.Success(new() { Rows = rows, Total = list.Count });
     }
 
-    /// <summary>强制下线（Step 2: 仅从登录日志中记录，不真正踢出会话）</summary>
-    [HttpDelete("online/{tokenId}")]
-    public ApiResponse<object?> ForceLogout(string tokenId)
+    /// <summary>强制下线（SignalR 通知客户端断开连接）</summary>
+    [HttpDelete("online/{connectionId}")]
+    public async Task<ApiResponse<object?>> ForceLogout(string connectionId)
     {
-        return ApiResponse<object?>.Success(null, $"已强制下线: {tokenId}");
+        if (!_onlineUserService.TryRemove(connectionId))
+            return ApiResponse<object?>.Fail("用户不在线", 404);
+        await _hubContext.Clients.Client(connectionId).SendAsync("ForceLogout");
+        return ApiResponse<object?>.Success(null, "已强制下线");
+    }
+
+    /// <summary>工作台概览数据</summary>
+    [HttpGet("dashboard")]
+    public ApiResponse<DashboardSummaryResponse> GetDashboard()
+    {
+        var today = DateTime.UtcNow.Date;
+        return ApiResponse<DashboardSummaryResponse>.Success(new DashboardSummaryResponse
+        {
+            OnlineUserCount = _onlineUserService.GetAll().Count,
+            TodayLoginCount = _context.LoginInfos.Count(l => l.LoginTime >= today && l.Status == 1),
+            NoticeCount = _context.Notices.Count(n => n.Status == 0),
+            TotalUserCount = _context.Users.Count(u => u.Status == 1),
+        });
     }
 
     /// <summary>服务器信息（读取真实运行时数据）</summary>

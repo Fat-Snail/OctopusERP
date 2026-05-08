@@ -21,6 +21,7 @@ public class ApplicationDbContext : DbContext
     public DbSet<DictData>  DictDatas  => Set<DictData>();
     public DbSet<Notice>    Notices    => Set<Notice>();
     public DbSet<Job>       Jobs       => Set<Job>();
+    public DbSet<JobLog>    JobLogs    => Set<JobLog>();
     public DbSet<SysConfig> Configs    => Set<SysConfig>();
     public DbSet<OssFile>   OssFiles   => Set<OssFile>();
     public DbSet<OperLog>   OperLogs   => Set<OperLog>();
@@ -164,6 +165,14 @@ public class ApplicationDbContext : DbContext
             e.ToTable("sys_job");
             e.HasKey(j => j.JobId);
             e.Property(j => j.JobId).ValueGeneratedOnAdd();
+        });
+
+        // ── JobLog ───────────────────────────────────────────
+        modelBuilder.Entity<JobLog>(e =>
+        {
+            e.ToTable("sys_job_log");
+            e.HasKey(l => l.JobLogId);
+            e.Property(l => l.JobLogId).ValueGeneratedOnAdd();
         });
 
         // ── SysConfig ────────────────────────────────────────

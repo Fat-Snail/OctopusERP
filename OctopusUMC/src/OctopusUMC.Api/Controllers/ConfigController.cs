@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Memory;
 using OctopusUMC.Api.DTOs;
 using OctopusUMC.Core.Domain.Entities;
 using OctopusUMC.Infrastructure.Persistence;
@@ -11,7 +12,13 @@ namespace OctopusUMC.Api.Controllers;
 public class ConfigController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
-    public ConfigController(ApplicationDbContext context) => _context = context;
+    private readonly IMemoryCache _cache;
+    private const string CacheKeyPrefix = "sys_config:";
+    public ConfigController(ApplicationDbContext context, IMemoryCache cache)
+    {
+        _context = context;
+        _cache = cache;
+    }
 
     private ConfigResponse MapConfig(SysConfig c) => new()
     {
@@ -52,13 +59,28 @@ public class ConfigController : ControllerBase
         return ApiResponse<ConfigResponse>.Success(MapConfig(c));
     }
 
-    /// <summary>根据配置Key获取配置值</summary>
+    /// <summary>根据配置Key获取配置值（结果缓存10分钟）</summary>
     [HttpGet("key/{configKey}")]
     public ApiResponse<string> GetByKey(string configKey)
     {
+        if (_cache.TryGetValue(CacheKeyPrefix + configKey, out string? cached))
+            return ApiResponse<string>.Success(cached!);
+
         var c = _context.Configs.FirstOrDefault(c => c.ConfigKey == configKey);
         if (c == null) return ApiResponse<string>.Fail("配置不存在", 404);
+
+        _cache.Set(CacheKeyPrefix + configKey, c.ConfigValue, TimeSpan.FromMinutes(10));
         return ApiResponse<string>.Success(c.ConfigValue);
+    }
+
+    /// <summary>刷新配置缓存</summary>
+    [HttpPut("refreshCache")]
+    public ApiResponse<object?> RefreshCache()
+    {
+        var allKeys = _context.Configs.Select(c => c.ConfigKey).ToList();
+        foreach (var key in allKeys)
+            _cache.Remove(CacheKeyPrefix + key);
+        return ApiResponse<object?>.Success(null, "缓存已刷新");
     }
 
     /// <summary>新增系统配置</summary>
@@ -88,6 +110,7 @@ public class ConfigController : ControllerBase
     {
         var c = _context.Configs.FirstOrDefault(c => c.ConfigId == req.ConfigId);
         if (c == null) return ApiResponse<ConfigResponse>.Fail("配置不存在", 404);
+        _cache.Remove(CacheKeyPrefix + c.ConfigKey);
         c.ConfigName = req.ConfigName;
         c.ConfigKey = req.ConfigKey;
         c.ConfigValue = req.ConfigValue;
@@ -105,6 +128,7 @@ public class ConfigController : ControllerBase
         var items = _context.Configs.Where(c => idList.Contains(c.ConfigId)).ToList();
         if (items.Count == 0)
             return ApiResponse<object?>.Fail("配置不存在", 404);
+        foreach (var item in items) _cache.Remove(CacheKeyPrefix + item.ConfigKey);
         _context.Configs.RemoveRange(items);
         _context.SaveChanges();
         return ApiResponse<object?>.Success(null, "删除成功");

@@ -1,0 +1,6 @@
+@OctopusWMS.Api_HostAddress = http://localhost:5168
+
+GET {{OctopusWMS.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

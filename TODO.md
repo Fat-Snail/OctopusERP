@@ -275,7 +275,7 @@ dotnet test --filter "Flow" --logger "console;verbosity=detailed"
 - [x] [TDD] 菜单权限：树形查询、角色绑定菜单
 - [x] [TDD] 角色管理：CRUD、绑定菜单、绑定数据权限
 - [x] [TDD] 数据权限：五种范围的 Repository 过滤实现
-- [ ] [TDD] 权限标识校验：HasPermission 特性 + 中间件（控制器层未实现）
+- [x] [TDD] 权限标识校验：HasPermission 特性 + Cookie Claims（93/93 通过）
 - [x] UMC.Web：前端权限集成（动态路由，LoginResponse 返回 permissions）
 - [x] UMC.Web：菜单管理页面（树形表格）
 - [x] UMC.Web：角色管理页面（菜单权限树、数据权限配置）
@@ -285,7 +285,7 @@ dotnet test --filter "Flow" --logger "console;verbosity=detailed"
 
 > **后端 CRUD API + 测试全部完成**。导入导出、UMC.Web 主控面板待实现。
 
-- [x] [TDD] 用户管理 CRUD API（导入导出待实现）
+- [x] [TDD] 用户管理 CRUD API + 导入导出（ClosedXML Excel）
 - [x] [TDD] 机构管理 API（多公司树形结构、多层级）
 - [x] [TDD] 职位管理 API
 - [x] [TDD] 字典管理 API（类型 + 数据，带缓存）
@@ -293,27 +293,148 @@ dotnet test --filter "Flow" --logger "console;verbosity=detailed"
 - [x] UMC.Web：机构管理页面（支持展示两家公司）
 - [x] UMC.Web：职位管理页面
 - [x] UMC.Web：字典管理页面
-- [ ] UMC.Web：主控面板（工作台/分析/统计 — 目前仅基础首页）
+- [x] UMC.Web：主控面板（工作台实时数据 + 操作日志/访问日志双 Tab + SignalR 公告推送）
 - [x] UMC.Web：个人中心（资料/修改密码）
 - [ ] 验收：RBAC 管理后台核心功能完整可用
 
-## Phase 5：扩展功能
-- [ ] 访问日志 & 操作日志（AOP 拦截器自动记录）
-- [ ] 在线用户（SignalR Hub + 强制下线）
-- [ ] 公告管理（SignalR 实时推送）
-- [ ] 文件管理（本地 + OSS + COS 策略模式）
-- [ ] 任务调度（Sundial 集成）
-- [ ] 服务监控（CPU/内存/磁盘）
-- [ ] 系统配置（带缓存）
-- [ ] 邮件短信发送
-- [ ] 导入导出（Magicodes.IE）
-- [ ] 限流控制（AspNetCoreRateLimit）
-- [ ] 开放授权（微信 OAuth 2.0）
-- [ ] API 文档（Swagger + Knife4jUI）
+## ✅ Phase 5：扩展功能（2026-05-04）
 
-## Phase 6：DevOps
-- [ ] 四个项目各自编写 Dockerfile（多阶段构建）
-- [ ] docker-compose.yml（MySQL + 全服务一键启动）
-- [ ] GitHub Actions CI 流水线（构建 + 测试）
+### ✅ AOP 操作日志
+- [x] `LogAttribute` — 方法级标注 `[Log("操作描述")]`
+- [x] `OperLogFilter` — IActionFilter 全局注册，拦截 `[Log]` 标注的 mutation 写入 `OperLogs` 表
+- [x] `OperLog` 实体 + `DbSeeder` 5 条种子数据
+- [x] `MonitorController.GetOperLogs` + `DeleteOperLogs` + `CleanOperLogs`
+- [x] UserController / DeptController / RoleController / PostController / DictController / NoticeController 全部加 `[Log]`
+- [x] 6 个新测试（Phase5MonitorTests.cs），85/85 全部通过
+
+### ✅ SignalR 在线用户
+- [x] `OnlineUserService` — ConcurrentDictionary 线程安全内存存储
+- [x] `OnlineUserHub` — [Authorize] + OnConnectedAsync（写入用户IP/部门）+ OnDisconnectedAsync
+- [x] `MonitorController.GetOnlineUsers` + `ForceLogout`（TryRemove → 404 / SendAsync "ForceLogout"）
+- [x] Program.cs：`AddSignalR()` + `AddSingleton<OnlineUserService>` + `MapHub<>("/hubs/online")`
+- [x] **前端**：`npm install @microsoft/signalr`
+- [x] `src/utils/hubService.ts` — HubConnectionBuilder + withCredentials + withAutomaticReconnect
+- [x] `views/monitor/online/index.vue` — 移除 Mock 警告条，改为 SignalR 连接状态指示器
+
+### ✅ UMC.Web 主控面板
+- [x] `GET /api/monitor/dashboard` 返回实时统计：在线用户数 / 今日登录数 / 系统公告数 / 在职用户数
+- [x] 工作台 4 张数据卡（实时数据，替换硬编码）
+- [x] 操作日志/访问日志双 Tab（可切换）
+- [x] 系统公告侧栏（最新 4 条）
+- [x] SignalR `UserConnected` / `UserDisconnected` 事件联动刷新在线人数
+
+### ✅ 公告管理 SignalR 实时推送
+- [x] `NoticeController.Create/Update` 在发布状态下广播 `NewNotice` 事件
+- [x] 工作台监听 `NewNotice` — 公告列表实时追加，公告计数器 +1
+
+### ✅ 导入导出（ClosedXML）
+- [x] `GET /api/system/user/export` — 按当前筛选条件导出 Excel（.xlsx）
+- [x] `GET /api/system/user/importTemplate` — 下载导入模板
+- [x] `POST /api/system/user/import` — 批量导入（跳过重名行，返回成功/失败明细）
+- [x] UMC.Web 用户管理页：导出按钮 + 导入弹窗（含模板下载 + 文件选择 + 结果预览）
+
+### ✅ HasPermission 权限中间件（Phase 3 补全）
+- [x] `HasPermissionAttribute` — IAuthorizationFilter 读取 Cookie Claims
+- [x] 权限写入 Cookie（登录时嵌入 `"permission"` Claim，零 DB 开销）
+- [x] `TestAuthHandler` — 测试环境默认 admin，`X-Test-UserId` 切换用户，`X-Test-Anonymous` 模拟匿名
+- [x] 8 个权限测试（Phase3PermissionTests.cs），93/93 全部通过
+
+### ✅ 系统配置（带缓存）
+- [x] `ConfigController` + `IMemoryCache`（CacheKeyPrefix `sys_config:`，10 分钟 TTL）
+- [x] `GET /key/{configKey}` — 先读缓存，miss 时查 DB 并写缓存
+- [x] `PUT /refreshCache` — 清空所有键的缓存
+- [x] Update / Delete 均失效对应缓存条目
+- [x] UMC.Web：`tool/config/index.vue` — CRUD + 刷新缓存按钮（已存在）
+
+### ✅ 文件管理（本地存储）
+- [x] `FileController` — 实际 `IFormFile` 上传，GUID 文件名，存储在 `uploads/` 目录
+- [x] `GET /download/{storedName}` — Path.GetFileName 防路径穿越
+- [x] `POST /api/common/upload` — 通用上传别名
+- [x] UMC.Web：`tool/file/index.vue` — 上传按钮（FormData POST）+ 文件列表 + 批量删除
+- [x] 文件列表按 `fileSuffix` 过滤（修正旧版 `service` 过滤）
+
+### ✅ 任务调度（Cronos BackgroundService）
+- [x] `JobSchedulerService` — BackgroundService，30s tick，`CronExpression.Parse` 计算下次运行
+- [x] `JobLog` 实体 + `ApplicationDbContext.JobLogs` — 记录每次执行结果
+- [x] 内置任务：`cleanOldLogs`（清理 90 天前操作日志）
+- [x] `JobController` — CRUD + `PUT /run/{id}`（立即执行）+ `PUT /pause/{id}` / `PUT /resume/{id}`
+- [x] `GET /log/list` + `DELETE /log/clean`
+- [x] UMC.Web：`tool/job/index.vue` — 任务列表 Tab + 执行日志 Tab，含执行/暂停/恢复/编辑/删除
+
+### ✅ 限流控制（ASP.NET Core 内置 RateLimiter）
+- [x] `builder.Services.AddRateLimiter()` — 固定窗口 `"login"`（10次/分钟，防暴力破解）+ 滑动窗口 `"api"`（200次/分钟）
+- [x] `[EnableRateLimiting("login")]` 标注 `AccountController.Login`
+- [x] `app.UseRateLimiter()` 中间件注册，拒绝返回 429
+
+### 待实现
+- [ ] 邮件短信发送
+- [ ] 开放授权（微信 OAuth 2.0）
+
+## ✅ Phase 6：DevOps（2026-05-04）
+- [x] 六个项目各自编写 Dockerfile（.NET 10 多阶段构建：SDK → aspnet runtime）
+- [x] 六个前端 Dockerfile（Node 22 构建 + nginx:stable-alpine 托管）+ nginx.conf（SPA fallback + /api 反向代理）
+- [x] docker-compose.yml（12 个服务，端口 5001-5006 / 5173-5178，healthcheck + 依赖链）
+- [x] GitHub Actions CI 流水线（.github/workflows/ci.yml）：后端 dotnet test × 6 + 前端 tsc + build × 6 + compose 语法校验
+- [x] 全局异常处理中间件（`Middleware/GlobalExceptionMiddleware.cs`，全部 6 个 API 统一接入）
+- [x] `/health` 健康检查端点（全部 6 个 API，docker-compose healthcheck 使用）
 - [ ] 生产证书替换（OpenIddict 签名/加密证书）
-- [ ] 全局异常处理中间件
+
+**CI 矩阵**（`.github/workflows/ci.yml`）：
+| Job | 内容 |
+|---|---|
+| `backend (OctopusUMC)` | `dotnet test OctopusUMC/OctopusUMC.sln` |
+| `backend (OctopusOA)` | `dotnet test OctopusOA/OctopusOA.sln` |
+| `backend (OctopusPLM)` | `dotnet test OctopusPLM/OctopusPLM.sln` |
+| `backend (OctopusCRM)` | `dotnet test OctopusCRM/OctopusCRM.sln` |
+| `backend (OctopusWMS)` | `dotnet test OctopusWMS/tests/...` |
+| `backend (OctopusMES)` | `dotnet test OctopusMES/tests/...` |
+| `frontend × 6` | `npm ci && tsc --noEmit && npm run build` |
+| `docker-lint` | `docker compose config --quiet` |
+
+**总测试数（283 个，全部通过）**：UMC 93 + OA 90 + PLM 22 + CRM 31 + WMS 23 + MES 20 = **279 个测试**
+
+---
+
+## 全链路 ERP 扩展（CRM → WMS → MES）
+
+> 详细方案见 `ROADMAP.md` 二至八章。
+
+### ✅ 已完成基础（UMC + OA + PLM）
+- [x] UMC：统一身份/SSO/RBAC（79 个测试）
+- [x] OA：审批流引擎 + 考勤/公告/会议/通讯录（90 个测试）
+- [x] PLM：商品/类目/SKU/渠道映射/1688导入（22 个测试）
+
+### ✅ P1：OctopusCRM 客户关系管理
+
+- [x] 项目骨架 + Persistence（10 张表，CrmDbContext + CrmDbSeeder）
+- [x] CustomerService / InquiryService / QuoteService / ContractService / PaymentService / StatsService
+- [x] 所有 Controller + ApprovalCallbackController（HMAC）+ UserSyncController + MeController
+- [x] `dotnet test` 31/31 通过（CustomerFlowTests / SalesPipelineFlowTests / ContractPaymentTests / StatsTests）
+- [x] 前端（shadcn-vue，端口 5176）：客户/询盘/报价/合同/回款 全部页面
+- [x] Aspire 集成：crm-api(5004) + crm-web(5176)
+
+### ✅ P2：OctopusWMS 仓储管理
+
+- [x] 项目骨架 + Persistence（10 张表，wms_ 前缀）
+- [x] 仓库/库存/入库/出库/盘点 全部 Service + Controller
+- [x] `dotnet test` 23/23 通过
+- [x] 前端（shadcn-vue，端口 5177）：库存看板 + 入出库管理
+- [x] Aspire 集成：wms-api(5005) + wms-web(5177)
+
+### ✅ P3：OctopusMES 生产与采购
+
+- [x] 项目骨架 + Persistence（6 张表，mes_ 前缀）
+- [x] 供应商/采购订单/生产工单 全部 Service + Controller
+- [x] `dotnet test` 20/20 通过
+- [x] 前端（shadcn-vue，端口 5178）：工单 + 采购 + 供应商管理
+- [x] Aspire 集成：mes-api(5006) + mes-web(5178)
+
+### ✅ P4：全链路 BI 看板（2026-05-04）
+
+- [x] 销售漏斗（CRM pipeline：询盘→报价→合同，含转化率）
+- [x] 时效仪表盘（7 大指标 vs SLA，RAG 红绿黄状态色）
+- [x] 合同全链路时间轴（询盘→报价→审批→合同→发货→收款，含逾期标注）
+- [x] 审批积压（CRM 侧：报价/合同/回款三类待审批数量 + 超时计数）
+- [x] OTD 趋势折线图（6 个月月度趋势，SVG 折线 + 95% SLA 参考线）
+- [x] 后端：`GET /api/stats/bi/efficiency|otd-trend|approval-backlog|contract-timeline/{id}|contracts`
+- [x] 前端：`CRM.Web /bi` 路由，SubMenu 新增"分析"组，纯 CSS/SVG 图表无三方依赖

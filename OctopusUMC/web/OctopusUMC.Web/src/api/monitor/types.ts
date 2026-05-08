@@ -36,6 +36,13 @@ export interface LoginfoResponse {
   loginTime: string
 }
 
+export interface DashboardSummary {
+  onlineUserCount: number
+  todayLoginCount: number
+  noticeCount: number
+  totalUserCount: number
+}
+
 export interface ServerInfo {
   cpu: { cpuNum: number; used: number; sys: number; free: number }
   mem: { total: number; used: number; free: number }

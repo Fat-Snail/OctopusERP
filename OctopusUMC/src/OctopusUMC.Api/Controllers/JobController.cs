@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using OctopusUMC.Api.DTOs;
+using OctopusUMC.Api.Services;
 using OctopusUMC.Core.Domain.Entities;
 using OctopusUMC.Infrastructure.Persistence;
 
@@ -11,7 +12,12 @@ namespace OctopusUMC.Api.Controllers;
 public class JobController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
-    public JobController(ApplicationDbContext context) => _context = context;
+    private readonly JobSchedulerService _scheduler;
+    public JobController(ApplicationDbContext context, JobSchedulerService scheduler)
+    {
+        _context = context;
+        _scheduler = scheduler;
+    }
 
     private JobResponse MapJob(Job j) => new()
     {
@@ -113,5 +119,77 @@ public class JobController : ControllerBase
         j.Status = req.Status;
         _context.SaveChanges();
         return ApiResponse<object?>.Success(null, "状态更新成功");
+    }
+
+    /// <summary>立即触发一次任务</summary>
+    [HttpPut("run/{id:long}")]
+    public async Task<ApiResponse<object?>> Run(long id)
+    {
+        var j = _context.Jobs.FirstOrDefault(j => j.JobId == id);
+        if (j == null) return ApiResponse<object?>.Fail("任务不存在", 404);
+        await _scheduler.ExecuteJobAsync(_context, j, DateTime.UtcNow, CancellationToken.None);
+        return ApiResponse<object?>.Success(null, "任务已触发");
+    }
+
+    /// <summary>暂停任务</summary>
+    [HttpPut("pause/{id:long}")]
+    public ApiResponse<object?> Pause(long id)
+    {
+        var j = _context.Jobs.FirstOrDefault(j => j.JobId == id);
+        if (j == null) return ApiResponse<object?>.Fail("任务不存在", 404);
+        j.Status = 0;
+        _context.SaveChanges();
+        return ApiResponse<object?>.Success(null, "任务已暂停");
+    }
+
+    /// <summary>恢复任务</summary>
+    [HttpPut("resume/{id:long}")]
+    public ApiResponse<object?> Resume(long id)
+    {
+        var j = _context.Jobs.FirstOrDefault(j => j.JobId == id);
+        if (j == null) return ApiResponse<object?>.Fail("任务不存在", 404);
+        j.Status = 1;
+        _context.SaveChanges();
+        return ApiResponse<object?>.Success(null, "任务已恢复");
+    }
+
+    /// <summary>查询任务执行日志</summary>
+    [HttpGet("log/list")]
+    public ApiResponse<PagedResult<JobLogResponse>> GetLogs(
+        [FromQuery] long? jobId,
+        [FromQuery] int? status,
+        [FromQuery] int pageNum = 1,
+        [FromQuery] int pageSize = 20)
+    {
+        var query = _context.JobLogs.AsQueryable();
+        if (jobId.HasValue) query = query.Where(l => l.JobId == jobId.Value);
+        if (status.HasValue) query = query.Where(l => l.Status == status.Value);
+
+        var total = query.Count();
+        var rows = query.OrderByDescending(l => l.StartTime)
+            .Skip((pageNum - 1) * pageSize).Take(pageSize)
+            .ToList()
+            .Select(l => new JobLogResponse
+            {
+                JobLogId = l.JobLogId,
+                JobId = l.JobId,
+                JobName = l.JobName,
+                JobGroup = l.JobGroup,
+                InvokeTarget = l.InvokeTarget,
+                StartTime = l.StartTime,
+                ElapsedMs = l.ElapsedMs,
+                Status = l.Status,
+                ErrorMsg = l.ErrorMsg,
+            }).ToList();
+        return ApiResponse<PagedResult<JobLogResponse>>.Success(new() { Rows = rows, Total = total });
+    }
+
+    /// <summary>清空任务日志</summary>
+    [HttpDelete("log/clean")]
+    public ApiResponse<object?> CleanLogs()
+    {
+        _context.JobLogs.RemoveRange(_context.JobLogs.ToList());
+        _context.SaveChanges();
+        return ApiResponse<object?>.Success(null, "日志已清空");
     }
 }

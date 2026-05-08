@@ -251,6 +251,144 @@ public class ProductService
         return null;
     }
 
+    private static readonly Dictionary<string, string> ActionLabels = new()
+    {
+        ["submit"] = "提交审核",
+        ["approve"] = "审核通过",
+        ["reject"] = "审核驳回",
+        ["publish"] = "上架",
+        ["discontinue"] = "下架",
+        ["cancel"] = "撤回",
+    };
+
+    /// <summary>审核通过（待审核 → 已通过）</summary>
+    public async Task<string?> ApproveAsync(long id, long reviewerId, string reviewerName, string? comment)
+    {
+        var product = await _db.Products.FindAsync(id);
+        if (product == null) return "商品不存在";
+        if (product.Status != "pending_review") return "仅待审核状态可通过审核";
+
+        product.Status = "approved";
+        product.UpdatedAt = DateTime.UtcNow;
+        product.Reviews.Add(new ProductReview
+        {
+            ReviewerId = reviewerId,
+            ReviewerName = reviewerName,
+            Action = "approve",
+            Comment = comment,
+            CreatedAt = DateTime.UtcNow,
+        });
+
+        await _db.SaveChangesAsync();
+        return null;
+    }
+
+    /// <summary>审核驳回（待审核 → 已驳回）</summary>
+    public async Task<string?> RejectAsync(long id, long reviewerId, string reviewerName, string? comment)
+    {
+        var product = await _db.Products.FindAsync(id);
+        if (product == null) return "商品不存在";
+        if (product.Status != "pending_review") return "仅待审核状态可驳回";
+
+        product.Status = "rejected";
+        product.UpdatedAt = DateTime.UtcNow;
+        product.Reviews.Add(new ProductReview
+        {
+            ReviewerId = reviewerId,
+            ReviewerName = reviewerName,
+            Action = "reject",
+            Comment = comment,
+            CreatedAt = DateTime.UtcNow,
+        });
+
+        await _db.SaveChangesAsync();
+        return null;
+    }
+
+    /// <summary>上架（已通过 → 已上架）</summary>
+    public async Task<string?> PublishAsync(long id, long reviewerId, string reviewerName)
+    {
+        var product = await _db.Products.FindAsync(id);
+        if (product == null) return "商品不存在";
+        if (product.Status != "approved") return "仅已通过状态可上架";
+
+        product.Status = "active";
+        product.UpdatedAt = DateTime.UtcNow;
+        product.Reviews.Add(new ProductReview
+        {
+            ReviewerId = reviewerId,
+            ReviewerName = reviewerName,
+            Action = "publish",
+            CreatedAt = DateTime.UtcNow,
+        });
+
+        await _db.SaveChangesAsync();
+        return null;
+    }
+
+    /// <summary>下架（已上架 → 已下架）</summary>
+    public async Task<string?> DiscontinueAsync(long id, long reviewerId, string reviewerName, string? comment)
+    {
+        var product = await _db.Products.FindAsync(id);
+        if (product == null) return "商品不存在";
+        if (product.Status != "active") return "仅已上架状态可下架";
+
+        product.Status = "discontinued";
+        product.UpdatedAt = DateTime.UtcNow;
+        product.Reviews.Add(new ProductReview
+        {
+            ReviewerId = reviewerId,
+            ReviewerName = reviewerName,
+            Action = "discontinue",
+            Comment = comment,
+            CreatedAt = DateTime.UtcNow,
+        });
+
+        await _db.SaveChangesAsync();
+        return null;
+    }
+
+    /// <summary>获取商品审核历史</summary>
+    public async Task<List<ReviewHistoryItem>> GetReviewHistoryAsync(long id)
+    {
+        var rows = await _db.ProductReviews
+            .Where(r => r.ProductId == id)
+            .OrderBy(r => r.CreatedAt)
+            .ToListAsync();
+
+        return rows.Select(r => new ReviewHistoryItem
+        {
+            ReviewId = r.ReviewId,
+            Action = r.Action,
+            ActionLabel = ActionLabels.GetValueOrDefault(r.Action, r.Action),
+            ReviewerId = r.ReviewerId,
+            ReviewerName = r.ReviewerName,
+            Comment = r.Comment,
+            CreatedAt = r.CreatedAt,
+        }).ToList();
+    }
+
+    /// <summary>商品各状态统计</summary>
+    public async Task<ProductStatsResponse> GetStatsAsync()
+    {
+        var counts = await _db.Products
+            .GroupBy(p => p.Status)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync();
+
+        var dict = counts.ToDictionary(x => x.Status, x => x.Count);
+        return new ProductStatsResponse
+        {
+            Total = counts.Sum(x => x.Count),
+            Draft = dict.GetValueOrDefault("draft"),
+            PendingReview = dict.GetValueOrDefault("pending_review"),
+            Approved = dict.GetValueOrDefault("approved"),
+            Rejected = dict.GetValueOrDefault("rejected"),
+            Active = dict.GetValueOrDefault("active"),
+            Discontinued = dict.GetValueOrDefault("discontinued"),
+        };
+    }
+
     /// <summary>删除商品（仅草稿）</summary>
     public async Task<string?> DeleteAsync(long id)
     {

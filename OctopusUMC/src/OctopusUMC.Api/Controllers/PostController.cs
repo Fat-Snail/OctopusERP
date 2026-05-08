@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using OctopusUMC.Api.Attributes;
 using OctopusUMC.Api.DTOs;
 using OctopusUMC.Core.Domain.Entities;
 using OctopusUMC.Infrastructure.Persistence;
@@ -59,6 +60,7 @@ public class PostController : ControllerBase
     }
 
     /// <summary>新增职位</summary>
+    [Log("职位管理-新增")]
     [HttpPost]
     public ApiResponse<PostResponse> Create([FromBody] CreatePostRequest req)
     {
@@ -80,6 +82,7 @@ public class PostController : ControllerBase
     }
 
     /// <summary>修改职位</summary>
+    [Log("职位管理-修改")]
     [HttpPut]
     public ApiResponse<PostResponse> Update([FromBody] UpdatePostRequest req)
     {
@@ -95,6 +98,7 @@ public class PostController : ControllerBase
     }
 
     /// <summary>批量删除职位（逗号分隔ID）</summary>
+    [Log("职位管理-删除")]
     [HttpDelete("{ids}")]
     public ApiResponse<object?> Delete(string ids)
     {

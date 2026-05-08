@@ -26,6 +26,16 @@ public class ProductController : ControllerBase
     private long GetCurrentUserId() =>
         long.Parse(User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
 
+    private (long Id, string Name) GetCurrentUserInfo()
+    {
+        var id = long.Parse(User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
+        var name = User.FindFirst("name")?.Value
+            ?? User.FindFirst("preferred_username")?.Value
+            ?? User.FindFirst(ClaimTypes.Name)?.Value
+            ?? id.ToString();
+        return (id, name);
+    }
+
     /// <summary>商品列表（分页 + 筛选）</summary>
     [HttpGet("list")]
     public async Task<IActionResult> GetList(
@@ -56,6 +66,10 @@ public class ProductController : ControllerBase
         if (req.CategoryId <= 0) return Ok(new { code = 400, msg = "请选择商品类目" });
 
         var product = await _service.CreateAsync(req, GetCurrentUserId());
+
+        if (req.VectorizeAfterSave && !string.IsNullOrEmpty(product.MainImage))
+            _ = _vector.IndexProductAsync(product.ProductId, product.MainImage, product.ProductName);
+
         return Ok(new { code = 200, msg = "创建成功", data = product });
     }
 
@@ -68,6 +82,10 @@ public class ProductController : ControllerBase
 
         var err = await _service.UpdateAsync(id, req);
         if (err != null) return Ok(new { code = 400, msg = err });
+
+        if (req.VectorizeAfterSave && !string.IsNullOrEmpty(req.MainImage))
+            _ = _vector.IndexProductAsync(id, req.MainImage, req.ProductName);
+
         return Ok(new { code = 200, msg = "修改成功" });
     }
 
@@ -99,6 +117,66 @@ public class ProductController : ControllerBase
 
         var result = await _service.ImportFrom1688Async(req.ProductJsonList, _categoryService, GetCurrentUserId());
         return Ok(new { code = 200, msg = $"导入完成：{result.Imported} 成功 / {result.Skipped} 跳过 / {result.Failed} 失败", data = result });
+    }
+
+    // ── 审核流程 ──────────────────────────────────────────────────────────────
+
+    /// <summary>商品各状态统计</summary>
+    [HttpGet("stats")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetStats()
+    {
+        var stats = await _service.GetStatsAsync();
+        return Ok(new { code = 200, msg = "ok", data = stats });
+    }
+
+    /// <summary>审核历史</summary>
+    [HttpGet("{id:long}/reviews")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetReviews(long id)
+    {
+        var history = await _service.GetReviewHistoryAsync(id);
+        return Ok(new { code = 200, msg = "ok", data = history });
+    }
+
+    /// <summary>审核通过（待审核 → 已通过）</summary>
+    [HttpPut("{id:long}/approve")]
+    public async Task<IActionResult> Approve(long id, [FromBody] ReviewActionRequest req)
+    {
+        var (uid, name) = GetCurrentUserInfo();
+        var err = await _service.ApproveAsync(id, uid, name, req.Comment);
+        if (err != null) return Ok(new { code = 400, msg = err });
+        return Ok(new { code = 200, msg = "审核通过" });
+    }
+
+    /// <summary>审核驳回（待审核 → 已驳回）</summary>
+    [HttpPut("{id:long}/reject")]
+    public async Task<IActionResult> Reject(long id, [FromBody] ReviewActionRequest req)
+    {
+        var (uid, name) = GetCurrentUserInfo();
+        var err = await _service.RejectAsync(id, uid, name, req.Comment);
+        if (err != null) return Ok(new { code = 400, msg = err });
+        return Ok(new { code = 200, msg = "已驳回" });
+    }
+
+    /// <summary>上架（已通过 → 已上架）</summary>
+    [HttpPut("{id:long}/publish")]
+    public async Task<IActionResult> Publish(long id)
+    {
+        var (uid, name) = GetCurrentUserInfo();
+        var err = await _service.PublishAsync(id, uid, name);
+        if (err != null) return Ok(new { code = 400, msg = err });
+        return Ok(new { code = 200, msg = "上架成功" });
+    }
+
+    /// <summary>下架（已上架 → 已下架）</summary>
+    [HttpPut("{id:long}/discontinue")]
+    public async Task<IActionResult> Discontinue(long id, [FromBody] ReviewActionRequest req)
+    {
+        var (uid, name) = GetCurrentUserInfo();
+        var err = await _service.DiscontinueAsync(id, uid, name, req.Comment);
+        if (err != null) return Ok(new { code = 400, msg = err });
+        return Ok(new { code = 200, msg = "下架成功" });
     }
 
     // ── 以图搜商品 ────────────────────────────────────────────────────────────

@@ -206,9 +206,82 @@ public static class PlmDbSeeder
         db.ChannelAttributeMappings.AddRange(
             new ChannelAttributeMapping { ChannelCategoryMappingId = mapPhone1688.MappingId, AttributeId = attrStorage.AttributeId, ExternalAttributeId = "storage", ExternalAttributeName = "存储容量", IsRequiredOutbound = true },
             new ChannelAttributeMapping { ChannelCategoryMappingId = mapPhone1688.MappingId, AttributeId = attrRam.AttributeId, ExternalAttributeId = "memory", ExternalAttributeName = "运行内存", IsRequiredOutbound = true },
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapPhone1688.MappingId, AttributeId = attrScreen.AttributeId, ExternalAttributeId = "screen_size", ExternalAttributeName = "屏幕尺寸", IsRequiredOutbound = false },
             new ChannelAttributeMapping { ChannelCategoryMappingId = mapTshirt1688.MappingId, AttributeId = attrColor.AttributeId, ExternalAttributeId = "color", ExternalAttributeName = "颜色", IsRequiredOutbound = true },
             new ChannelAttributeMapping { ChannelCategoryMappingId = mapTshirt1688.MappingId, AttributeId = attrSize.AttributeId, ExternalAttributeId = "size", ExternalAttributeName = "尺码", IsRequiredOutbound = true },
-            new ChannelAttributeMapping { ChannelCategoryMappingId = mapSnack1688.MappingId, AttributeId = attrShelfLife.AttributeId, ExternalAttributeId = "shelf_life", ExternalAttributeName = "保质期", IsRequiredOutbound = true }
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapTshirt1688.MappingId, AttributeId = attrFabric.AttributeId, ExternalAttributeId = "fabric_detail", ExternalAttributeName = "面料成分", IsRequiredOutbound = false },
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapSnack1688.MappingId, AttributeId = attrShelfLife.AttributeId, ExternalAttributeId = "shelf_life", ExternalAttributeName = "保质期", IsRequiredOutbound = true },
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapSnack1688.MappingId, AttributeId = attrTaste.AttributeId, ExternalAttributeId = "taste_flavor", ExternalAttributeName = "口味口感", IsRequiredOutbound = false },
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapSnack1688.MappingId, AttributeId = attrWeight.AttributeId, ExternalAttributeId = "net_weight_g", ExternalAttributeName = "净含量(g)", IsRequiredOutbound = true }
+        );
+        db.SaveChanges();
+
+        // ── 渠道种子：淘宝（B2C 消费级，属性命名以中文描述为主）──
+        var channelTaobao = new ChannelDef { ChannelCode = "taobao", ChannelName = "淘宝" };
+        db.ChannelDefs.Add(channelTaobao);
+        db.SaveChanges();
+
+        var mapPhoneTB = new ChannelCategoryMapping { ChannelId = channelTaobao.ChannelId, CategoryId = catPhone.CategoryId, ExternalCategoryId = "TB_PHONE_01", ExternalCategoryName = "手机/智能手机" };
+        var mapLaptopTB = new ChannelCategoryMapping { ChannelId = channelTaobao.ChannelId, CategoryId = catLaptop.CategoryId, ExternalCategoryId = "TB_LAPTOP_02", ExternalCategoryName = "电脑/笔记本" };
+        var mapTshirtTB = new ChannelCategoryMapping { ChannelId = channelTaobao.ChannelId, CategoryId = catTshirt.CategoryId, ExternalCategoryId = "TB_TOPS_TSHIRT", ExternalCategoryName = "上衣/T恤" };
+        var mapDressTB  = new ChannelCategoryMapping { ChannelId = channelTaobao.ChannelId, CategoryId = catDress.CategoryId,  ExternalCategoryId = "TB_DRESS_001",   ExternalCategoryName = "连衣裙/裙装" };
+        var mapSnackTB  = new ChannelCategoryMapping { ChannelId = channelTaobao.ChannelId, CategoryId = catSnack.CategoryId,  ExternalCategoryId = "TB_FOOD_SNACK",  ExternalCategoryName = "休闲食品/零食" };
+        db.ChannelCategoryMappings.AddRange(mapPhoneTB, mapLaptopTB, mapTshirtTB, mapDressTB, mapSnackTB);
+        db.SaveChanges();
+
+        db.ChannelAttributeMappings.AddRange(
+            // 手机 → 淘宝用数字枚举 ID
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapPhoneTB.MappingId, AttributeId = attrStorage.AttributeId, ExternalAttributeId = "prop_20509", ExternalAttributeName = "机身存储", IsRequiredOutbound = true },
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapPhoneTB.MappingId, AttributeId = attrRam.AttributeId,     ExternalAttributeId = "prop_20510", ExternalAttributeName = "运行内存", IsRequiredOutbound = true },
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapPhoneTB.MappingId, AttributeId = attrColor.AttributeId,   ExternalAttributeId = "prop_1627207", ExternalAttributeName = "颜色分类", IsRequiredOutbound = true },
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapPhoneTB.MappingId, AttributeId = attrScreen.AttributeId,  ExternalAttributeId = "prop_20513", ExternalAttributeName = "屏幕尺寸", IsRequiredOutbound = false },
+            // 笔记本
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapLaptopTB.MappingId, AttributeId = attrCpu.AttributeId,     ExternalAttributeId = "prop_cpu_model", ExternalAttributeName = "处理器型号", IsRequiredOutbound = true },
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapLaptopTB.MappingId, AttributeId = attrRam.AttributeId,     ExternalAttributeId = "prop_memory",    ExternalAttributeName = "内存容量", IsRequiredOutbound = true },
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapLaptopTB.MappingId, AttributeId = attrStorage.AttributeId, ExternalAttributeId = "prop_storage",   ExternalAttributeName = "硬盘容量", IsRequiredOutbound = true },
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapLaptopTB.MappingId, AttributeId = attrScreen.AttributeId,  ExternalAttributeId = "prop_screen",    ExternalAttributeName = "屏幕尺寸", IsRequiredOutbound = false },
+            // T恤
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapTshirtTB.MappingId, AttributeId = attrColor.AttributeId,  ExternalAttributeId = "prop_1627207", ExternalAttributeName = "颜色分类", IsRequiredOutbound = true },
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapTshirtTB.MappingId, AttributeId = attrSize.AttributeId,   ExternalAttributeId = "prop_20755",   ExternalAttributeName = "尺码", IsRequiredOutbound = true },
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapTshirtTB.MappingId, AttributeId = attrFabric.AttributeId, ExternalAttributeId = "prop_fabric",  ExternalAttributeName = "面料成分", IsRequiredOutbound = false },
+            // 连衣裙
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapDressTB.MappingId, AttributeId = attrColor.AttributeId, ExternalAttributeId = "prop_1627207", ExternalAttributeName = "颜色分类", IsRequiredOutbound = true },
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapDressTB.MappingId, AttributeId = attrSize.AttributeId,  ExternalAttributeId = "prop_20755",   ExternalAttributeName = "尺码", IsRequiredOutbound = true },
+            // 零食
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapSnackTB.MappingId, AttributeId = attrShelfLife.AttributeId, ExternalAttributeId = "prop_shelf_life", ExternalAttributeName = "保质期", IsRequiredOutbound = true },
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapSnackTB.MappingId, AttributeId = attrTaste.AttributeId,     ExternalAttributeId = "prop_taste",      ExternalAttributeName = "口味", IsRequiredOutbound = false },
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapSnackTB.MappingId, AttributeId = attrWeight.AttributeId,    ExternalAttributeId = "prop_net_weight", ExternalAttributeName = "净含量", IsRequiredOutbound = true }
+        );
+        db.SaveChanges();
+
+        // ── 渠道种子：抖音小店（直播电商，属性 ID 以 dy_ 前缀）──
+        var channelDouyin = new ChannelDef { ChannelCode = "douyin", ChannelName = "抖音小店" };
+        db.ChannelDefs.Add(channelDouyin);
+        db.SaveChanges();
+
+        var mapPhoneDY  = new ChannelCategoryMapping { ChannelId = channelDouyin.ChannelId, CategoryId = catPhone.CategoryId,  ExternalCategoryId = "DY_3C_PHONE",     ExternalCategoryName = "数码/手机" };
+        var mapTshirtDY = new ChannelCategoryMapping { ChannelId = channelDouyin.ChannelId, CategoryId = catTshirt.CategoryId, ExternalCategoryId = "DY_CLO_TSHIRT",   ExternalCategoryName = "服饰/T恤" };
+        var mapDressDY  = new ChannelCategoryMapping { ChannelId = channelDouyin.ChannelId, CategoryId = catDress.CategoryId,  ExternalCategoryId = "DY_CLO_DRESS",    ExternalCategoryName = "服饰/连衣裙" };
+        var mapSnackDY  = new ChannelCategoryMapping { ChannelId = channelDouyin.ChannelId, CategoryId = catSnack.CategoryId,  ExternalCategoryId = "DY_FOOD_LEISURE", ExternalCategoryName = "食品/休闲零食" };
+        db.ChannelCategoryMappings.AddRange(mapPhoneDY, mapTshirtDY, mapDressDY, mapSnackDY);
+        db.SaveChanges();
+
+        db.ChannelAttributeMappings.AddRange(
+            // 手机 → 抖音用 snake_case 字段名
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapPhoneDY.MappingId, AttributeId = attrStorage.AttributeId, ExternalAttributeId = "dy_storage_gb",  ExternalAttributeName = "存储(GB)", IsRequiredOutbound = true },
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapPhoneDY.MappingId, AttributeId = attrRam.AttributeId,     ExternalAttributeId = "dy_ram_gb",      ExternalAttributeName = "内存(GB)", IsRequiredOutbound = true },
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapPhoneDY.MappingId, AttributeId = attrColor.AttributeId,   ExternalAttributeId = "dy_color_name",  ExternalAttributeName = "颜色", IsRequiredOutbound = true },
+            // T恤
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapTshirtDY.MappingId, AttributeId = attrColor.AttributeId,  ExternalAttributeId = "dy_color_name", ExternalAttributeName = "颜色", IsRequiredOutbound = true },
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapTshirtDY.MappingId, AttributeId = attrSize.AttributeId,   ExternalAttributeId = "dy_size_std",   ExternalAttributeName = "尺码规格", IsRequiredOutbound = true },
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapTshirtDY.MappingId, AttributeId = attrFabric.AttributeId, ExternalAttributeId = "dy_material",   ExternalAttributeName = "材质工艺", IsRequiredOutbound = false },
+            // 连衣裙
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapDressDY.MappingId, AttributeId = attrColor.AttributeId, ExternalAttributeId = "dy_color_name", ExternalAttributeName = "颜色", IsRequiredOutbound = true },
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapDressDY.MappingId, AttributeId = attrSize.AttributeId,  ExternalAttributeId = "dy_size_std",   ExternalAttributeName = "尺码规格", IsRequiredOutbound = true },
+            // 零食
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapSnackDY.MappingId, AttributeId = attrShelfLife.AttributeId, ExternalAttributeId = "dy_shelf_days",  ExternalAttributeName = "保质期(天)", IsRequiredOutbound = true },
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapSnackDY.MappingId, AttributeId = attrTaste.AttributeId,     ExternalAttributeId = "dy_flavor_tag",  ExternalAttributeName = "口味标签", IsRequiredOutbound = false },
+            new ChannelAttributeMapping { ChannelCategoryMappingId = mapSnackDY.MappingId, AttributeId = attrWeight.AttributeId,    ExternalAttributeId = "dy_weight_gram", ExternalAttributeName = "重量(g)", IsRequiredOutbound = true }
         );
 
         db.SaveChanges();

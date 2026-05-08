@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using OctopusUMC.Api.Attributes;
 using OctopusUMC.Api.DTOs;
 using OctopusUMC.Core.Domain.Entities;
 using OctopusUMC.Infrastructure.Persistence;
@@ -62,6 +63,8 @@ public class RoleController : ControllerBase
     }
 
     /// <summary>新增角色</summary>
+    [HasPermission("system:role:add")]
+    [Log("角色管理-新增")]
     [HttpPost]
     public ApiResponse<RoleResponse> Create([FromBody] CreateRoleRequest req)
     {
@@ -90,6 +93,8 @@ public class RoleController : ControllerBase
     }
 
     /// <summary>修改角色</summary>
+    [HasPermission("system:role:edit")]
+    [Log("角色管理-修改")]
     [HttpPut]
     public ApiResponse<RoleResponse> Update([FromBody] UpdateRoleRequest req)
     {
@@ -113,6 +118,8 @@ public class RoleController : ControllerBase
     }
 
     /// <summary>批量删除角色（逗号分隔ID）</summary>
+    [HasPermission("system:role:delete")]
+    [Log("角色管理-删除")]
     [HttpDelete("{ids}")]
     public ApiResponse<object?> Delete(string ids)
     {

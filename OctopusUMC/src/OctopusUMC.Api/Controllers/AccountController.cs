@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using OctopusUMC.Api.DTOs;
 using OctopusUMC.Infrastructure.Persistence;
 using System.Security.Claims;
@@ -19,6 +20,7 @@ public class AccountController : ControllerBase
     /// <summary>登录（颁发 Cookie）</summary>
     [HttpPost("login")]
     [AllowAnonymous]
+    [EnableRateLimiting("login")]
     public async Task<ApiResponse<LoginResponse>> Login([FromBody] LoginRequest request)
     {
         var user = _context.Users.FirstOrDefault(u => u.UserName == request.UserName);
@@ -32,12 +34,35 @@ public class AccountController : ControllerBase
         var roleIds = _context.UserRoles.Where(ur => ur.UserId == user.UserId).Select(ur => ur.RoleId).ToList();
         var userRoles = _context.Roles.Where(r => roleIds.Contains(r.RoleId)).ToList();
 
+        // 计算权限标识（通过 RoleMenu 关联表）
+        var permissions = new List<string>();
+        if (userRoles.Any(r => r.RoleKey == "admin"))
+        {
+            permissions.Add("*:*:*");
+        }
+        else
+        {
+            var roleIdList = userRoles.Select(r => r.RoleId).ToList();
+            var menuIds = _context.RoleMenus
+                .Where(rm => roleIdList.Contains(rm.RoleId))
+                .Select(rm => rm.MenuId)
+                .Distinct()
+                .ToList();
+            permissions = _context.Menus
+                .Where(m => menuIds.Contains(m.MenuId) && m.MenuType == "F" && m.Permission != null && m.Permission != "")
+                .Select(m => m.Permission!)
+                .Distinct()
+                .ToList();
+        }
+
+        // 将权限写入 Cookie Claims，供 HasPermissionAttribute 直接读取（零 DB 开销）
         var claims = new List<Claim>
         {
             new(ClaimTypes.NameIdentifier, user.UserId.ToString()),
             new(ClaimTypes.Name, user.UserName),
         };
         foreach (var role in userRoles) claims.Add(new(ClaimTypes.Role, role.RoleKey));
+        foreach (var perm in permissions) claims.Add(new("permission", perm));
 
         var identity = new ClaimsIdentity(claims, "Cookies");
         await HttpContext.SignInAsync("Cookies", new ClaimsPrincipal(identity));
@@ -55,27 +80,6 @@ public class AccountController : ControllerBase
             LoginTime = DateTime.UtcNow
         });
         _context.SaveChanges();
-
-        // 计算权限标识（通过 RoleMenu 关联表）
-        var permissions = new List<string>();
-        if (userRoles.Any(r => r.RoleKey == "admin"))
-        {
-            permissions.Add("*:*:*"); // 超级管理员拥有所有权限
-        }
-        else
-        {
-            var roleIdList = userRoles.Select(r => r.RoleId).ToList();
-            var menuIds = _context.RoleMenus
-                .Where(rm => roleIdList.Contains(rm.RoleId))
-                .Select(rm => rm.MenuId)
-                .Distinct()
-                .ToList();
-            permissions = _context.Menus
-                .Where(m => menuIds.Contains(m.MenuId) && m.MenuType == "F" && m.Permission != null && m.Permission != "")
-                .Select(m => m.Permission!)
-                .Distinct()
-                .ToList();
-        }
 
         return ApiResponse<LoginResponse>.Success(new LoginResponse
         {

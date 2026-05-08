@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using OctopusUMC.Api.Attributes;
 using OctopusUMC.Api.DTOs;
 using OctopusUMC.Api.Services;
 using OctopusUMC.Core.Domain.Entities;
@@ -91,6 +92,8 @@ public class DeptController : ControllerBase
     }
 
     /// <summary>新增部门</summary>
+    [HasPermission("system:dept:add")]
+    [Log("部门管理-新增")]
     [HttpPost]
     public ApiResponse<DeptResponse> Create([FromBody] CreateDeptRequest req)
     {
@@ -109,6 +112,8 @@ public class DeptController : ControllerBase
     }
 
     /// <summary>修改部门</summary>
+    [HasPermission("system:dept:edit")]
+    [Log("部门管理-修改")]
     [HttpPut]
     public ApiResponse<DeptResponse> Update([FromBody] UpdateDeptRequest req)
     {
@@ -124,6 +129,8 @@ public class DeptController : ControllerBase
     }
 
     /// <summary>删除部门（有子部门或用户时不允许删除）</summary>
+    [HasPermission("system:dept:delete")]
+    [Log("部门管理-删除")]
     [HttpDelete("{id:long}")]
     public ApiResponse<object?> Delete(long id)
     {

@@ -1,5 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
+using OctopusUMC.Api.Attributes;
 using OctopusUMC.Api.DTOs;
+using OctopusUMC.Api.Hubs;
 using OctopusUMC.Api.Services;
 using OctopusUMC.Core.Domain.Entities;
 using OctopusUMC.Infrastructure.Persistence;
@@ -14,10 +17,12 @@ public class NoticeController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly NoticeSyncService _syncService;
-    public NoticeController(ApplicationDbContext context, NoticeSyncService syncService)
+    private readonly IHubContext<OnlineUserHub> _hubContext;
+    public NoticeController(ApplicationDbContext context, NoticeSyncService syncService, IHubContext<OnlineUserHub> hubContext)
     {
         _context = context;
         _syncService = syncService;
+        _hubContext = hubContext;
     }
 
     private void PushSync(Notice n, string action = "upsert")
@@ -80,6 +85,7 @@ public class NoticeController : ControllerBase
     }
 
     /// <summary>新增公告</summary>
+    [Log("公告管理-新增")]
     [HttpPost]
     public ApiResponse<NoticeResponse> Create([FromBody] CreateNoticeRequest req)
     {
@@ -97,10 +103,13 @@ public class NoticeController : ControllerBase
         _context.Notices.Add(notice);
         _context.SaveChanges();
         PushSync(notice);
+        if (notice.Status == 0)
+            _ = _hubContext.Clients.All.SendAsync("NewNotice", MapNotice(notice));
         return ApiResponse<NoticeResponse>.Success(MapNotice(notice), "新增成功");
     }
 
     /// <summary>修改公告</summary>
+    [Log("公告管理-修改")]
     [HttpPut]
     public ApiResponse<NoticeResponse> Update([FromBody] UpdateNoticeRequest req)
     {
@@ -113,10 +122,13 @@ public class NoticeController : ControllerBase
         n.Remark = req.Remark;
         _context.SaveChanges();
         PushSync(n);
+        if (n.Status == 0)
+            _ = _hubContext.Clients.All.SendAsync("NewNotice", MapNotice(n));
         return ApiResponse<NoticeResponse>.Success(MapNotice(n), "修改成功");
     }
 
     /// <summary>批量删除公告（逗号分隔ID）</summary>
+    [Log("公告管理-删除")]
     [HttpDelete("{ids}")]
     public ApiResponse<object?> Delete(string ids)
     {

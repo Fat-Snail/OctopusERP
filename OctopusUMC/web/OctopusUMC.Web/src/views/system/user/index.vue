@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { Search, RefreshCw, Plus, Trash2, Edit, KeyRound } from 'lucide-vue-next'
+import { Search, RefreshCw, Plus, Trash2, Edit, KeyRound, Download, Upload } from 'lucide-vue-next'
 import { get, post, put, del } from '@/utils/http'
 import type { UserResponse, DeptResponse, RoleResponse, PostResponse } from '@/api/system/types'
 import type { PagedResult } from '@/api/types'
@@ -180,6 +180,49 @@ async function handleResetPwd() {
   resetPwdOpen.value = false
 }
 
+function handleExport() {
+  const params = new URLSearchParams()
+  if (query.userName) params.set('userName', query.userName)
+  if (query.phoneNumber) params.set('phoneNumber', query.phoneNumber)
+  if (query.status !== undefined) params.set('status', String(query.status))
+  if (query.deptId !== undefined) params.set('deptId', String(query.deptId))
+  const BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5001'
+  window.open(`${BASE}/api/system/user/export?${params.toString()}`, '_blank')
+}
+
+function handleDownloadTemplate() {
+  const BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5001'
+  window.open(`${BASE}/api/system/user/importTemplate`, '_blank')
+}
+
+const importFile = ref<File | null>(null)
+const importLoading = ref(false)
+const importDialogOpen = ref(false)
+const importResult = ref('')
+
+async function handleImport() {
+  if (!importFile.value) return
+  importLoading.value = true
+  importResult.value = ''
+  try {
+    const form = new FormData()
+    form.append('file', importFile.value)
+    const result = await post<{ successCount: number; failCount: number; failMessages: string[] }>(
+      '/system/user/import', form
+    )
+    importResult.value = `成功 ${result.successCount} 条，失败 ${result.failCount} 条`
+    if (result.failMessages?.length) {
+      importResult.value += '\n' + result.failMessages.join('\n')
+    }
+    loadUsers()
+  } catch {
+    importResult.value = '导入失败，请检查文件格式'
+  } finally {
+    importLoading.value = false
+    importFile.value = null
+  }
+}
+
 // Flatten dept tree for rendering
 function flattenDepts(nodes: DeptResponse[], depth = 0): Array<DeptResponse & { depth: number }> {
   const result: Array<DeptResponse & { depth: number }> = []
@@ -282,6 +325,18 @@ onMounted(() => {
           @click="handleBatchDelete"
         >
           <Trash2 :size="12" /> 删除
+        </button>
+        <button
+          class="h-7 px-3 bg-muted text-foreground text-[12px] rounded-[var(--radius)] flex items-center gap-1.5 hover:bg-muted/80 cursor-pointer border border-border"
+          @click="handleExport"
+        >
+          <Download :size="12" /> 导出
+        </button>
+        <button
+          class="h-7 px-3 bg-muted text-foreground text-[12px] rounded-[var(--radius)] flex items-center gap-1.5 hover:bg-muted/80 cursor-pointer border border-border"
+          @click="importDialogOpen = true"
+        >
+          <Upload :size="12" /> 导入
         </button>
       </div>
 
@@ -487,6 +542,44 @@ onMounted(() => {
       <DialogFooter>
         <button class="h-8 px-4 bg-muted text-foreground text-[12px] rounded-[var(--radius)] hover:bg-muted/80 cursor-pointer border border-border" @click="resetPwdOpen = false">取消</button>
         <button class="h-8 px-4 bg-primary text-primary-foreground text-[12px] rounded-[var(--radius)] hover:opacity-90 cursor-pointer border-0" @click="handleResetPwd">确定</button>
+      </DialogFooter>
+    </DialogContent>
+  </Dialog>
+
+  <!-- Import dialog -->
+  <Dialog v-model:open="importDialogOpen">
+    <DialogContent class="w-[460px]">
+      <DialogHeader>
+        <DialogTitle>批量导入用户</DialogTitle>
+      </DialogHeader>
+      <div class="space-y-4 py-2">
+        <div class="flex items-center gap-2">
+          <span class="text-[12px] text-muted-foreground">先下载模板，填写后上传：</span>
+          <button
+            class="h-7 px-3 bg-muted text-foreground text-[12px] rounded-[var(--radius)] flex items-center gap-1.5 hover:bg-muted/80 cursor-pointer border border-border"
+            @click="handleDownloadTemplate"
+          >
+            <Download :size="12" /> 下载模板
+          </button>
+        </div>
+        <div>
+          <label class="block text-[12px] font-medium text-foreground mb-1">选择 Excel 文件</label>
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            class="block w-full text-[12px] text-muted-foreground file:mr-3 file:h-7 file:px-3 file:rounded-[var(--radius)] file:border file:border-border file:bg-muted file:text-foreground file:text-[12px] file:cursor-pointer"
+            @change="e => { const f = (e.target as HTMLInputElement).files?.[0]; importFile = f ?? null }"
+          />
+        </div>
+        <pre v-if="importResult" class="text-[12px] text-foreground bg-subtle rounded-[var(--radius)] p-3 whitespace-pre-wrap max-h-[140px] overflow-y-auto">{{ importResult }}</pre>
+      </div>
+      <DialogFooter>
+        <button class="h-8 px-4 bg-muted text-foreground text-[12px] rounded-[var(--radius)] hover:bg-muted/80 cursor-pointer border border-border" @click="importDialogOpen = false; importResult = ''">关闭</button>
+        <button
+          :disabled="!importFile || importLoading"
+          class="h-8 px-4 bg-primary text-primary-foreground text-[12px] rounded-[var(--radius)] hover:opacity-90 disabled:opacity-50 cursor-pointer border-0"
+          @click="handleImport"
+        >{{ importLoading ? '导入中...' : '开始导入' }}</button>
       </DialogFooter>
     </DialogContent>
   </Dialog>

@@ -165,6 +165,28 @@ public class InMemoryDataStore
             PostLogoutRedirectUris = new() { "http://localhost:5174" },
             Status = 1,
             CreatedAt = DateTime.UtcNow.AddDays(-30)
+        },
+        new OidcClient
+        {
+            Id = "plm-client-001",
+            ClientId = "octopus-plm-web",
+            ClientName = "OctopusPLM Web",
+            ClientType = "public",
+            RedirectUris = new() { "http://localhost:5175/callback" },
+            PostLogoutRedirectUris = new() { "http://localhost:5175" },
+            Status = 1,
+            CreatedAt = DateTime.UtcNow.AddDays(-30)
+        },
+        new OidcClient
+        {
+            Id = "crm-client-001",
+            ClientId = "octopus-crm-web",
+            ClientName = "OctopusCRM Web",
+            ClientType = "public",
+            RedirectUris = new() { "http://localhost:5176/callback" },
+            PostLogoutRedirectUris = new() { "http://localhost:5176" },
+            Status = 1,
+            CreatedAt = DateTime.UtcNow.AddDays(-30)
         }
     };
 

@@ -71,6 +71,8 @@ using (var scope = app.Services.CreateScope())
     OaDbSeeder.Seed(db);
 }
 
+app.UseMiddleware<OctopusOA.Api.Middleware.GlobalExceptionMiddleware>();
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
 app.UseCors("OctopusPolicy");
 app.UseSwagger();
 app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "OctopusOA v1"));

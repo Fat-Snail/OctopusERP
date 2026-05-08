@@ -29,7 +29,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Content Include="Models\clip_vision.onnx">
+    <Content Include="Models\clip_vision.onnx" Condition="Exists('Models\clip_vision.onnx')">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

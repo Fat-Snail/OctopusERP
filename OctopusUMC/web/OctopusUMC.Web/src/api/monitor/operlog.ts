@@ -1,6 +1,6 @@
 import { get, del } from '@/utils/http'
 import type { PagedResult, PageQuery } from '../types'
-import type { OperlogResponse, LoginfoResponse, ServerInfo } from './types'
+import type { OperlogResponse, LoginfoResponse, ServerInfo, DashboardSummary } from './types'
 
 interface OperlogQuery extends PageQuery {
   title?: string
@@ -36,4 +36,9 @@ export function cleanLogininfor() {
 /** GET /api/monitor/server — 服务器信息 */
 export function getServerInfo() {
   return get<ServerInfo>('/monitor/server')
+}
+
+/** GET /api/monitor/dashboard — 工作台概览 */
+export function getDashboardSummary() {
+  return get<DashboardSummary>('/monitor/dashboard')
 }

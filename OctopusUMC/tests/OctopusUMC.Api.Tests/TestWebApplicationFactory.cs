@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
@@ -44,6 +45,20 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             db.Database.EnsureCreated();
             DbSeeder.Seed(db);
+
+            // 替换认证方案：测试环境用 TestAuthHandler，默认以 admin 身份认证
+            var authDescriptors = services
+                .Where(s => s.ServiceType == typeof(IAuthenticationSchemeProvider) ||
+                            s.ServiceType == typeof(IAuthenticationHandlerProvider) ||
+                            s.ServiceType.FullName?.StartsWith("Microsoft.AspNetCore.Authentication") == true)
+                .ToList();
+
+            services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = "TestAuth";
+                options.DefaultChallengeScheme = "TestAuth";
+            })
+            .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("TestAuth", null);
         });
 
         builder.ConfigureLogging(logging =>
