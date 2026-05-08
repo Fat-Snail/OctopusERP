@@ -64,6 +64,7 @@ builder.Services.AddScoped<OctopusPLM.Api.Services.ChannelService>();
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<OctopusPLM.Api.Services.VectorService>();
 builder.Services.AddSingleton<OctopusPLM.Api.Services.ModelDownloadService>();
+builder.Services.AddSingleton<OctopusPLM.Api.Services.VectorScanService>();
 
 var app = builder.Build();
 

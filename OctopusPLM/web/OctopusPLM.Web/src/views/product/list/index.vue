@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, h, computed } from 'vue'
+import { ref, onMounted, onUnmounted, h, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import {
   useVueTable,
@@ -10,6 +10,7 @@ import {
 import {
   Plus, Pencil, Trash2, SendHorizontal, ScanSearch,
   CheckCircle2, XCircle, Upload, ArrowDownToLine, FileText, Loader2,
+  Database, X,
 } from 'lucide-vue-next'
 import ButtonVue from '@/components/ui/button.vue'
 import InputVue from '@/components/ui/input.vue'
@@ -334,6 +335,56 @@ function openImportDialog() {
   importResult.value = null
 }
 
+// ── Vector scan ───────────────────────────────────────────────────────────────
+interface ScanStatus {
+  state: 'idle' | 'scanning' | 'done' | 'error'
+  total: number
+  processed: number
+  success: number
+  fail: number
+  error: string | null
+}
+
+const scanVisible = ref(false)
+const scanStatus = ref<ScanStatus>({ state: 'idle', total: 0, processed: 0, success: 0, fail: 0, error: null })
+let scanEs: EventSource | null = null
+
+function closeScanPanel() {
+  scanEs?.close()
+  scanEs = null
+  scanVisible.value = false
+}
+
+function startScanSSE() {
+  scanEs?.close()
+  scanEs = new EventSource('/api/vector/scan/stream')
+  scanEs.onmessage = (e: MessageEvent) => {
+    const data = JSON.parse(e.data as string) as ScanStatus
+    scanStatus.value = data
+    if (data.state === 'done' || data.state === 'error') {
+      scanEs?.close()
+      scanEs = null
+    }
+  }
+  scanEs.onerror = () => { scanEs?.close(); scanEs = null }
+}
+
+async function handleScanAll() {
+  scanStatus.value = { state: 'idle', total: 0, processed: 0, success: 0, fail: 0, error: null }
+  scanVisible.value = true
+  const res = await fetch('/api/vector/scan/start', { method: 'POST' })
+  const body = await res.json() as { code: number; msg: string }
+  if (body.code === 409) {
+    // already running, just attach SSE
+  } else if (body.code !== 200) {
+    scanStatus.value = { ...scanStatus.value, state: 'error', error: body.msg }
+    return
+  }
+  startScanSSE()
+}
+
+onUnmounted(() => { scanEs?.close() })
+
 onMounted(() => { loadData(); loadStats() })
 </script>
 
@@ -376,6 +427,10 @@ onMounted(() => { loadData(); loadStats() })
       <ButtonVue variant="outline" size="sm" @click="router.push('/plm/product/image-search')">
         <ScanSearch :size="13" />
         以图搜商品
+      </ButtonVue>
+      <ButtonVue variant="outline" size="sm" @click="handleScanAll">
+        <Database :size="13" />
+        一键向量化
       </ButtonVue>
       <ButtonVue variant="outline" size="sm" @click="openImportDialog">
         <FileText :size="13" />
@@ -633,6 +688,79 @@ onMounted(() => { loadData(); loadStats() })
               {{ reviewDialog.loading ? '处理中...' : '确认' }}
             </ButtonVue>
           </div>
+        </div>
+      </div>
+    </Teleport>
+
+    <!-- Vector scan progress panel -->
+    <Teleport to="body">
+      <div
+        v-if="scanVisible"
+        class="fixed bottom-6 right-6 z-50 w-[340px] bg-card border border-border rounded-[var(--radius-lg)] shadow-xl p-4 space-y-3"
+      >
+        <!-- Header -->
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2 text-[13px] font-semibold">
+            <Database :size="14" class="text-primary" />
+            一键向量化
+          </div>
+          <button
+            v-if="scanStatus.state !== 'scanning'"
+            class="text-muted-foreground hover:text-foreground cursor-pointer border-0 bg-transparent p-0"
+            @click="closeScanPanel"
+          >
+            <X :size="14" />
+          </button>
+        </div>
+
+        <!-- Idle -->
+        <p v-if="scanStatus.state === 'idle'" class="text-[12px] text-muted-foreground">
+          正在连接，请稍候...
+        </p>
+
+        <!-- Scanning -->
+        <template v-else-if="scanStatus.state === 'scanning'">
+          <div class="flex items-center justify-between text-[12px]">
+            <span class="text-muted-foreground flex items-center gap-1.5">
+              <Loader2 :size="12" class="animate-spin" />
+              正在处理...
+            </span>
+            <span class="font-mono-tnum text-foreground">
+              {{ scanStatus.processed }} / {{ scanStatus.total }}
+            </span>
+          </div>
+          <div class="h-1.5 rounded-full bg-muted overflow-hidden">
+            <div
+              class="h-full rounded-full bg-primary transition-all duration-300"
+              :style="{ width: (scanStatus.total > 0 ? scanStatus.processed / scanStatus.total * 100 : 0) + '%' }"
+            />
+          </div>
+          <div class="flex gap-4 text-[11px] text-muted-foreground">
+            <span class="text-success">✓ {{ scanStatus.success }} 成功</span>
+            <span v-if="scanStatus.fail > 0" class="text-danger">✗ {{ scanStatus.fail }} 失败</span>
+          </div>
+        </template>
+
+        <!-- Done -->
+        <template v-else-if="scanStatus.state === 'done'">
+          <div class="flex items-center gap-2 text-[12px]">
+            <CheckCircle2 :size="14" class="text-success shrink-0" />
+            <span class="text-foreground">
+              扫描完成：<span class="font-medium text-success">{{ scanStatus.success }}</span> 成功
+              <template v-if="scanStatus.fail > 0">
+                / <span class="font-medium text-danger">{{ scanStatus.fail }}</span> 失败
+              </template>
+            </span>
+          </div>
+          <div class="h-1.5 rounded-full bg-success/20">
+            <div class="h-full rounded-full bg-success" style="width: 100%" />
+          </div>
+        </template>
+
+        <!-- Error -->
+        <div v-else-if="scanStatus.state === 'error'" class="flex items-start gap-2 text-[12px]">
+          <XCircle :size="14" class="text-danger shrink-0 mt-0.5" />
+          <span class="text-danger">{{ scanStatus.error || '扫描失败' }}</span>
         </div>
       </div>
     </Teleport>
