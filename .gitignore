@@ -33,6 +33,13 @@ logs/
 *.db
 *.sqlite
 *.sqlite3
+# SQLite临时文件
+*.db-shm
+*.db-wal
+*.db-journal
+*.sqlite-shm
+*.sqlite-wal
+*.sqlite-journal
 
 # 临时文件
 temp/

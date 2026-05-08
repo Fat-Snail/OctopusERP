@@ -1,74 +1,37 @@
-import { getPluginsList } from "./build/plugins";
-import { include, exclude } from "./build/optimize";
-import { type UserConfigExport, type ConfigEnv, loadEnv } from "vite";
-import {
-  root,
-  alias,
-  wrapperEnv,
-  pathResolve,
-  __APP_INFO__
-} from "./build/utils";
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import vueJsx from '@vitejs/plugin-vue-jsx'
+import tailwindcss from '@tailwindcss/vite'
+import { resolve } from 'path'
+import { readFileSync } from 'fs'
 
-export default ({ mode }: ConfigEnv): UserConfigExport => {
-  const { VITE_CDN, VITE_PORT, VITE_COMPRESSION, VITE_PUBLIC_PATH } =
-    wrapperEnv(loadEnv(mode, root));
-  return {
-    base: VITE_PUBLIC_PATH,
-    root,
-    resolve: {
-      alias
-    },
-    // 服务端渲染
-    server: {
-      // 端口号
-      port: parseInt(process.env['PORT'] ?? String(VITE_PORT)),
-      host: "0.0.0.0",
-      // 本地跨域代理 https://cn.vitejs.dev/config/server-options.html#server-proxy
-      // 将所有 /api/* 请求转发到 PLM 后端（Aspire 保证 plm-api 在端口 5003）
-      proxy: {
-        "/api": {
-          target: "http://localhost:5003",
-          changeOrigin: true
-        },
-        "/uploads": {
-          target: "http://localhost:5003",
-          changeOrigin: true
-        }
+const pkg = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf-8')) as { version: string }
+
+export default defineConfig({
+  plugins: [
+    vue(),
+    vueJsx(),
+    tailwindcss(),
+  ],
+  resolve: {
+    alias: { '@': resolve(__dirname, 'src') }
+  },
+  define: {
+    __APP_VERSION__: JSON.stringify(`v${pkg.version}`),
+    __BUILD_DATE__: JSON.stringify(new Date().toISOString().slice(0, 10)),
+  },
+  server: {
+    port: parseInt(process.env['PORT'] ?? '5175'),
+    host: "0.0.0.0",
+    proxy: {
+      '/api': {
+        target: 'http://localhost:5003',
+        changeOrigin: true,
       },
-      // 预热文件以提前转换和缓存结果，降低启动期间的初始页面加载时长并防止转换瀑布
-      warmup: {
-        clientFiles: ["./index.html", "./src/{views,components}/*"]
+      '/uploads': {
+        target: 'http://localhost:5003',
+        changeOrigin: true,
       }
-    },
-    plugins: getPluginsList(VITE_CDN, VITE_COMPRESSION),
-    // https://cn.vitejs.dev/config/dep-optimization-options.html#dep-optimization-options
-    optimizeDeps: {
-      include,
-      exclude
-    },
-    build: {
-      // https://cn.vitejs.dev/guide/build.html#browser-compatibility
-      target: "es2015",
-      sourcemap: false,
-      // 消除打包大小超过500kb警告
-      chunkSizeWarningLimit: 4000,
-      rollupOptions: {
-        input: {
-          index: pathResolve("./index.html", import.meta.url)
-        },
-        // 静态资源分类打包
-        output: {
-          chunkFileNames: "static/js/[name]-[hash].js",
-          entryFileNames: "static/js/[name]-[hash].js",
-          assetFileNames: "static/[ext]/[name]-[hash].[ext]"
-        }
-      }
-    },
-    define: {
-      __INTLIFY_PROD_DEVTOOLS__: false,
-      __APP_INFO__: JSON.stringify(__APP_INFO__),
-      __APP_VERSION__: JSON.stringify(`v${__APP_INFO__.pkg.version}`),
-      __BUILD_DATE__: JSON.stringify(__APP_INFO__.lastBuildTime.slice(0, 10)),
     }
-  };
-};
+  }
+})
