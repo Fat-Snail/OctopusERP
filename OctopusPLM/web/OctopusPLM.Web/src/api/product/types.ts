@@ -48,6 +48,17 @@ export interface SkuResponse {
   status: number
 }
 
+export interface ProductModelVersionInfo {
+  modelVersionId: number
+  versionNo: string
+  status: string
+  createdByName: string | null
+  publishedByName: string | null
+  publishedAt: string | null
+  effectiveFrom: string
+  changeSummary: string | null
+}
+
 export interface ProductResponse {
   productId: number
   categoryId: number
@@ -64,6 +75,8 @@ export interface ProductResponse {
   createdAt: string
   updatedAt: string
   skus: SkuResponse[]
+  reviews: ReviewHistoryItem[]
+  modelVersionInfo: ProductModelVersionInfo | null
 }
 
 export interface ProductListRow {
@@ -78,8 +91,23 @@ export interface ProductListRow {
   minPrice: number
   maxPrice: number
   totalStock: number
+  skuCount: number
+  createdByName: string
+  sourceChannel: string | null
   createdAt: string
   updatedAt: string
+}
+
+export interface ProductListQuery {
+  page?: number
+  size?: number
+  keyword?: string
+  categoryId?: number
+  status?: string
+  minPrice?: number
+  maxPrice?: number
+  createdFrom?: string
+  createdTo?: string
 }
 
 export interface ProductListResult {

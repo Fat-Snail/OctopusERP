@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
-import { TrendingUp, Clock, Target, AlertTriangle, CheckCircle, RefreshCw } from 'lucide-vue-next'
+import { TrendingUp, Clock, Target, AlertTriangle, CheckCircle, RefreshCw } from '@lucide/vue'
 import PageHeader from '@/components/app/PageHeader.vue'
 import {
   getBiEfficiency,

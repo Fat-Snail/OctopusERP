@@ -51,6 +51,8 @@ public class CategoryService
                 PublishedAt = v.PublishedAt,
                 PublishedBy = v.PublishedBy,
                 ChangeSummary = v.ChangeSummary,
+                CreatedByName = v.CreatedByName,
+                PublishedByName = v.PublishedByName,
             })
             .ToListAsync();
     }
@@ -272,9 +274,12 @@ public class CategoryService
         if (hasChildren) return "该类目下有子类目，请先删除子类目";
         var hasProducts = await _db.Products.AnyAsync(p => p.CategoryId == id);
         if (hasProducts) return "该类目下有商品，无法删除";
+        var templates = await _db.CategoryBomTemplates.Where(x => x.CategoryId == id).ToListAsync();
+        if (templates.Any(x => x.Status != "draft")) return "该类目存在已发布 BOM 模板，无法删除";
 
         var cat = await _db.Categories.FindAsync(id);
         if (cat == null) return "类目不存在";
+        _db.CategoryBomTemplates.RemoveRange(templates);
         _db.Categories.Remove(cat);
         await _db.SaveChangesAsync();
         return null;
@@ -367,7 +372,7 @@ public class CategoryService
         => await GetGroupedAttributesAsync(categoryId, versionId);
 
     /// <summary>新建草稿版本，克隆 active 版本的属性绑定</summary>
-    public async Task<(Core.Entities.CategoryModelVersion? Version, string? Error)> CreateModelVersionAsync(long categoryId, string? changeSummary)
+    public async Task<(Core.Entities.CategoryModelVersion? Version, string? Error)> CreateModelVersionAsync(long categoryId, string? changeSummary, string? createdByName = null)
     {
         if (await _db.Categories.FindAsync(categoryId) == null) return (null, "类目不存在");
 
@@ -392,6 +397,7 @@ public class CategoryService
             Status = "draft",
             EffectiveFrom = DateTime.UtcNow,
             ChangeSummary = changeSummary,
+            CreatedByName = createdByName,
             CreatedAt = DateTime.UtcNow,
             UpdatedAt = DateTime.UtcNow,
         };
@@ -439,7 +445,7 @@ public class CategoryService
     }
 
     /// <summary>发布草稿版本，归档旧 active 版</summary>
-    public async Task<string?> PublishModelVersionAsync(long categoryId, long versionId)
+    public async Task<string?> PublishModelVersionAsync(long categoryId, long versionId, long publishedBy = 0, string? publishedByName = null)
     {
         var version = await _db.CategoryModelVersions.FindAsync(versionId);
         if (version == null || version.CategoryId != categoryId) return "版本不存在";
@@ -453,6 +459,8 @@ public class CategoryService
         version.Status = "active";
         version.PublishedAt = DateTime.UtcNow;
         version.EffectiveFrom = DateTime.UtcNow;
+        if (publishedBy > 0) version.PublishedBy = publishedBy;
+        if (publishedByName != null) version.PublishedByName = publishedByName;
         await _db.SaveChangesAsync();
         return null;
     }

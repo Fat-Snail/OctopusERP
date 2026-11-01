@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { Users, TrendingUp, Bell, UserCheck } from 'lucide-vue-next'
+import { Users, TrendingUp, Bell, UserCheck } from '@lucide/vue'
 import { useUserStore } from '@/store/modules/user'
 import { getDashboardSummary, getOperlogList, getLogininforList } from '@/api/monitor/operlog'
 import { getNoticeList } from '@/api/system/notice'

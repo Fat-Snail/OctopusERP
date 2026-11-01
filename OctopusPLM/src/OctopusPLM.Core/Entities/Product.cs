@@ -29,6 +29,14 @@ public class Product
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+    // 服装行业字段（其它行业留空即可）
+    /// <summary>季节编码: 22SS=22春夏 / 22FW=22秋冬</summary>
+    public string? SeasonCode { get; set; }
+    /// <summary>款式编码(LB5210100/LA5400200)，服装行业 PLM 主键之一</summary>
+    public string? StyleCode { get; set; }
+    /// <summary>系列: 经典 / 新锐</summary>
+    public string? Series { get; set; }
+
     public Category? Category { get; set; }
     public CategoryModelVersion? ModelVersion { get; set; }
     public List<ProductImage> Images { get; set; } = new();

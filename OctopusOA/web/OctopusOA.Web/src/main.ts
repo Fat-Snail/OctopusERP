@@ -7,7 +7,7 @@ import './styles/globals.css'
 async function bootstrap() {
   if (import.meta.env.DEV) {
     const { worker } = await import('./mock/index')
-    await worker.start({ onUnhandledRequest: 'bypass' })
+    await worker.start({ onUnhandledFrame: 'bypass' })
   }
 
   const app = createApp(App)

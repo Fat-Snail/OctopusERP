@@ -20,6 +20,15 @@ public class UserResponse
     public List<string> Roles { get; set; } = new();
     public DateTime CreateTime { get; set; }
     public string? Remark { get; set; }
+
+    /// <summary>employee | customer | partner（ADR-010）</summary>
+    public string UserType { get; set; } = "employee";
+
+    /// <summary>umc | retail</summary>
+    public string Source { get; set; } = "umc";
+
+    /// <summary>对应 Keycloak 用户 id</summary>
+    public string? KcSub { get; set; }
 }
 
 /// <summary>创建用户请求</summary>
@@ -66,4 +75,29 @@ public class UpdateStatusRequest
 {
     public long UserId { get; set; }
     public int Status { get; set; }
+}
+
+/// <summary>内部接口：零售域建号（ADR-010）</summary>
+public class InternalCreateUserRequest
+{
+    public string UserName { get; set; } = string.Empty;
+    public string? NickName { get; set; }
+    public string? Email { get; set; }
+    public string? PhoneNumber { get; set; }
+    public string Password { get; set; } = string.Empty;
+    /// <summary>默认 retail</summary>
+    public string? Source { get; set; }
+}
+
+/// <summary>内部接口：接管已在 Keycloak 存在的存量用户</summary>
+public class InternalAdoptUserRequest
+{
+    public string UserName { get; set; } = string.Empty;
+    public string KcSub { get; set; } = string.Empty;
+    public string? NickName { get; set; }
+    public string? Email { get; set; }
+    public string? PhoneNumber { get; set; }
+    public string? UserType { get; set; }
+    public string? Source { get; set; }
+    public int Status { get; set; } = 1;
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Briefcase, ArrowRight } from 'lucide-vue-next'
+import { Briefcase, ArrowRight } from '@lucide/vue'
 import { oidcService } from '@/services/oidcService'
 
 function handleSSOLogin() {
@@ -8,8 +8,8 @@ function handleSSOLogin() {
 </script>
 
 <template>
-  <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-[oklch(0.96_0.03_250)] to-[oklch(0.97_0.02_220)]">
-    <div class="w-[400px] bg-card border border-border rounded-[var(--radius-lg)] shadow-sm p-8">
+  <div class="min-h-screen flex items-center justify-center bg-gradient-to-br from-[oklch(0.96_0.03_250)] to-[oklch(0.97_0.02_220)] px-4">
+    <div class="w-full max-w-[400px] bg-card border border-border rounded-[var(--radius-lg)] shadow-sm p-8">
       <!-- Logo + title -->
       <div class="text-center mb-8">
         <div class="w-14 h-14 bg-primary rounded-xl flex items-center justify-center mx-auto mb-4">

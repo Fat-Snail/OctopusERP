@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ExternalLink } from 'lucide-vue-next'
+import { ExternalLink } from '@lucide/vue'
 import BadgeVue from '@/components/ui/badge.vue'
 import { usePlmUserStore } from '@/store/modules/plmUser'
 

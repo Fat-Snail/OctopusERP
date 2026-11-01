@@ -32,6 +32,10 @@ const groups: NavGroup[] = [
     group: '生产',
     items: [
       { label: '工单管理', path: '/workorder' },
+      { label: '服装春夏排程', path: '/garment-schedule' },
+      { label: '通用生产排程', path: '/scheduling' },
+      { label: 'PLM 同步管理', path: '/plm-sync' },
+      { label: '车间组管理', path: '/garment-team' },
     ],
   },
 ]

@@ -9,7 +9,7 @@ namespace OctopusPLM.Api.Controllers;
 [ApiController]
 [Route("api/vector/scan")]
 [AllowAnonymous]
-public class VectorScanController(VectorScanService scan, IServiceProvider sp) : ControllerBase
+public class VectorScanController(VectorScanService scan) : ControllerBase
 {
     private static readonly JsonSerializerOptions _jsonOpts = new()
     {
@@ -27,7 +27,7 @@ public class VectorScanController(VectorScanService scan, IServiceProvider sp) :
     [HttpPost("start")]
     public IActionResult Start()
     {
-        if (!scan.TryStart(sp))
+        if (!scan.TryStart())
             return Ok(new { code = 409, msg = "扫描任务正在进行中" });
         return Ok(new { code = 200, msg = "扫描已启动" });
     }

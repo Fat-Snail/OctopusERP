@@ -40,6 +40,18 @@ public class UpdateProductRequest
 
 // ── Response DTOs ──
 
+public class ProductModelVersionInfo
+{
+    public long ModelVersionId { get; set; }
+    public string VersionNo { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public string? CreatedByName { get; set; }
+    public string? PublishedByName { get; set; }
+    public DateTime? PublishedAt { get; set; }
+    public DateTime EffectiveFrom { get; set; }
+    public string? ChangeSummary { get; set; }
+}
+
 public class ProductResponse
 {
     public long ProductId { get; set; }
@@ -57,6 +69,8 @@ public class ProductResponse
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public List<SkuResponse> Skus { get; set; } = new();
+    public List<ReviewHistoryItem> Reviews { get; set; } = new();
+    public ProductModelVersionInfo? ModelVersionInfo { get; set; }
 }
 
 public class SkuResponse
@@ -84,8 +98,17 @@ public class ProductListRow
     public decimal MinPrice { get; set; }
     public decimal MaxPrice { get; set; }
     public int TotalStock { get; set; }
+    public int SkuCount { get; set; }
+    public string CreatedByName { get; set; } = string.Empty;
+    public string? SourceChannel { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+
+    // P10：跨系统聚合字段（withSales=true / withStock=true 时填充）
+    public decimal? CrossStockTotal { get; set; }
+    public decimal? CrossStockAvailable { get; set; }
+    public decimal? SalesQty30d { get; set; }
+    public decimal? SalesAmount30d { get; set; }
 }
 
 // ── 审核流程 DTOs ──

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Check, X, Clock, MoreHorizontal, CheckCircle, XCircle, Flag, User } from 'lucide-vue-next'
+import { Check, X, Clock, MoreHorizontal, CheckCircle, XCircle, Flag, User } from '@lucide/vue'
 import type { RecordResponse } from '@/api/approval/types'
 import Badge from '@/components/ui/badge.vue'
 

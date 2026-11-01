@@ -1,0 +1,91 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  # ── Backend: dotnet test ──────────────────────────────────────────
+  backend:
+    name: Test ${{ matrix.system }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - system: OctopusUMC
+            sln: OctopusUMC/OctopusUMC.sln
+          - system: OctopusOA
+            sln: OctopusOA/OctopusOA.sln
+          - system: OctopusPLM
+            sln: OctopusPLM/OctopusPLM.sln
+          - system: OctopusCRM
+            sln: OctopusCRM/OctopusCRM.sln
+          - system: OctopusWMS
+            sln: OctopusWMS/tests/OctopusWMS.Api.Tests/OctopusWMS.Api.Tests.csproj
+          - system: OctopusMES
+            sln: OctopusMES/tests/OctopusMES.Api.Tests/OctopusMES.Api.Tests.csproj
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.x'
+
+      - name: Restore
+        run: dotnet restore ${{ matrix.sln }}
+
+      - name: Test
+        run: dotnet test ${{ matrix.sln }} --no-restore --verbosity minimal
+
+  # ── Frontend: tsc --noEmit ────────────────────────────────────────
+  frontend:
+    name: TypeCheck ${{ matrix.name }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: OctopusUMC.Web
+            path: OctopusUMC/web/OctopusUMC.Web
+          - name: OctopusOA.Web
+            path: OctopusOA/web/OctopusOA.Web
+          - name: OctopusPLM.Web
+            path: OctopusPLM/web/OctopusPLM.Web
+          - name: OctopusCRM.Web
+            path: OctopusCRM/web/OctopusCRM.Web
+          - name: OctopusWMS.Web
+            path: OctopusWMS/web/OctopusWMS.Web
+          - name: OctopusMES.Web
+            path: OctopusMES/web/OctopusMES.Web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: ${{ matrix.path }}/package-lock.json
+
+      - name: Install
+        run: npm ci
+        working-directory: ${{ matrix.path }}
+
+      - name: TypeCheck
+        run: npx tsc --noEmit
+        working-directory: ${{ matrix.path }}
+
+      - name: Build
+        run: npm run build
+        working-directory: ${{ matrix.path }}
+
+  # ── Docker: validate compose syntax ──────────────────────────────
+  docker-lint:
+    name: Validate docker-compose.yml
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate compose
+        run: docker compose config --quiet

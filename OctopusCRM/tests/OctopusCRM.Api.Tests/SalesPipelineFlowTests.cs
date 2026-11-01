@@ -29,7 +29,7 @@ public class SalesPipelineFlowTests : IClassFixture<CrmTestFactory>
 
     private async Task<long> GetHuaweiCustomerIdAsync()
     {
-        var resp = await _client.GetAsync("/api/customer?keyword=华为");
+        var resp = await _client.GetAsync("/api/customer?keyword=示例客户1");
         var doc = await resp.Content.ReadFromJsonAsync<JsonDocument>(_json);
         return doc!.RootElement.GetProperty("data").GetProperty("rows")[0]
             .GetProperty("customerId").GetInt64();

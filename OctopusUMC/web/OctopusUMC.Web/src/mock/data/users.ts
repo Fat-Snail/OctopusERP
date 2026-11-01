@@ -18,7 +18,10 @@ export const usersData: UserResponse[] = [
     postIds: [1],
     roles: ['admin'],
     createTime: '2024-01-01 00:00:00',
-    remark: '超级管理员'
+    remark: '超级管理员',
+    userType: 'employee',
+    source: 'umc',
+    kcSub: null,
   },
   {
     userId: 2,
@@ -37,7 +40,10 @@ export const usersData: UserResponse[] = [
     postIds: [4],
     roles: ['common'],
     createTime: '2024-02-01 00:00:00',
-    remark: null
+    remark: null,
+    userType: 'employee',
+    source: 'umc',
+    kcSub: null,
   },
   {
     userId: 3,
@@ -56,7 +62,10 @@ export const usersData: UserResponse[] = [
     postIds: [4],
     roles: ['common', 'editor'],
     createTime: '2024-02-15 00:00:00',
-    remark: null
+    remark: null,
+    userType: 'employee',
+    source: 'umc',
+    kcSub: null,
   },
   {
     userId: 4,
@@ -75,7 +84,10 @@ export const usersData: UserResponse[] = [
     postIds: [2],
     roles: ['common'],
     createTime: '2024-03-01 00:00:00',
-    remark: '已停用'
+    remark: '已停用',
+    userType: 'employee',
+    source: 'umc',
+    kcSub: null,
   },
   {
     userId: 5,
@@ -94,6 +106,9 @@ export const usersData: UserResponse[] = [
     postIds: [3],
     roles: ['editor'],
     createTime: '2024-03-15 00:00:00',
-    remark: null
+    remark: null,
+    userType: 'employee',
+    source: 'umc',
+    kcSub: null,
   }
 ]

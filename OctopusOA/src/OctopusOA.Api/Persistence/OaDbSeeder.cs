@@ -1,11 +1,146 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage;
+
 namespace OctopusOA.Api.Persistence;
 
 public static class OaDbSeeder
 {
     public static void Seed(OaDbContext db)
     {
-        if (db.SyncUsers.Any()) return;
+        // P17 后新增 oa_approval_delegate 表，oa_workflow_node 新增 SkipCondition/CcUsersJson 列。
+        // 旧 octopus_oa.db 下 EnsureCreated 不会增量补齐，此处自愈避免阻塞 Seed。
+        EnsureSchemaUpToDate(db);
 
+        if (!db.SyncUsers.Any())
+        {
+            SeedMainData(db);
+        }
+        // 服装行业审批模板：幂等(以 TemplateCode = "garment_production" 为 marker)
+        try { SeedGarmentTemplates(db); }
+        catch (Exception ex) { Console.WriteLine($"[OaDbSeeder] SeedGarmentTemplates 失败(已跳过): {ex.Message}"); }
+    }
+
+    // ── Schema 自愈：补齐缺失的表与列 ─────────────────────────────
+    private static void EnsureSchemaUpToDate(OaDbContext db)
+    {
+        if (!db.Database.IsRelational()) return;
+
+        var conn = db.Database.GetDbConnection();
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen) conn.Open();
+        try
+        {
+            // 1) 表级自愈：oa_approval_delegate(P17 新增) 等
+            if (!TableExists(conn, "oa_approval_delegate"))
+            {
+                var creator = (IRelationalDatabaseCreator)db.GetService<IDatabaseCreator>();
+                var script = creator.GenerateCreateScript();
+                foreach (var raw in script.Split(';'))
+                {
+                    var stmt = raw.Trim();
+                    if (stmt.Length == 0) continue;
+                    if (!stmt.StartsWith("CREATE TABLE", StringComparison.OrdinalIgnoreCase) &&
+                        !stmt.StartsWith("CREATE INDEX", StringComparison.OrdinalIgnoreCase) &&
+                        !stmt.StartsWith("CREATE UNIQUE INDEX", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    var safe = stmt
+                        .Replace("CREATE TABLE ", "CREATE TABLE IF NOT EXISTS ", StringComparison.OrdinalIgnoreCase)
+                        .Replace("CREATE UNIQUE INDEX ", "CREATE UNIQUE INDEX IF NOT EXISTS ", StringComparison.OrdinalIgnoreCase)
+                        .Replace("CREATE INDEX ", "CREATE INDEX IF NOT EXISTS ", StringComparison.OrdinalIgnoreCase);
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = safe;
+                    try { cmd.ExecuteNonQuery(); }
+                    catch (Exception ex) { Console.WriteLine($"[OaDbSeeder] 自愈建表跳过: {ex.Message}"); }
+                }
+                Console.WriteLine("[OaDbSeeder] Schema 自愈完成（已补齐缺失的表/索引）");
+            }
+
+            // 2) 列级自愈：枚举 EF Core 模型，对比每张表的实际列与模型预期列，
+            //    缺则 ALTER TABLE ADD COLUMN（按列的 SQL 类型推断 + 主键自增列跳过）
+            foreach (var et in db.Model.GetEntityTypes())
+            {
+                var table = et.GetTableName();
+                if (string.IsNullOrEmpty(table)) continue;
+                if (!TableExists(conn, table)) continue;
+
+                var existingCols = ReadColumns(conn, table);
+                var storeId = StoreObjectIdentifier.Table(table, et.GetSchema());
+                foreach (var prop in et.GetProperties())
+                {
+                    var col = prop.GetColumnName(storeId);
+                    if (string.IsNullOrEmpty(col)) continue;
+                    if (existingCols.Contains(col)) continue;
+                    if (prop.IsPrimaryKey()) continue; // 主键不能用 ALTER TABLE ADD
+
+                    var sqlType = prop.GetColumnType() ?? InferSqliteType(prop.ClrType);
+                    var nullable = prop.IsNullable ? "NULL" : "NOT NULL DEFAULT " + DefaultValueLiteral(prop.ClrType);
+                    var def = $"{sqlType} {nullable}";
+                    try
+                    {
+                        using var cmd = conn.CreateCommand();
+                        cmd.CommandText = $"ALTER TABLE \"{table}\" ADD COLUMN \"{col}\" {def}";
+                        cmd.ExecuteNonQuery();
+                        Console.WriteLine($"[OaDbSeeder] 列级自愈: {table}.{col} 已补齐 ({def})");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[OaDbSeeder] ALTER TABLE 失败 {table}.{col}: {ex.Message}");
+                    }
+                }
+            }
+        }
+        finally
+        {
+            if (!wasOpen) conn.Close();
+        }
+    }
+
+    private static bool TableExists(System.Data.Common.DbConnection conn, string tableName)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name=@n LIMIT 1";
+        var p = cmd.CreateParameter();
+        p.ParameterName = "@n";
+        p.Value = tableName;
+        cmd.Parameters.Add(p);
+        return cmd.ExecuteScalar() != null;
+    }
+
+    private static HashSet<string> ReadColumns(System.Data.Common.DbConnection conn, string tableName)
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = $"PRAGMA table_info(\"{tableName}\")";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read()) set.Add(reader.GetString(1));
+        return set;
+    }
+
+    private static string InferSqliteType(Type clr)
+    {
+        var t = Nullable.GetUnderlyingType(clr) ?? clr;
+        if (t == typeof(int) || t == typeof(long) || t == typeof(short) || t == typeof(byte) || t == typeof(bool))
+            return "INTEGER";
+        if (t == typeof(double) || t == typeof(float)) return "REAL";
+        if (t == typeof(decimal)) return "decimal(18,4)";
+        if (t == typeof(byte[])) return "BLOB";
+        return "TEXT";
+    }
+
+    private static string DefaultValueLiteral(Type clr)
+    {
+        var t = Nullable.GetUnderlyingType(clr) ?? clr;
+        if (t == typeof(int) || t == typeof(long) || t == typeof(short) || t == typeof(byte) || t == typeof(bool))
+            return "0";
+        if (t == typeof(double) || t == typeof(float) || t == typeof(decimal)) return "0";
+        if (t == typeof(DateTime)) return "'1970-01-01 00:00:00'";
+        return "''";
+    }
+
+    private static void SeedMainData(OaDbContext db)
+    {
         var now = DateTime.UtcNow;
 
         // ── 同步用户 ──
@@ -60,13 +195,13 @@ public static class OaDbSeeder
         );
 
         db.Nodes.AddRange(
-            new WorkflowNode { NodeId = 1, TemplateId = 1, NodeName = "直属主管审批", NodeOrder = 1, ApproverType = "dept_leader" },
-            new WorkflowNode { NodeId = 2, TemplateId = 1, NodeName = "HR 确认",      NodeOrder = 2, ApproverType = "role", ApproverValue = "oa_admin" },
-            new WorkflowNode { NodeId = 3, TemplateId = 2, NodeName = "直属主管审批", NodeOrder = 1, ApproverType = "dept_leader" },
-            new WorkflowNode { NodeId = 4, TemplateId = 2, NodeName = "财务审核",     NodeOrder = 2, ApproverType = "role", ApproverValue = "oa_admin" },
-            new WorkflowNode { NodeId = 5, TemplateId = 2, NodeName = "总经理审批",   NodeOrder = 3, ApproverType = "user", ApproverValue = "1" },
-            new WorkflowNode { NodeId = 6, TemplateId = 3, NodeName = "直属主管审批", NodeOrder = 1, ApproverType = "dept_leader" },
-            new WorkflowNode { NodeId = 7, TemplateId = 3, NodeName = "HR 确认",      NodeOrder = 2, ApproverType = "role", ApproverValue = "oa_admin" }
+            new WorkflowNode { NodeId = 1, TemplateId = 1, NodeName = "直属主管审批", NodeOrder = 1, ApproverType = "dept_leader", SlaHours = 24 },
+            new WorkflowNode { NodeId = 2, TemplateId = 1, NodeName = "HR 确认",      NodeOrder = 2, ApproverType = "role", ApproverValue = "oa_admin", SlaHours = 48 },
+            new WorkflowNode { NodeId = 3, TemplateId = 2, NodeName = "直属主管审批", NodeOrder = 1, ApproverType = "dept_leader", SlaHours = 24 },
+            new WorkflowNode { NodeId = 4, TemplateId = 2, NodeName = "财务审核",     NodeOrder = 2, ApproverType = "role", ApproverValue = "oa_admin", SlaHours = 48 },
+            new WorkflowNode { NodeId = 5, TemplateId = 2, NodeName = "总经理审批",   NodeOrder = 3, ApproverType = "user", ApproverValue = "1", SlaHours = 72 },
+            new WorkflowNode { NodeId = 6, TemplateId = 3, NodeName = "直属主管审批", NodeOrder = 1, ApproverType = "dept_leader", SlaHours = 8 },
+            new WorkflowNode { NodeId = 7, TemplateId = 3, NodeName = "HR 确认",      NodeOrder = 2, ApproverType = "role", ApproverValue = "oa_admin", SlaHours = 24 }
         );
 
         db.Approvals.AddRange(
@@ -105,7 +240,7 @@ public static class OaDbSeeder
             new Employee
             {
                 EmployeeId = 1, Status = "temp", Name = "王小明", Gender = "male", Phone = "13600000001",
-                BirthDate = "1998-05-15", Email = "wangxm@qq.com", ApplyPosition = "前端工程师",
+                BirthDate = "1998-05-15", Email = "wangxm@example.invalid", ApplyPosition = "前端工程师",
                 ApplyDeptId = 3, ApplyDeptName = "技术部", Education = "本科", GraduateSchool = "华南理工大学", Major = "软件工程",
                 WorkYears = 3, HrRemark = "面试表现良好，技术基础扎实",
                 H5Token = "h5_token_001", CreatedBy = 1,
@@ -113,12 +248,16 @@ public static class OaDbSeeder
             new Employee
             {
                 EmployeeId = 2, Status = "pending", Name = "李小红", Gender = "female", Phone = "13600000002",
-                BirthDate = "1996-08-22", Email = "lixh@qq.com", ApplyPosition = "产品经理",
+                BirthDate = "1996-08-22", Email = "lixh@example.invalid", ApplyPosition = "产品经理",
                 ApplyDeptId = 3, ApplyDeptName = "技术部", Education = "硕士", GraduateSchool = "中山大学", Major = "计算机科学",
                 WorkYears = 5,
-                Photo = "/uploads/photo_lixh.jpg", IdCardNo = "440106199608220025",
+                // ⚠️ 证件号一律用「校验位不成立」的占位值：
+                // 校验位合法的号码可能与真实居民身份证重合（原种子值就是校验位正确的
+                // 广州天河区号码，等同于泄露真人证件号）。
+                // 下面这个值的校验位应为 9 实际给 0 —— 永远不可能是真实证件。
+                Photo = "/uploads/photo_lixh.jpg", IdCardNo = "440106199608220000",
                 PoliticalStatus = "群众", MaritalStatus = "未婚", NativePlace = "广东广州",
-                CurrentAddress = "广州市天河区珠江新城xx小区", BankName = "中国银行", BankAccount = "6217001234567890",
+                CurrentAddress = "广州市天河区示例路1号", BankName = "示例银行", BankAccount = "6222000000000000",
                 H5Token = "h5_token_002", H5FilledAt = now.AddDays(-1), CreatedBy = 1,
             },
             new Employee
@@ -139,11 +278,11 @@ public static class OaDbSeeder
             new EmployeeWorkHistory { Id = 2, EmployeeId = 2, Company = "网易科技", Position = "产品助理", StartDate = "2020-06", EndDate = "2021-06", LeaveReason = "实习结束" }
         );
         db.EmployeeFamilies.AddRange(
-            new EmployeeFamily { Id = 1, EmployeeId = 2, Name = "李大明", Relation = "父亲", Workplace = "广州市第一人民医院", Phone = "13800001111" },
-            new EmployeeFamily { Id = 2, EmployeeId = 2, Name = "张秀英", Relation = "母亲", Workplace = "退休", Phone = "13800002222" }
+            new EmployeeFamily { Id = 1, EmployeeId = 2, Name = "家属甲", Relation = "父亲", Workplace = "示例单位", Phone = "13800001111" },
+            new EmployeeFamily { Id = 2, EmployeeId = 2, Name = "家属乙", Relation = "母亲", Workplace = "退休", Phone = "13800002222" }
         );
         db.EmployeeEmergencyContacts.AddRange(
-            new EmployeeEmergencyContact { Id = 1, EmployeeId = 2, Name = "李大明", Relation = "父亲", Phone = "13800001111" }
+            new EmployeeEmergencyContact { Id = 1, EmployeeId = 2, Name = "家属甲", Relation = "父亲", Phone = "13800001111" }
         );
 
         // ── 公告 ──
@@ -189,6 +328,50 @@ public static class OaDbSeeder
         );
 
         db.MeetingBookings.AddRange(InitBookings());
+
+        db.SaveChanges();
+    }
+
+    // 服装行业：投产/加单/面料采购 三个审批模板（幂等）
+    private static void SeedGarmentTemplates(OaDbContext db)
+    {
+        if (db.Templates.Any(t => t.TemplateCode == "garment_production")) return;
+
+        // 用大 ID 段(50+)避免与主种子冲突
+        db.Templates.AddRange(
+            new WorkflowTemplate
+            {
+                TemplateId = 50, TemplateName = "服装款式投产审批", TemplateCode = "garment_production",
+                Description = "排程发布前的款式投产审批：设计→技术→生产 三级", Icon = "Box", Status = 1,
+                FormSchema = """{"fields":[{"key":"customerName","label":"客户","type":"text","required":true},{"key":"orderNo","label":"客户款号","type":"text","required":true},{"key":"styleCode","label":"款式编码","type":"text","required":true},{"key":"plannedQty","label":"计划数量","type":"number","required":true},{"key":"dueDate","label":"货期","type":"date","required":true},{"key":"team","label":"指派组别","type":"text","required":true}]}""",
+            },
+            new WorkflowTemplate
+            {
+                TemplateId = 51, TemplateName = "服装加单审批", TemplateCode = "garment_additional",
+                Description = "客户返单/补单：业务→生管→车间", Icon = "Plus", Status = 1,
+                FormSchema = """{"fields":[{"key":"originalOrderNo","label":"原款号","type":"text","required":true},{"key":"additionalQty","label":"加单数量","type":"number","required":true},{"key":"reason","label":"加单原因","type":"textarea","required":true}]}""",
+            },
+            new WorkflowTemplate
+            {
+                TemplateId = 52, TemplateName = "服装面料采购审批", TemplateCode = "garment_fabric_purchase",
+                Description = "面料采购单审批", Icon = "Truck", Status = 1,
+                FormSchema = """{"fields":[{"key":"fabricCode","label":"面料编号","type":"text","required":true},{"key":"colorCode","label":"色号","type":"text"},{"key":"qty","label":"采购数量","type":"number","required":true},{"key":"supplier","label":"供应商","type":"text","required":true},{"key":"expectedDate","label":"期望到货日","type":"date","required":true}]}""",
+            }
+        );
+
+        db.Nodes.AddRange(
+            // 投产审批 三级
+            new WorkflowNode { NodeId = 50, TemplateId = 50, NodeName = "设计确认", NodeOrder = 1, ApproverType = "role", ApproverValue = "oa_admin", SlaHours = 24 },
+            new WorkflowNode { NodeId = 51, TemplateId = 50, NodeName = "技术评估", NodeOrder = 2, ApproverType = "role", ApproverValue = "oa_admin", SlaHours = 24 },
+            new WorkflowNode { NodeId = 52, TemplateId = 50, NodeName = "生产确认", NodeOrder = 3, ApproverType = "role", ApproverValue = "oa_admin", SlaHours = 48 },
+            // 加单审批 三级
+            new WorkflowNode { NodeId = 53, TemplateId = 51, NodeName = "业务确认", NodeOrder = 1, ApproverType = "role", ApproverValue = "oa_admin", SlaHours = 24 },
+            new WorkflowNode { NodeId = 54, TemplateId = 51, NodeName = "生管确认", NodeOrder = 2, ApproverType = "role", ApproverValue = "oa_admin", SlaHours = 24 },
+            new WorkflowNode { NodeId = 55, TemplateId = 51, NodeName = "车间接单", NodeOrder = 3, ApproverType = "dept_leader", SlaHours = 12 },
+            // 面料采购审批 二级
+            new WorkflowNode { NodeId = 56, TemplateId = 52, NodeName = "采购主管", NodeOrder = 1, ApproverType = "role", ApproverValue = "oa_admin", SlaHours = 24 },
+            new WorkflowNode { NodeId = 57, TemplateId = 52, NodeName = "财务审批", NodeOrder = 2, ApproverType = "role", ApproverValue = "oa_admin", SlaHours = 48 }
+        );
 
         db.SaveChanges();
     }

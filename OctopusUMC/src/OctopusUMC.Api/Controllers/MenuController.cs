@@ -1,7 +1,9 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Distributed;
 using OctopusUMC.Api.DTOs;
 using OctopusUMC.Core.Domain.Entities;
 using OctopusUMC.Infrastructure.Persistence;
+using System.Text.Json;
 
 namespace OctopusUMC.Api.Controllers;
 
@@ -11,7 +13,19 @@ namespace OctopusUMC.Api.Controllers;
 public class MenuController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
-    public MenuController(ApplicationDbContext context) => _context = context;
+    private readonly IDistributedCache _cache;
+    private const string CacheKeyTree = "umc:menu:tree";
+    private static readonly DistributedCacheEntryOptions _treeCacheOpt = new()
+    {
+        SlidingExpiration = TimeSpan.FromMinutes(5),
+        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(30),
+    };
+
+    public MenuController(ApplicationDbContext context, IDistributedCache cache)
+    {
+        _context = context;
+        _cache = cache;
+    }
 
     private MenuResponse MapMenu(Menu m) => new()
     {
@@ -36,13 +50,24 @@ public class MenuController : ControllerBase
            .OrderBy(m => m.OrderNum)
            .ToList();
 
-    /// <summary>获取菜单树形结构</summary>
+    /// <summary>获取菜单树形结构（5min 分布式缓存）</summary>
     [HttpGet("tree")]
-    public ApiResponse<List<MenuResponse>> GetTree()
+    public async Task<ApiResponse<List<MenuResponse>>> GetTree()
     {
+        var cached = await _cache.GetStringAsync(CacheKeyTree);
+        if (!string.IsNullOrEmpty(cached))
+        {
+            var hit = JsonSerializer.Deserialize<List<MenuResponse>>(cached);
+            if (hit != null) return ApiResponse<List<MenuResponse>>.Success(hit);
+        }
         var all = _context.Menus.ToList().Select(MapMenu).ToList();
-        return ApiResponse<List<MenuResponse>>.Success(BuildTree(all, 0));
+        var tree = BuildTree(all, 0);
+        await _cache.SetStringAsync(CacheKeyTree, JsonSerializer.Serialize(tree), _treeCacheOpt);
+        return ApiResponse<List<MenuResponse>>.Success(tree);
     }
+
+    /// <summary>失效菜单树缓存（CRUD 内部调用）</summary>
+    private void InvalidateMenuTreeCache() => _cache.Remove(CacheKeyTree);
 
     /// <summary>获取菜单平铺列表（支持条件筛选）</summary>
     [HttpGet("list")]
@@ -92,6 +117,7 @@ public class MenuController : ControllerBase
         };
         _context.Menus.Add(menu);
         _context.SaveChanges();
+        InvalidateMenuTreeCache();
         return ApiResponse<MenuResponse>.Success(MapMenu(menu), "新增成功");
     }
 
@@ -114,6 +140,7 @@ public class MenuController : ControllerBase
         m.IsFrame = req.IsFrame;
         m.Visible = req.Visible;
         _context.SaveChanges();
+        InvalidateMenuTreeCache();
         return ApiResponse<MenuResponse>.Success(MapMenu(m), "修改成功");
     }
 
@@ -128,6 +155,7 @@ public class MenuController : ControllerBase
             return ApiResponse<object?>.Fail("菜单不存在", 404);
         _context.Menus.Remove(menu);
         _context.SaveChanges();
+        InvalidateMenuTreeCache();
         return ApiResponse<object?>.Success(null, "删除成功");
     }
 

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { Search, RefreshCw, Trash2, ExternalLink, Upload } from 'lucide-vue-next'
+import { Search, RefreshCw, Trash2, ExternalLink, Upload } from '@lucide/vue'
 import { get, del } from '@/utils/http'
 import service from '@/utils/http'
 import type { FileResponse } from '@/api/system/types'

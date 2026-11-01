@@ -6,7 +6,8 @@ namespace OctopusOA.Api.Services;
 public class NoticeService
 {
     private readonly OaDbContext _db;
-    public NoticeService(OaDbContext db) => _db = db;
+    private readonly NotificationService _notif;
+    public NoticeService(OaDbContext db, NotificationService notif) { _db = db; _notif = notif; }
 
     /// <summary>查询公告列表（带已读状态）</summary>
     public List<NoticeItem> GetList(long userId, string? type, int? status)
@@ -108,6 +109,10 @@ public class NoticeService
             });
         }
         _db.SaveChanges();
+
+        // 新公告发布时推送全员通知
+        if (payload.Action != "delete" && payload.Status == 1)
+            _ = _notif.NotifyAllAsync("notice", $"新公告：{payload.Title}");
     }
 
     private static NoticeItem MapToItem(OaNotice n, HashSet<long> readIds) => new()

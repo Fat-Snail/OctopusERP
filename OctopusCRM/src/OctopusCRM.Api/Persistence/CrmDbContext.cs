@@ -16,6 +16,7 @@ public class CrmDbContext : DbContext
     public DbSet<CrmContract> Contracts => Set<CrmContract>();
     public DbSet<CrmContractItem> ContractItems => Set<CrmContractItem>();
     public DbSet<CrmPayment> Payments => Set<CrmPayment>();
+    public DbSet<CrmCustomerStyle> CustomerStyles => Set<CrmCustomerStyle>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -29,6 +30,7 @@ public class CrmDbContext : DbContext
         b.Entity<CrmContract>().ToTable("crm_contract");
         b.Entity<CrmContractItem>().ToTable("crm_contract_item");
         b.Entity<CrmPayment>().ToTable("crm_payment");
+        b.Entity<CrmCustomerStyle>().ToTable("crm_customer_style");
 
         // 显式主键 + 自增
         b.Entity<CrmSyncUser>().HasKey(x => x.Id);
@@ -103,5 +105,17 @@ public class CrmDbContext : DbContext
             .WithOne(x => x.Contract)
             .HasForeignKey(x => x.ContractId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        b.Entity<CrmCustomerStyle>().HasKey(x => x.CustomerStyleId);
+        b.Entity<CrmCustomerStyle>().Property(x => x.CustomerStyleId).ValueGeneratedOnAdd();
+        b.Entity<CrmCustomerStyle>().HasIndex(x => new { x.CustomerId, x.CustomerOrderNo }).IsUnique();
+        b.Entity<CrmCustomerStyle>()
+            .HasOne(x => x.Customer)
+            .WithMany()
+            .HasForeignKey(x => x.CustomerId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // CustomerOrderNo: 同客户内唯一
+        b.Entity<CrmContract>().HasIndex(x => new { x.CustomerId, x.CustomerOrderNo });
     }
 }

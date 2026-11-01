@@ -109,6 +109,8 @@ export interface CategoryModelVersionSummary {
   publishedAt: string | null
   publishedBy: number | null
   changeSummary: string | null
+  createdByName: string | null
+  publishedByName: string | null
 }
 
 export interface CategoryRuleResponse {

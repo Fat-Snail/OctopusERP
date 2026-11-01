@@ -2,6 +2,56 @@
 
 > 六步闸门制：每步全部通过后方可进入下一步。
 
+---
+
+## 全平台进度快照（2026-05-11）
+
+**9 个后端子系统 + 自愈 Schema + Aspire 一键编排，全部跑通**
+
+| 系统 | 端口 | 测试 | 状态 |
+|---|---|---|---|
+| UMC（OIDC IdP） | 5001 | 79+ | ✅ 含 P16 新增 octopus-hrm-web / octopus-oms-web / octopus-customer-portal / octopus-supplier-portal 客户端 |
+| OA（含 P17 BPM 扩展） | 5002 | 95 | ✅ SkipCondition / CcUsersJson / ApprovalDelegate 上线 |
+| PLM | 5003 | 27 | ✅ 含服装行业字段（StyleCode / SeasonCode / Series） |
+| CRM | 5004 | 31 | ✅ |
+| WMS（P11 多货主 / FEFO） | 5005 | 23+ | ✅ |
+| MES（P12 OEE / 工序报工） | 5006 | 20+ | ✅ |
+| FIN（P13 复式记账） | 5007 | — | ✅ AR/AP webhook 已挂上 CRM/HRM |
+| HRM（P14） | 5008 | 11 | ✅ 算薪 → FIN 凭证联动 |
+| OMS（P15 订单中台） | 5009 | 10 | ✅ 6 渠道种子（淘宝/京东/拼多多/抖音/Shopify/Amazon） |
+
+**全平台测试基线**：≥ 391 个（含 9 个系统的集成测试）。
+
+### 已完成的 P 系列里程碑
+
+- ✅ P5（H5 移动端）— 已完成：UMC.H5（5179）+ OA.H5（5180）独立 Vite 项目，含完整功能页
+- ✅ P6（跨系统 Webhook 链）— OA → CRM → WMS → MES 全打通
+- ✅ P7（OA SLA 催办）— `WorkflowNode.SlaHours` + `ApprovalSlaWorker` 30 分钟扫描
+- ✅ P8（限流 + 操作日志 AOP）— `[OperationLog]` + RateLimiter 全平台
+- ✅ P9（SignalR 统一通知中心）— `/hubs/notification` + `POST /api/internal/notify`
+- ✅ P10（PLM 升级）— 跨系统标准化 API + 类目模型版本
+- ✅ P11（WMS 多货主 / 库区 / FEFO / 三段式调拨）
+- ✅ P12（MES OEE / 工序报工 / 服装排程）
+- ✅ P13（OctopusFIN 财务）
+- ✅ P14（OctopusHRM 人力资源）
+- ✅ P15（OctopusOMS 订单中台）
+- ✅ P16（UMC 新增 4 个 OIDC 客户端 + customer/supplier 角色，门户前端待建）
+- ✅ P17（OA BPM 扩展：条件分支 / 转交 / 抄送）
+
+### 2026-05-11 修复
+
+- ✅ **SQLite Schema 模型驱动自愈**（DECISIONS ADR-007）— OA / PLM / MES 启动时自动 ALTER TABLE ADD COLUMN 补齐缺失的列，CREATE TABLE IF NOT EXISTS 补齐缺失的表；解决了"实体加字段后旧 db 启动崩溃 → 进而拖垮 Aspire 内其它子系统"的连锁故障。
+- ✅ **UMC 健康端点拆分**：`/health/live` vs `/health/ready`（Seeder 完成前 503，避免被认作"已就绪"导致下游误连）。
+
+### 待落地（按优先级）
+
+- ✅ P5 H5 — OA H5 全功能（首页/审批/考勤/公告/通讯录/会议室/个人中心）+ UMC H5 完成
+- ⬜ P16 门户前端 — Customer / Supplier Portal Vite 项目
+- ⬜ P18+ MySQL 迁移路径（EF Migrations 启用、自愈守卫加 `Sqlite` 判断）
+- ⬜ Redis 缓存 / 真实电商平台对接 / BPM 拖拽设计器
+
+---
+
 ## ✅ Step 1：前端样板（仅 UI，Mock 数据）
 - [x] 安装配置 MSW（Mock Service Worker）
 - [x] UMC.Web：登录页、工作台、用户/机构/职位/菜单/角色/字典/个人中心 9 个页面
@@ -366,9 +416,26 @@ dotnet test --filter "Flow" --logger "console;verbosity=detailed"
 - [x] `[EnableRateLimiting("login")]` 标注 `AccountController.Login`
 - [x] `app.UseRateLimiter()` 中间件注册，拒绝返回 429
 
+### ✅ SMTP 邮件发送（2026-05-09）
+- [x] `IEmailService` 接口 + `SmtpEmailService`（MailKit 4.16，StartTLS/Plain 两模式）
+- [x] `EmailSettings`：Host / Port / UseSsl / UserName / Password / FromAddress / FromName（`appsettings.json` 配置）
+- [x] `POST /api/account/forgot-password`：按邮箱查用户，生成 30 分钟 token 写 IMemoryCache，发送重置链接
+- [x] `POST /api/account/reset-password`：验证 token，更新 PasswordHash，token 一次性失效
+- [x] 4 个测试覆盖：已知邮箱发邮件 / 未知邮箱 404 / 有效 token 改密可登录 / 无效 token 400
+
+### ✅ 微信 OAuth 2.0（PC 扫码登录，2026-05-09）
+- [x] `IWechatOAuthService` 接口 + `WechatOAuthService`（HttpClient 直接调用微信 API，无第三方 SDK）
+- [x] `WechatSettings`：AppId / AppSecret / CallbackBaseUrl / FrontendBaseUrl（`appsettings.json` 配置）
+- [x] `WechatExternalLogin` 实体（`sys_wechat_login` 表，OpenId 唯一索引）
+- [x] `GET /api/account/wechat/authorize`：生成 state（防 CSRF）→ 返回微信扫码 URL
+- [x] `GET /api/account/wechat/callback`：换 token → 获取用户信息 → 首次自动建账号 → 签发 Cookie → 跳转前端
+- [x] `POST /api/account/wechat/bind`（已登录）：绑定微信到现有账户
+- [x] `DELETE /api/account/wechat/unbind`（已登录）：解绑微信
+- [x] 5 个测试覆盖：获取授权 URL / state 防 CSRF / 缺失 code / 新用户首次登录 / 已有绑定用户登录
+- [x] 配置填入后（AppId + AppSecret）即可直接使用，其余代码无需修改
+
 ### 待实现
-- [ ] 邮件短信发送
-- [ ] 开放授权（微信 OAuth 2.0）
+- [ ] 短信发送（需短信服务商账号，如阿里云 SMS / 腾讯 SMS）
 
 ## ✅ Phase 6：DevOps（2026-05-04）
 - [x] 六个项目各自编写 Dockerfile（.NET 10 多阶段构建：SDK → aspnet runtime）
@@ -437,4 +504,382 @@ dotnet test --filter "Flow" --logger "console;verbosity=detailed"
 - [x] 审批积压（CRM 侧：报价/合同/回款三类待审批数量 + 超时计数）
 - [x] OTD 趋势折线图（6 个月月度趋势，SVG 折线 + 95% SLA 参考线）
 - [x] 后端：`GET /api/stats/bi/efficiency|otd-trend|approval-backlog|contract-timeline/{id}|contracts`
+
+---
+
+## 下一阶段规划（2026-05-09 Review 产出）
+
+> 背景：六大模块全部完成（284 个测试），全链路业务流已贯通。Review 发现三类缺口：
+> ① 跨系统 Webhook 调用链只有接收方，缺发送方；② OA SLA 催办未实现；③ 移动端空白。
+> 以下按优先级排列，P0 最紧。
+
+### ✅ P5：H5 移动端（OA + UMC）— 已完成
+
+#### UMC H5（仅 SSO 登录页 + 个人资料）
+
+- [x] 新建 `OctopusUMC/web/OctopusUMC.H5/`（Vite + Vue 3 + Tailwind v4）
+- [x] Cookie 登录页：用户名/密码 + 行内错误提示
+- [x] 首页工作台：模块入口宫格（OA/WMS/MES/CRM 跳转）
+- [x] 个人资料页：昵称/手机/邮箱编辑 + 修改密码
+- [x] Aspire 集成：端口 5179
+
+#### OA H5（员工日常高频场景）
+
+- [x] 新建 `OctopusOA/web/OctopusOA.H5/`（Vite + Vue 3 + Tailwind v4 + oidc-client-ts）
+- [x] 底部 TabBar 框架：首页 / 审批 / 考勤 / 我的（4 Tab）
+- [x] 考勤打卡页：今日状态卡片 + [上班打卡] / [下班打卡] + 本月日历摘要 + 最近记录
+- [x] 审批列表页（待审批/我的申请 Segment）+ 发起申请弹层（模板宫格 + 标题输入）
+- [x] 审批详情页：申请信息 + 流程时间轴 + 通过/驳回底部弹层（含填写意见）
+- [x] 首页工作台：4 张统计卡 + 快捷入口宫格 + 待办聚合列表
+- [x] 公告列表 + 详情（铃铛入口，未读蓝点标记）
+- [x] 通讯录：部门侧边栏 + 用户列表 + 详情底部弹层（拨号/邮件）
+- [x] 会议室预订：我的预订列表 + 新建预订底部表单（冲突提示 409）
+- [x] 个人中心：资料展示 + 账号设置跳转 UMC H5 + 退出登录（OIDC signoutRedirect）
+- [x] OIDC SSO 登录/回调（新建 `octopus-oa-h5` 客户端，端口 5180/callback）
+- [x] Aspire 集成：端口 5180
+- [x] UMC CORS 放行 5179/5180；OA CORS 放行 5179/5180
+
+**技术约定（H5 通用）**：
+- 375px 基准宽度，`viewport-fit=cover` 支持刘海屏
+- 点击区域 ≥ 44px（iOS 规范）
+- 底部固定元素留 `env(safe-area-inset-bottom)` 安全区
+- 禁止使用 reka-ui（同 OA.Web 规避 SPA 冻结问题）
+- Dialog/Sheet/Select 使用 `provide/inject` + `<Teleport to="body">` 自定义实现
+
+---
+
+### ✅ P6：跨系统 Webhook 调用链（打通全链路 7 步）— 已完成
+
+> 当前各系统通过 `PlmProductId`/`CrmContractId` 等字段关联种子数据，但运行时跨系统实时联动缺少发送方。
+
+#### 缺口清单
+
+| 事件 | 接收方 | 发送方现状 | 优先级 |
+|---|---|---|---|
+| OA 审批通过/驳回 → CRM | `CRM ApprovalCallbackController` ✅ | OA 无主动 POST | ★★★ |
+| CRM 合同生成 → WMS 库存预留 | ❌ WMS 无此端点 | CRM 无调用 | ★★★ |
+| MES 工单完工 → WMS 入库 | ❌ WMS 无此端点 | MES 无调用 | ★★ |
+| WMS 出库完成 → CRM 回填发货日 | ❌ CRM 无此 Webhook | WMS 无调用 | ★★ |
+| CRM 合同 → WMS 缺料 → MES 工单 | ❌ MES 无此端点 | WMS 无调用 | ★ |
+
+#### 实现方案（直接 HTTP，不引入消息队列）
+
+```csharp
+// 统一 WebhookSender 工具类（每个系统各有一个，复用 UserSyncService 模式）
+public class WebhookSender(IHttpClientFactory factory, IConfiguration config, ILogger<WebhookSender> log)
+{
+    public async Task PostAsync(string targetBaseUrl, string path, object payload, string secret)
+    {
+        var json = JsonSerializer.Serialize(payload);
+        var sig  = ComputeHmacSha256(json, secret);
+        var req  = new HttpRequestMessage(HttpMethod.Post, $"{targetBaseUrl}{path}");
+        req.Content = new StringContent(json, Encoding.UTF8, "application/json");
+        req.Headers.Add("X-Signature", $"sha256={sig}");
+        try { await factory.CreateClient().SendAsync(req); }
+        catch (Exception ex) { log.LogError(ex, "Webhook 发送失败 {Path}", path); }
+    }
+}
+```
+
+#### 实施步骤
+
+- [ ] OA `ApprovalService.Approve()` / `Reject()` 末尾：扫描关联的 CRM/MES 回调 URL，POST 结果
+- [ ] WMS 新增 `POST /api/stock/reserve`（CRM 合同生成时调用，预留库存）
+- [ ] WMS 新增 `POST /api/inbound/receive-from-mes`（MES 完工时调用，自动入库）
+- [ ] WMS `OutboundService.ConfirmAsync()` 末尾：POST CRM `/api/contract/{id}/ship`（回填 ActualDeliveryDate）
+- [ ] CRM `ContractService.ExecuteAsync()` 末尾：POST WMS `/api/stock/reserve`（库存预留）
+- [ ] MES `WorkOrderService.CompleteAsync()` 末尾：POST WMS `/api/inbound/receive-from-mes`
+- [ ] 每条 Webhook 补充集成测试（用 `WireMock.Net` mock 目标端点）
+- [ ] `appsettings.json` 各系统新增 `Webhooks:{ CrmBaseUrl, WmsBaseUrl, MesBaseUrl, OaBaseUrl }` 配置节
+
+---
+
+### ✅ P7：OA 审批 SLA 催办 — 已完成
+
+> ROADMAP 有完整设计但未实现：`SlaHours` 字段 + BackgroundService 扫描 + 站内消息推送
+
+- [ ] `WorkflowNode` 实体新增 `public int? SlaHours { get; set; }`
+- [ ] `Approval` 实体新增 `public DateTime? CurrentNodeDeadline { get; set; }`
+- [ ] `ApprovalService.AdvanceNode()` 写入 `CurrentNodeDeadline = UtcNow + SlaHours`
+- [ ] 新增 `ApprovalSlaWorker : BackgroundService`，每 30 分钟扫描：
+  - `CurrentNodeDeadline < UtcNow + 4h` → 发预警通知
+  - `CurrentNodeDeadline < UtcNow` → 标记超时，发催办通知
+- [ ] `NoticeService.SendAsync()` 推站内消息给当前节点审批人
+- [ ] `Program.cs` 注册 `builder.Services.AddHostedService<ApprovalSlaWorker>()`
+- [ ] OA 前端：审批详情页节点超时标红 + 剩余时效倒计时
+- [ ] OA 前端：待审批列表显示超时徽标 🔴
+- [ ] 种子模板中为各节点设置合理 SlaHours（请假：48h，报销：24h，补卡：4h）
+- [ ] 补充测试：`SlaWorkerTests.cs`（超时触发通知 + 未超时不触发）
+
+---
+
+### 🔶 P8：生产就绪 — 限流/操作日志已完成，MySQL/Redis 待做
+
+#### 数据库：SQLite → MySQL
+
+- [ ] 各系统创建 EF Core Migration（当前是 `EnsureCreated`，无迁移历史）
+  ```bash
+  cd OctopusXXX/src/OctopusXXX.Api
+  dotnet ef migrations add InitialCreate --project . --startup-project .
+  dotnet ef migrations script | review → 手动执行
+  ```
+- [ ] `appsettings.Production.json` 切换 MySQL 连接串（6 个系统各一份）
+- [ ] 测试保持用 SQLite `:memory:`，生产用 MySQL（双轨，无需改测试）
+- [ ] docker-compose.yml 补充 MySQL 服务（已有 `octopus-db` 占位，补全配置）
+
+#### 缓存层：Redis
+
+- [ ] `docker-compose.yml` 添加 `redis:7-alpine` 服务
+- [ ] 各系统 `Program.cs` 注册 `AddStackExchangeRedisCache`
+- [ ] 优先缓存（TTL 5 分钟）：UMC 菜单树、UMC 权限 Claims、OA 部门树、PLM 类目树
+- [ ] 缓存失效：对应数据 CRUD 时主动 `cache.Remove(key)`
+
+#### 安全加固
+
+- [ ] 各系统统一异常处理中间件（不暴露堆栈，返回 `{ code: 500, msg: "服务器内部错误" }`）
+- [ ] CRM / WMS / MES 补充限流（复制 UMC 的 `AddRateLimiter` 配置）
+- [ ] OpenIddict 生产证书：替换 `AddDevelopmentEncryptionCertificate` 为 `.pfx` 文件
+- [ ] 生产环境强制 HTTPS（`UseHttpsRedirection` + `UseHsts`）
+- [ ] CRM / WMS / MES 补充操作日志 AOP（参考 UMC `OperationLogAttribute`）
+
+---
+
+### ✅ P9：统一通知中心 — 已完成（OA `NotificationHub` + `/api/internal/notify`）
+
+> 当前：OA 公告独立、UMC SignalR 独立，各系统没有跨系统实时推送能力。
+
+- [ ] UMC `NoticeController` 新增内网接口：`POST /api/internal/notify`（HMAC 签名，不对外）
+- [ ] UMC `OnlineUserHub` 扩展：收到内网通知后 `Clients.User(userId).SendAsync("Notification", payload)`
+- [ ] CRM / WMS / MES 在关键事件（合同审批通过、库存预警触发、工单完工）后 POST UMC 通知接口
+- [ ] 前端（所有子系统）：TopBar 铃铛统一显示未读数，点击展开跨系统通知列表
+- [ ] 通知类型定义：`approval_result` / `stock_alert` / `workorder_done` / `notice` / `mention`
+
+---
+
+## 二期规划（P10–P17，对标金蝶云星空 + 聚水潭）
+
+> 详细技术方案见 `ROADMAP.md` 第十四至二十一章。
+> 触发原因：用户反馈 PLM 列表展示弱、缺图标、跨系统接口少；MES 无时效统计；WMS 太基础不可用。
+
+### ✅ P10：PLM 升级（列表强化 + 类目模板进阶 + 跨系统标准化 API）— 已完成
+
+**14.1 商品列表展示强化**
+- [ ] `ProductResponse` 扩展字段：`thumbnailUrl` / `skuCount` / `priceRange` / `totalStock` / `salesQty30d` / `channelBindings` / `statusIcon` / `lifecycleStage`
+- [ ] `totalStock` 实现：PLM 调 WMS `POST /api/inventory/by-products`（批量）
+- [ ] `salesQty30d` 实现：PLM 调 CRM `POST /api/contract/sales-qty?productIds=`
+- [ ] 商品列表前端改造：缩略图列 + lucide 状态图标（FileEdit/Clock/CheckCircle2/XCircle）
+- [ ] 排序：按销量/更新时间/价格/库存
+- [ ] 高级筛选抽屉：类目树 + 状态多选 + 价格区间 + 渠道 + 创建人
+- [ ] 行级快速操作菜单（提交审核/克隆/复制 SKU/上下架）
+- [ ] 列表性能：1000 商品虚拟列表（vue-virtual-scroller）
+
+**14.2 类目模板进阶**
+- [ ] 属性模板可视化编辑器（左侧属性库 → 拖到右侧 SPU/SKU 槽位 → SKU 矩阵预览）
+- [ ] 版本对比页（左右两栏 diff，新增/删除/修改高亮）
+- [ ] 版本回滚 + 二次确认 + 审计日志
+- [ ] `POST /api/category/{id}/template/apply-all`：批量应用变更到子类目商品
+- [ ] 类目模板继承机制（子类目继承父类目，可覆盖）
+
+**14.3 跨系统标准化 API**
+- [ ] `POST /api/product/by-codes`：CRM/WMS/MES 通用批量查询
+- [ ] `POST /api/product/by-ids`：按 ID 批量
+- [ ] `GET /api/product/{id}/cross-system`：跨系统数据聚合（PLM + WMS + CRM + MES）
+- [ ] PLM 事件订阅推送：`product.created/updated/published/discontinued/sku.price_changed`
+- [ ] 各下游系统注册订阅意向（写到 PLM `plm_subscriber` 表）
+- [ ] 集成测试：5 条事件链路 ≥ 5 个测试
+
+---
+
+### ✅ P11：WMS 升级（聚水潭风格执行级 WMS）— 已完成
+
+**15.1 多货主多仓 + 库区/库位**
+- [ ] 新增 `wms_owner` 货主表，`wms_warehouse` 加 `OwnerId`
+- [ ] 新增 `wms_zone` 库区表（拣货区/存储区/退货区/质检区/不良品区）
+- [ ] `wms_location` 扩展：`ZoneId` / `BinType` / `AbcClass` / `MaxQty` / `IsLocked`
+- [ ] `wms_inventory` 改造：唯一索引 (Warehouse, Location, Product, BatchNo, Owner)
+- [ ] ABC 分类自动计算：定时任务按 30 天出库频次更新
+
+**15.2 批次/序列号管理**
+- [ ] 新增 `wms_batch` 批次表（生产日期/有效期/QC 状态）
+- [ ] 新增 `wms_serial` 序列号表（电子产品强制扫码）
+- [ ] FEFO 出库策略：按 `ExpireDate ASC` 自动选批次
+- [ ] PDA H5 扫码登记序列号
+
+**15.3 入库流程升级**
+- [ ] `wms_inbound_qc` 入库质检单表
+- [ ] PDA H5 扫码上架（库位扫码 → 商品扫码 → 数量录入）
+- [ ] 收货差异处理：实收 ≠ 应收触发 OA 审批（templateCode `INBOUND_DIFF_APPROVAL`）
+
+**15.4 出库流程升级（波次拣货）**
+- [ ] 新增 `wms_wave` 波次单 + `wms_pick_task` 拣货任务 + `wms_package` 包裹
+- [ ] 4 种波次策略：单品单订/多品分播/同库位归并/急单优先
+- [ ] PDA 拣货界面（任务列表 → 库位导航 → 扫码确认）
+- [ ] 复核打包流程：扫描包裹 → 称重 → 打面单
+- [ ] 路径优化算法（贪心，按库位 X/Y 坐标排序）
+
+**15.5 三方物流接入**
+- [ ] 新增 `wms_logistics_provider` / `wms_logistics_account` / `wms_waybill` / `wms_logistics_track`
+- [ ] 顺丰开放平台接入（下单/取消/电子面单/路由）
+- [ ] 快递鸟 KdNiao 统一对接中通/韵达/圆通
+- [ ] 面单打印（PDF/PNG，前端调用浏览器打印）
+- [ ] 路由轨迹定时拉取（4h 一次 BackgroundService）
+- [ ] 异常告警（超 3 天卡件/退回件）
+
+**15.6 库内移库 + 调拨 + 盘点升级**
+- [ ] 库内移库（PDA 扫描原位 → 目标位）
+- [ ] 跨仓调拨单（出库 + 在途 + 入库三段式）
+- [ ] 循环盘点定时任务（A 类月/B 类季/C 类半年）
+- [ ] 抽盘 + 盲盘模式
+- [ ] 差异自动生成调整单 → OA 审批
+
+---
+
+### ✅ P12：MES 升级（时效统计 + OEE + 节拍 + 瓶颈）— 已完成
+
+**16.1 工单时效统计**
+- [ ] `MesWorkOrder` 扩展：`PlannedStart/EndTime`、`ActualStart/EndTime`、`ScheduleVariance`、`LeadTimeHr`
+- [ ] `GET /api/stats/wo-efficiency`：按期完工率/平均交期/排程依从度/瓶颈/工人效率
+- [ ] `GET /api/stats/wo-trend?months=6`：6 月趋势
+
+**16.2 工序级管理（报工系统）**
+- [ ] `MesWorkOrderProcess` 改造：`StandardCycleSec`、`ActualCycleSec`、`QualifiedQty`、`DefectQty`、`ReworkQty`、`OperatorId`、`EquipmentId`、`DowntimeMinutes`、`DowntimeReason`
+- [ ] PDA H5 扫码报工（开工/暂停/完工 + 数量）
+- [ ] 工序流转看板（生产现场大屏，实时在制品）
+- [ ] 异常报工自动创建处理单
+
+**16.3 设备 OEE**
+- [ ] 新增 `mes_equipment` 设备档案 + `mes_equipment_log` 运行日志
+- [ ] 每日跑批 `mes_equipment_oee_daily`：可用率 × 表现率 × 质量率
+- [ ] OEE 看板（仪表盘 + 趋势）
+
+**16.4 瓶颈与产能分析**
+- [ ] `GET /api/stats/capacity-load?date=`：设备/工序负载率
+- [ ] `GET /api/stats/bottleneck`：瓶颈识别
+- [ ] `GET /api/stats/operator-ranking`：工人产量/合格率排名
+- [ ] 不良品 Pareto 图（按缺陷类型）
+- [ ] 节拍偏差折线（标准 vs 实际，超标标红）
+
+---
+
+### ✅ P13：OctopusFIN（财务）— 已完成（端口 5007）
+
+- [ ] 项目骨架 `OctopusFIN/src/OctopusFIN.Api`（端口 5007/5181）
+- [ ] 数据模型 12 表：`fin_account` / `fin_voucher` / `fin_voucher_entry` / `fin_period` / `fin_ar_invoice` / `fin_ar_receipt` / `fin_ap_invoice` / `fin_ap_payment` / `fin_expense_claim` / `fin_bank_account` / `fin_bank_statement` / `fin_journal`
+- [ ] 阶段 1：科目树 + 凭证录入 + 月结
+- [ ] 阶段 2：CRM 发货 → AR 自动凭证 / MES 入库 → AP 自动凭证
+- [ ] 阶段 3：OA 报销审批通过 → 费用凭证 + 出纳付款单
+- [ ] 阶段 4：三大报表（资产负债 / 利润 / 现金流量）
+- [ ] Aspire 集成 + 测试 ≥ 30 个
+
+---
+
+### ✅ P14：OctopusHRM（人力资源）— 已完成（端口 5008，11 测试）
+
+- [ ] 项目骨架（端口 5008/5182）
+- [ ] 员工档案升级（从 OA Employee 迁移 + 合同/社保/薪资历史）
+- [ ] 薪酬模块：薪资项配置 + 月度算薪（拉 OA 考勤）+ 工资条
+- [ ] 算薪完成 → 推 FIN 生成薪资凭证
+- [ ] 绩效模块：KPI/OKR 设置 + 评分 + 360 评估
+- [ ] 招聘模块：JD 发布 + 投递 + 面试 + Offer
+- [ ] Offer 接受 → 自动创建 OA Employee（H5 入职流程联通）
+- [ ] 假期模块：余额管理 + 与 OA 考勤打通
+- [ ] 培训模块：课程 + 报名 + 证书
+
+---
+
+### ✅ P15：OctopusOMS（订单中台，聚水潭风格）— 已完成（端口 5009，10 测试）
+
+- [ ] 项目骨架（端口 5009/5183）
+- [ ] 数据模型：`oms_channel` / `oms_shop` / `oms_order` / `oms_order_item` / `oms_sku_mapping` / `oms_inventory_sync_rule` / `oms_after_sale`
+- [ ] 渠道接入（按优先级）：
+  - [ ] 淘宝/天猫（顶级开放平台）
+  - [ ] 京东（JOS）
+  - [ ] 拼多多
+  - [ ] 抖音小店
+  - [ ] 独立站 Shopify（Webhook）
+  - [ ] Amazon SP-API（跨境）
+- [ ] 订单合并/拆单/预售/赠品规则
+- [ ] 库存分配规则引擎（按比例/按优先级/按销量预测）
+- [ ] 售后管理：退/换/补/退款
+- [ ] 黑名单/风控
+
+---
+
+### 🔶 P16：客户 + 供应商门户 — 后端就绪，前端待建
+
+> UMC 已新增 4 个 OIDC 客户端（`octopus-hrm-web` / `octopus-oms-web` / `octopus-customer-portal` / `octopus-supplier-portal`）+ `customer` / `supplier` 两个角色。
+> 前端 Vite 项目（端口 5184 / 5185）尚未实装。
+
+**客户门户（OctopusPortal.Customer）**
+- [ ] 独立 H5 + PWA（端口 5184）
+- [ ] UMC 新建 OIDC 客户端 `octopus-customer-portal`，新增 `customer` 角色
+- [ ] 我的询盘 / 报价进度
+- [ ] 我的合同 / 下载 PDF
+- [ ] 物流追踪
+- [ ] 对账中心
+- [ ] 在线客服（接 OctopusOMS 客服工单）
+
+**供应商门户（OctopusPortal.Supplier）**
+- [ ] 独立 H5（端口 5185）
+- [ ] UMC 新增 `supplier` 角色
+- [ ] 询价响应（在线报价）
+- [ ] 我的订单（备货状态）
+- [ ] 发货登记
+- [ ] 对账中心
+- [ ] 资质上传
+
+**API 网关（OctopusGateway）**
+- [ ] 新建 .NET YARP 反向代理项目
+- [ ] 统一限流 / 鉴权 / 日志
+- [ ] 外网请求强制走网关
+
+---
+
+### ✅ P17：低代码 BPM（OA 工作流升级）— 引擎层已完成，设计器待建
+
+> 已完成：`WorkflowNode.SkipCondition`（表达式跳过：`amount < 1000`）+ `CcUsersJson`（抄送）+ `ApprovalDelegate` 转交表 + `ApprovalService.Delegate / EvaluateCondition / NotifyCcUsers`。5 个 BpmExtensionTests 全绿。
+> 待做：拖拽流程设计器（前端）+ 表单设计器升级（字段联动 / 公式 / 明细表 / 关联下拉）。
+
+- [ ] 引入 Elsa Workflows 或自研 BPMN 简化引擎
+- [ ] 流程设计器（拖拽节点：开始/审批/抄送/分支/并行/结束）
+- [ ] 条件分支（表单字段表达式：`金额 > 100000`）
+- [ ] 委托/转交/加签节点
+- [ ] 自由跳转（驳回到指定节点而非起点）
+- [ ] 表单设计器升级：
+  - [ ] 字段联动（A 变 → B 显示/必填切换）
+  - [ ] 公式字段（`总金额 = 数量 × 单价`）
+  - [ ] 明细表（一对多子表）
+  - [ ] 关联数据下拉（实时查接口）
+- [ ] 流程模板库（请假/报销/采购/合同/调岗/离职/资产领用/入职…）
+
+---
+
+## 长期愿景（12 个月+）
+
+### L1：多租户 SaaS 化
+- [ ] 所有表加 `TenantId`，中间件自动注入过滤
+- [ ] JWT 携带 TenantId，路由级数据隔离
+- [ ] 计费引擎（用户数/存储/调用量）
+- [ ] 双轨发布：开源版（基础功能）+ 商业版（高级功能 + SLA）
+
+### L2：移动原生 App（Capacitor 套壳）
+- [ ] iOS / Android 双端壳工程（基于 OA H5）
+- [ ] 推送通知（极光/腾讯信鸽）
+- [ ] 离线打卡 + 网络恢复同步
+- [ ] 条码 / 二维码扫描
+- [ ] GPS 围栏定位打卡
+
+### L3：AI 赋能
+- [ ] 智能审批助手（LLM 摘要 + 类型分类）
+- [ ] 销售助理（RAG 检索历史合同推荐报价）
+- [ ] 库存预测（时序模型，自动建议采购量）
+- [ ] 客户意向分析（沟通记录 → LLM 抽取意向标签）
+- [ ] 智能客服（RAG + LLM 自动应答）
+
+### L4：国际化 + 跨境
+- [ ] i18n（中/英/日/西）
+- [ ] 多币种 + 实时汇率（FIN）
+- [ ] 多税制（增值税 / GST / VAT）
+- [ ] 用户级时区
+- [ ] 海外仓 + 报关报检（OMS 跨境扩展）
 - [x] 前端：`CRM.Web /bi` 路由，SubMenu 新增"分析"组，纯 CSS/SVG 图表无三方依赖

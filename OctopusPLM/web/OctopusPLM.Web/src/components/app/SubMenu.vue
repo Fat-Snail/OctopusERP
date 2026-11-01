@@ -38,7 +38,8 @@ const groups: NavGroup[] = [
   {
     group: '设计',
     items: [
-      { label: 'BOM管理', path: '/plm/bom', disabled: true },
+      { label: '制造版本管理', path: '/plm/manufacturing' },
+      { label: '物料库', path: '/plm/material' },
     ],
   },
   {

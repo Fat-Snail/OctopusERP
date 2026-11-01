@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Plus, Link } from 'lucide-vue-next'
+import { Plus, Link } from '@lucide/vue'
 import PageHeader from '@/components/app/PageHeader.vue'
 import Badge from '@/components/ui/badge.vue'
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from '@/components/ui/dialog'

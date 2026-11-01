@@ -60,7 +60,7 @@ public class AccountControllerTests : IClassFixture<TestWebApplicationFactory>
     {
         // wangwu (UserId=4) has Status=0
         var response = await _client.PostAsJsonAsync("/api/account/login",
-            new { UserName = "wangwu", Password = "User@123" });
+            new { UserName = "wangwu", Password = "Admin@123" });
 
         var result = await response.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>();
         result!.Code.Should().Be(403);
@@ -80,7 +80,7 @@ public class AccountControllerTests : IClassFixture<TestWebApplicationFactory>
     public async Task Login_WithEditorUser_ReturnsRoleInfo()
     {
         var response = await _client.PostAsJsonAsync("/api/account/login",
-            new { UserName = "editor", Password = "Editor@123" });
+            new { UserName = "editor", Password = "Admin@123" });
 
         var result = await response.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>();
         result!.Code.Should().Be(200);

@@ -196,7 +196,7 @@ public class UserDataPermissionTests : IClassFixture<TestWebApplicationFactory>
     {
         // common 角色(RoleId=2) MenuIds={1,2,3,100,101,102}，均为 M/C 类型，无 F(按钮)
         var response = await _client.PostAsJsonAsync("/api/account/login",
-            new { UserName = "zhangsan", Password = "User@123" });
+            new { UserName = "zhangsan", Password = "Admin@123" });
         var result = await response.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>();
 
         result!.Code.Should().Be(200);
@@ -210,7 +210,7 @@ public class UserDataPermissionTests : IClassFixture<TestWebApplicationFactory>
     {
         // editor 角色(RoleId=3) MenuIds 不含按钮节点
         var response = await _client.PostAsJsonAsync("/api/account/login",
-            new { UserName = "editor", Password = "Editor@123" });
+            new { UserName = "editor", Password = "Admin@123" });
         var result = await response.Content.ReadFromJsonAsync<ApiResponse<LoginResponse>>();
 
         result!.Code.Should().Be(200);

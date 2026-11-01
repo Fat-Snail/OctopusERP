@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { ref, h, onMounted } from 'vue'
 import {
-  useVueTable,
-  getCoreRowModel,
+  useTable,
+  coreFeatures,
+  columnVisibilityFeature,
   createColumnHelper,
   FlexRender,
 } from '@tanstack/vue-table'
-import { Plus } from 'lucide-vue-next'
+
+const features = { ...coreFeatures, columnVisibilityFeature }
+import { Plus } from '@lucide/vue'
 import { getStocktakeList } from '@/api/stocktake'
 import type { StocktakeListRow, StocktakeStatus } from '@/api/stocktake/types'
 import PageHeader from '@/components/app/PageHeader.vue'
@@ -44,8 +47,8 @@ const statusLabel: Record<StocktakeStatus, string> = {
   cancelled: '已取消',
 }
 
-const columnHelper = createColumnHelper<StocktakeListRow>()
-const columns = [
+const columnHelper = createColumnHelper<typeof features, StocktakeListRow>()
+const columns = columnHelper.columns([
   columnHelper.accessor('stocktakeCode', {
     header: '盘点单号',
     cell: info => h('span', { class: 'font-mono-tnum text-[11px]' }, info.getValue()),
@@ -74,12 +77,12 @@ const columns = [
     header: '创建时间',
     cell: info => h('span', { class: 'font-mono-tnum text-[11px] text-muted-foreground' }, info.getValue().slice(0, 10)),
   }),
-]
+])
 
-const table = useVueTable({
+const table = useTable({
+  features,
   get data() { return rows.value },
   columns,
-  getCoreRowModel: getCoreRowModel(),
 })
 </script>
 

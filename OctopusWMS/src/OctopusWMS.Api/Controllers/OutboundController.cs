@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using OctopusWMS.Api.Filters;
 using OctopusWMS.Api.Persistence;
 using OctopusWMS.Api.Services;
 
@@ -28,6 +29,7 @@ public class OutboundController(OutboundService svc) : ControllerBase
     }
 
     [HttpPost]
+    [OperationLog("创建出库单")]
     public async Task<IActionResult> Create([FromBody] WmsOutboundOrder req)
     {
         var data = await svc.CreateAsync(req, UserId);
@@ -35,6 +37,7 @@ public class OutboundController(OutboundService svc) : ControllerBase
     }
 
     [HttpPut("{id}/ship")]
+    [OperationLog("出库发货")]
     public async Task<IActionResult> Ship(long id)
     {
         var data = await svc.ShipAsync(id);

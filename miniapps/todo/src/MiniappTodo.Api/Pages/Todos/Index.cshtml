@@ -1,0 +1,115 @@
+@page
+@model MiniappTodo.Api.Pages.Todos.IndexModel
+@{
+    ViewData["Title"] = "待办";
+    string PriorityLabel(int p) => p switch
+    {
+        5 => "🔥 紧急",
+        4 => "⬆ 高",
+        3 => "● 中",
+        2 => "⬇ 低",
+        _ => "○ 极低"
+    };
+    string FilterBtn(string mode) =>
+        Model.FilterMode == mode ? "btn btn-primary" : "btn btn-outline-secondary";
+}
+
+<div class="d-flex justify-content-between align-items-end mb-3">
+    <div>
+        <h2 class="mb-1">我的待办</h2>
+        <p class="text-muted small mb-0">所有数据仅当前用户可见 — 业务表按 <code>kc_sub</code> 严格过滤</p>
+    </div>
+    <div class="btn-group">
+        <a class="@FilterBtn("all")" href="/Todos?mode=all">全部</a>
+        <a class="@FilterBtn("pending")" href="/Todos?mode=pending">未完成</a>
+        <a class="@FilterBtn("done")" href="/Todos?mode=done">已完成</a>
+    </div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        @if (Model.Items.Count == 0)
+        {
+            <div class="card shadow-sm border-0">
+                <div class="card-body text-center text-muted py-5">
+                    <p class="mb-2">暂无待办事项</p>
+                    <p class="small">→ 用右侧表单新增一条吧</p>
+                </div>
+            </div>
+        }
+        else
+        {
+            @foreach (var t in Model.Items)
+            {
+                <div class="card card-todo shadow-sm border-0 mb-2 priority-@t.Priority @(t.IsDone ? "done" : "")">
+                    <div class="card-body py-2 px-3">
+                        <div class="d-flex align-items-center gap-2">
+                            <form method="post" asp-page-handler="Toggle" asp-route-id="@t.TodoId" class="m-0">
+                                <input type="checkbox" class="form-check-input"
+                                       onchange="this.form.submit()" @(t.IsDone ? "checked" : "") />
+                            </form>
+                            <div class="flex-grow-1">
+                                <div class="todo-title">@t.Title</div>
+                                @if (!string.IsNullOrEmpty(t.Description))
+                                {
+                                    <div class="small text-muted">@t.Description</div>
+                                }
+                                <div class="small text-muted mt-1">
+                                    <span class="me-2">@PriorityLabel(t.Priority)</span>
+                                    @if (t.DueDate.HasValue)
+                                    {
+                                        var overdue = !t.IsDone && t.DueDate < DateTime.UtcNow;
+                                        <span class="me-2 @(overdue ? "text-danger fw-bold" : "")">
+                                            截止 @t.DueDate.Value.ToLocalTime():yyyy-MM-dd
+                                            @if (overdue) { <span>· 已逾期</span> }
+                                        </span>
+                                    }
+                                    <span class="text-muted">创建 @t.CreatedAt.ToLocalTime():MM-dd HH:mm</span>
+                                </div>
+                            </div>
+                            <form method="post" asp-page-handler="Delete" asp-route-id="@t.TodoId" class="m-0">
+                                <button type="submit" class="btn btn-sm btn-outline-danger"
+                                        onclick="return confirm('确定删除「@t.Title」?');">删除</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            }
+        }
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card shadow-sm border-0 sticky-top" style="top: 16px;">
+            <div class="card-body">
+                <h5 class="card-title">新增待办</h5>
+                <form method="post" asp-page-handler="Create">
+                    <div class="mb-2">
+                        <label class="form-label small">标题 *</label>
+                        <input asp-for="Input.Title" class="form-control" placeholder="例如：本周提交季度报告" required maxlength="200" />
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">描述</label>
+                        <textarea asp-for="Input.Description" class="form-control" rows="2" placeholder="可选"></textarea>
+                    </div>
+                    <div class="row mb-2">
+                        <div class="col">
+                            <label class="form-label small">截止日期</label>
+                            <input asp-for="Input.DueDate" type="datetime-local" class="form-control form-control-sm" />
+                        </div>
+                        <div class="col">
+                            <label class="form-label small">优先级</label>
+                            <select asp-for="Input.Priority" class="form-select form-select-sm">
+                                <option value="5">🔥 紧急 (5)</option>
+                                <option value="4">⬆ 高 (4)</option>
+                                <option value="3" selected>● 中 (3)</option>
+                                <option value="2">⬇ 低 (2)</option>
+                                <option value="1">○ 极低 (1)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">添加</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>

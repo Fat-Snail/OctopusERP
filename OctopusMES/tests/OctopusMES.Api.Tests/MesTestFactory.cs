@@ -7,6 +7,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OctopusMES.Api.Persistence;
+using OctopusMES.Api.Services;
 using System.Security.Claims;
 using System.Text.Encodings.Web;
 
@@ -20,10 +21,15 @@ public class MesTestFactory : WebApplicationFactory<Program>
     {
         _connection = new SqliteConnection("Data Source=:memory:;Cache=Shared");
         _connection.Open();
+        // 测试默认：归档截止设为远古（1900-01-01），让 2021/2022 seed 数据保持可写。
+        // 归档专项测试可临时覆盖此值。
+        GarmentScheduleService.CutoffProvider = () => new DateTime(1900, 1, 1);
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        builder.UseSetting("Plm:SharedSecret", "mes-test-secret");
+        builder.UseSetting("Plm:RetryWorkerEnabled", "false");
         builder.ConfigureServices(services =>
         {
             var descriptor = services.SingleOrDefault(
@@ -81,7 +87,7 @@ public class MesTestAuthHandler(
             new Claim("sub", userIdStr),
             new Claim("name", name),
             new Claim("email", email),
-            new Claim("role", userIdStr == "1" ? "admin" : "common"),
+            new Claim(ClaimTypes.Role, userIdStr == "1" ? "admin" : "common"),
         };
         var identity = new ClaimsIdentity(claims, "Test");
         var principal = new ClaimsPrincipal(identity);

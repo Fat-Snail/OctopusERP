@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Building2, Phone, Mail } from 'lucide-vue-next'
+import { Building2, Phone, Mail } from '@lucide/vue'
 import type { ContactUser } from '@/api/contact/types'
 
 const props = defineProps<{ user: ContactUser }>()

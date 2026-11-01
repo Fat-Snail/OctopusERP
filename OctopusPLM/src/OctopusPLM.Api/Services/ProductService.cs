@@ -25,7 +25,9 @@ public class ProductService
 
     /// <summary>商品列表（分页 + 筛选）</summary>
     public async Task<(List<ProductListRow> Rows, int Total)> GetListAsync(
-        int page, int size, long? categoryId, string? keyword, string? status)
+        int page, int size, long? categoryId, string? keyword, string? status,
+        decimal? minPrice = null, decimal? maxPrice = null,
+        DateTime? createdFrom = null, DateTime? createdTo = null)
     {
         var query = _db.Products.AsQueryable();
 
@@ -35,6 +37,14 @@ public class ProductService
             query = query.Where(p => p.ProductName.Contains(keyword));
         if (!string.IsNullOrEmpty(status))
             query = query.Where(p => p.Status == status);
+        if (minPrice.HasValue)
+            query = query.Where(p => p.Skus.Any(s => s.Price >= minPrice.Value));
+        if (maxPrice.HasValue)
+            query = query.Where(p => p.Skus.Any(s => s.Price <= maxPrice.Value));
+        if (createdFrom.HasValue)
+            query = query.Where(p => p.CreatedAt >= createdFrom.Value);
+        if (createdTo.HasValue)
+            query = query.Where(p => p.CreatedAt <= createdTo.Value.AddDays(1));
 
         var total = await query.CountAsync();
 
@@ -43,6 +53,13 @@ public class ProductService
             .Include(p => p.Category)
             .Include(p => p.Skus)
             .ToListAsync();
+
+        // Batch-load creator names from SyncUsers
+        var creatorIds = products.Select(p => p.CreatedBy).Where(id => id > 0).Distinct().ToList();
+        var userNames = creatorIds.Count > 0
+            ? await _db.SyncUsers.Where(u => creatorIds.Contains(u.UmcUserId))
+                .ToDictionaryAsync(u => u.UmcUserId, u => u.NickName ?? u.UserName)
+            : new Dictionary<long, string>();
 
         var rows = products.Select(p => new ProductListRow
         {
@@ -57,6 +74,9 @@ public class ProductService
             MinPrice = p.Skus.Count > 0 ? p.Skus.Min(s => s.Price) : 0,
             MaxPrice = p.Skus.Count > 0 ? p.Skus.Max(s => s.Price) : 0,
             TotalStock = p.Skus.Sum(s => s.Stock),
+            SkuCount = p.Skus.Count,
+            CreatedByName = userNames.GetValueOrDefault(p.CreatedBy, ""),
+            SourceChannel = p.SourceChannel,
             CreatedAt = p.CreatedAt,
             UpdatedAt = p.UpdatedAt,
         }).ToList();
@@ -64,19 +84,59 @@ public class ProductService
         return (rows, total);
     }
 
-    /// <summary>商品详情</summary>
+    /// <summary>商品详情（含创建人、审核历史、类目模版版本）</summary>
     public async Task<ProductResponse?> GetByIdAsync(long id)
     {
         var p = await _db.Products
             .Include(x => x.Category)
             .Include(x => x.Images)
             .Include(x => x.Skus)
-            .Include(x => x.AttributeValues)
+            .Include(x => x.Reviews)
             .FirstOrDefaultAsync(x => x.ProductId == id);
 
         if (p == null) return null;
 
-        return MapToResponse(p);
+        string creatorName = "";
+        if (p.CreatedBy > 0)
+        {
+            var creator = await _db.SyncUsers.FirstOrDefaultAsync(u => u.UmcUserId == p.CreatedBy);
+            creatorName = creator?.NickName ?? creator?.UserName ?? "";
+        }
+
+        var activeVersion = await _db.CategoryModelVersions
+            .Where(v => v.CategoryId == p.CategoryId && v.Status == "active")
+            .OrderByDescending(v => v.EffectiveFrom)
+            .FirstOrDefaultAsync();
+
+        var response = MapToResponse(p);
+        response.CreatedByName = creatorName;
+        response.Reviews = p.Reviews.OrderBy(r => r.CreatedAt).Select(r => new ReviewHistoryItem
+        {
+            ReviewId = r.ReviewId,
+            Action = r.Action,
+            ActionLabel = ActionLabels.GetValueOrDefault(r.Action, r.Action),
+            ReviewerId = r.ReviewerId,
+            ReviewerName = r.ReviewerName,
+            Comment = r.Comment,
+            CreatedAt = r.CreatedAt,
+        }).ToList();
+
+        if (activeVersion != null)
+        {
+            response.ModelVersionInfo = new ProductModelVersionInfo
+            {
+                ModelVersionId = activeVersion.ModelVersionId,
+                VersionNo = activeVersion.VersionNo,
+                Status = activeVersion.Status,
+                CreatedByName = activeVersion.CreatedByName,
+                PublishedByName = activeVersion.PublishedByName,
+                PublishedAt = activeVersion.PublishedAt,
+                EffectiveFrom = activeVersion.EffectiveFrom,
+                ChangeSummary = activeVersion.ChangeSummary,
+            };
+        }
+
+        return response;
     }
 
     /// <summary>批量查询商品（用于向量搜索结果还原）</summary>

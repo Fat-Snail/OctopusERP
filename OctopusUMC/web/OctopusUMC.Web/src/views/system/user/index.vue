@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { Search, RefreshCw, Plus, Trash2, Edit, KeyRound, Download, Upload } from 'lucide-vue-next'
+import { Search, RefreshCw, Plus, Trash2, Edit, KeyRound, Download, Upload } from '@lucide/vue'
 import { get, post, put, del } from '@/utils/http'
 import type { UserResponse, DeptResponse, RoleResponse, PostResponse } from '@/api/system/types'
 import type { PagedResult } from '@/api/types'
@@ -42,7 +42,17 @@ const query = reactive({
   phoneNumber: '',
   status: undefined as number | undefined,
   deptId: undefined as number | undefined,
+  /** ADR-010：员工与零售客户同表，按类型区分 */
+  userType: undefined as string | undefined,
 })
+
+/** 用户类型展示（customer 是零售域邀请进来的客户/店员） */
+const USER_TYPES: Record<string, { label: string; cls: string }> = {
+  employee: { label: '员工', cls: 'bg-[var(--color-primary)]/10 text-[var(--color-primary)]' },
+  customer: { label: '客户', cls: 'bg-[var(--color-warning,#f59e0b)]/15 text-[var(--color-warning,#b45309)]' },
+  partner: { label: '伙伴', cls: 'bg-muted text-muted-foreground' },
+}
+const typeOf = (t?: string) => USER_TYPES[t ?? ''] ?? { label: t || '-', cls: 'bg-muted text-muted-foreground' }
 
 const formData = reactive<UserForm>({
   userName: '', nickName: '', email: '', phoneNumber: '',
@@ -80,6 +90,7 @@ function resetQuery() {
   query.phoneNumber = ''
   query.status = undefined
   query.deptId = undefined
+  query.userType = undefined
   loadUsers()
 }
 
@@ -287,6 +298,18 @@ onMounted(() => {
           />
         </div>
         <div class="flex items-center gap-1.5">
+          <span class="text-[12px] text-muted-foreground">类型</span>
+          <select
+            v-model="query.userType"
+            class="h-7 px-2 rounded-[var(--radius)] border border-input bg-background text-[12px] focus:outline-none focus:ring-1 focus:ring-ring"
+          >
+            <option :value="undefined">全部</option>
+            <option value="employee">员工</option>
+            <option value="customer">客户</option>
+            <option value="partner">伙伴</option>
+          </select>
+        </div>
+        <div class="flex items-center gap-1.5">
           <span class="text-[12px] text-muted-foreground">状态</span>
           <select
             v-model="query.status"
@@ -355,6 +378,7 @@ onMounted(() => {
               </th>
               <th class="text-left text-[11px] uppercase tracking-wide text-muted-foreground px-3 py-2.5 font-medium">用户名</th>
               <th class="text-left text-[11px] uppercase tracking-wide text-muted-foreground px-3 py-2.5 font-medium">昵称</th>
+              <th class="text-left text-[11px] uppercase tracking-wide text-muted-foreground px-3 py-2.5 font-medium">类型</th>
               <th class="text-left text-[11px] uppercase tracking-wide text-muted-foreground px-3 py-2.5 font-medium">部门</th>
               <th class="text-left text-[11px] uppercase tracking-wide text-muted-foreground px-3 py-2.5 font-medium">手机号</th>
               <th class="text-left text-[11px] uppercase tracking-wide text-muted-foreground px-3 py-2.5 font-medium">邮箱</th>
@@ -365,10 +389,10 @@ onMounted(() => {
           </thead>
           <tbody>
             <tr v-if="loading">
-              <td colspan="9" class="py-8 text-center text-[12px] text-muted-foreground">加载中...</td>
+              <td colspan="10" class="py-8 text-center text-[12px] text-muted-foreground">加载中...</td>
             </tr>
             <tr v-else-if="!users.length">
-              <td colspan="9" class="py-8 text-center text-[12px] text-muted-foreground">暂无数据</td>
+              <td colspan="10" class="py-8 text-center text-[12px] text-muted-foreground">暂无数据</td>
             </tr>
             <tr
               v-else
@@ -386,6 +410,14 @@ onMounted(() => {
               </td>
               <td class="px-3 py-2 text-[12px] text-foreground font-medium">{{ row.userName }}</td>
               <td class="px-3 py-2 text-[12px] text-foreground">{{ row.nickName }}</td>
+              <td class="px-3 py-2">
+                <span class="px-1.5 py-0.5 rounded text-[11px]" :class="typeOf(row.userType).cls">
+                  {{ typeOf(row.userType).label }}
+                </span>
+                <span v-if="row.source && row.source !== 'umc'" class="ml-1 text-[10px] text-muted-foreground">
+                  {{ row.source }}
+                </span>
+              </td>
               <td class="px-3 py-2 text-[12px] text-muted-foreground">{{ row.deptName }}</td>
               <td class="px-3 py-2 text-[12px] font-mono-tnum text-foreground">{{ row.phoneNumber || '-' }}</td>
               <td class="px-3 py-2 text-[12px] text-muted-foreground max-w-[160px] truncate">{{ row.email }}</td>

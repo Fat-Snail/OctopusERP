@@ -60,6 +60,28 @@ public class WorkflowNode
     public string ApproverType { get; set; } = "role";
     public string? ApproverValue { get; set; }
     public int Status { get; set; } = 1;
+    /// <summary>节点审批 SLA（小时），null 表示不限时</summary>
+    public int? SlaHours { get; set; }
+
+    /// <summary>P17：节点跳过条件表达式（满足则跳过该节点，例：amount &lt; 1000 → 小额免审）</summary>
+    public string? SkipCondition { get; set; }
+
+    /// <summary>P17：抄送用户列表（JSON [umcUserId,...]，节点流转到时通知）</summary>
+    public string? CcUsersJson { get; set; }
+}
+
+/// <summary>P17：审批转交记录（A 转给 B，原审批人卸责，B 接管）</summary>
+public class ApprovalDelegate
+{
+    public long DelegateId { get; set; }
+    public long ApprovalId { get; set; }
+    public int NodeOrder { get; set; }
+    public long FromUserId { get; set; }
+    public string FromUserName { get; set; } = string.Empty;
+    public long ToUserId { get; set; }
+    public string ToUserName { get; set; } = string.Empty;
+    public string? Reason { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
 // ── 审批实例 ─────────────────────────────────────────
@@ -76,6 +98,12 @@ public class Approval
     public string FormData { get; set; } = "{}";
     public DateTime CreateTime { get; set; } = DateTime.UtcNow;
     public DateTime UpdateTime { get; set; } = DateTime.UtcNow;
+    /// <summary>当前节点的截止时间（由 SlaHours 推算），null 表示节点不限时</summary>
+    public DateTime? CurrentNodeDeadline { get; set; }
+    /// <summary>是否已超期（由 SLA Worker 标记）</summary>
+    public bool IsOverdue { get; set; }
+    /// <summary>是否已发过即将超时预警（避免重复推送）</summary>
+    public bool IsSlaWarned { get; set; }
 }
 
 public class ApprovalRecord

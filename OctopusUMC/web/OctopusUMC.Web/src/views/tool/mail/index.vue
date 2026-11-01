@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive } from 'vue'
-import { Send } from 'lucide-vue-next'
+import { Send } from '@lucide/vue'
 import { post } from '@/utils/http'
 
 const submitting = ref(false)

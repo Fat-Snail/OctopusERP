@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
-import { Search, RefreshCw, Plus, Edit, Trash2 } from 'lucide-vue-next'
+import { Search, RefreshCw, Plus, Edit, Trash2 } from '@lucide/vue'
 import { get, post, put, del } from '@/utils/http'
 import type { NoticeResponse } from '@/api/system/types'
 import type { PagedResult } from '@/api/types'

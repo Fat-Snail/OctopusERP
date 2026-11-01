@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { Search, RefreshCw } from 'lucide-vue-next'
+import { Search, RefreshCw } from '@lucide/vue'
 import PageHeader from '@/components/app/PageHeader.vue'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { getDeptTree, getUsers, getUser } from '@/api/contact'
@@ -138,7 +138,7 @@ onMounted(async () => {
 <script lang="ts">
 // Recursive dept node component
 import { defineComponent, h, type PropType, type Component } from 'vue'
-import { ChevronRight } from 'lucide-vue-next'
+import { ChevronRight } from '@lucide/vue'
 
 const DeptNode: Component = defineComponent({
   name: 'DeptNode',

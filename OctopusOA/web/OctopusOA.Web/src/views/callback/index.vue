@@ -7,7 +7,9 @@ const router = useRouter()
 
 onMounted(async () => {
   await oidcService.handleCallback()
-  router.replace('/home')
+  const redirect = sessionStorage.getItem('oa_redirect') || '/home'
+  sessionStorage.removeItem('oa_redirect')
+  router.replace(redirect)
 })
 </script>
 

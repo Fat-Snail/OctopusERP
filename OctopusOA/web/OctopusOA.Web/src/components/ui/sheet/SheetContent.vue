@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { inject, type ComputedRef } from 'vue'
-import { X } from 'lucide-vue-next'
+import { X } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 
 type Side = 'left' | 'right' | 'top' | 'bottom'

@@ -1,64 +1,286 @@
-# IDE配置
-.vscode/
-.idea/
-*.swp
-*~
-.DS_Store
+# ============================================================
+# OctopusUMC & OctopusOA — .gitignore
+# 覆盖：.NET 8 / Vue 3 / Rider / Visual Studio / Docker
+# ============================================================
 
-# 依赖目录
-node_modules/
+
+# ============================================================
+# .NET / C#
+# ============================================================
+
+# 编译输出
 bin/
 obj/
+out/
+
+# NuGet
+*.nupkg
+*.snupkg
+.nuget/
 packages/
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# EF Core 迁移快照以外的临时文件（迁移文件本身需提交）
+# 注意：Migrations/ 目录不加入忽略
+
+# 用户级配置
+*.user
+*.userosscache
+*.suo
+*.sln.docstates
+
+# 发布输出
+publish/
+**/publish/
+*_publish/
+
+# 应用程序运行时文件
+*.log
+*.sqlite
+*.db
+*.db-shm
+*.db-wal
+
+# 敏感配置（本地覆盖，不提交到仓库）
+appsettings.Development.json
+appsettings.Local.json
+appsettings.*.local.json
+secrets.json
+
+# 证书与密钥
+*.pfx
+*.p12
+*.key
+*.pem
+*.cer
+*.crt
+
+# 测试结果
+TestResults/
+*.trx
+*.coverage
+*.coveragexml
+coverage/
+coverage-report/
+
+# 代码分析
+.sonarqube/
+
+
+# ============================================================
+# JetBrains Rider
+# ============================================================
+
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Rider 本地工作区（不共享）
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/usage.statistics.xml
+.idea/dictionaries/
+.idea/shelf/
+
+# 代码风格（如果团队统一用 .editorconfig 则忽略）
+# .idea/codeStyles/
+
+# Rider 插件生成的文件
+.idea/httpRequests/
+.idea/dataSource.xml
+.idea/dataSources/
+.idea/dataSources.local.xml
+.idea/sqlDataSources.xml
+.idea/dynamic.xml
+.idea/uiDesigner.xml
+.idea/gradle.xml
+.idea/libraries/
+.idea/jarRepositories.xml
+.idea/compiler.xml
+.idea/modules.xml
+.idea/.gitignore
+
+# ReSharper
+_ReSharper*/
+*.[Rr]e[Ss]harper
+*.DotSettings.user
+
+
+# ============================================================
+# Visual Studio 2022 / 2026
+# ============================================================
+
+# 用户特定文件
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Visual Studio 自动生成文件
 .vs/
+*.VC.db
+*.VC.VC.opendb
+*.aps
+
+# MSTest 测试项目输出
+[Tt]est[Rr]esult*/
+[Bb]uild[Ll]og.*
+
+# 调试转储文件
+*.dump
+*.gpstate
+
+# NuGet v3+
+*.nuget.props
+*.nuget.targets
+
+# Windows 镜像文件
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+
+# StyleCop
+StyleCopReport.xml
+
+# 代码契约
+contract/
+
+# VS Code 调试配置（如果项目不使用则忽略）
+# .vscode/
+
+
+# ============================================================
+# Node.js / npm / Vue 3 / Vite
+# ============================================================
+
+# 依赖
+node_modules/
+.npm/
+.yarn/
+.pnp/
+.pnp.js
 
 # 构建输出
 dist/
+dist-ssr/
 build/
-out/
-release/
+.vite/
 
-# 日志文件
-*.log
-logs/
-
-# 环境变量文件
+# 环境变量（本地覆盖）
 .env
 .env.local
+.env.*.local
 .env.development.local
 .env.test.local
 .env.production.local
 
-# 数据库文件
-*.db
-*.sqlite
-*.sqlite3
-# SQLite临时文件
-*.db-shm
-*.db-wal
-*.db-journal
-*.sqlite-shm
-*.sqlite-wal
-*.sqlite-journal
+# 缓存
+.cache/
+.parcel-cache/
+.eslintcache
+.stylelintcache
 
-# 临时文件
-temp/
-tmp/
+# MSW（仅忽略自动生成的 worker 文件，handlers 需提交）
+# public/mockServiceWorker.js 由 npx msw init 生成，建议提交
+# 如不想提交则取消下行注释：
+# public/mockServiceWorker.js
 
-# 测试覆盖
+# TypeScript 增量构建
+*.tsbuildinfo
+
+# Vitest 覆盖率
 coverage/
-.nyc_output/
 
-# 包管理器
-yarn-error.log
+# 日志
 npm-debug.log*
 yarn-debug.log*
-yarn.lock
-package-lock.json
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
 
-# 操作系统文件
+
+# ============================================================
+# Docker
+# ============================================================
+
+# 本地 Docker 覆盖配置
+docker-compose.override.yml
+docker-compose.local.yml
+.docker/
+
+
+# ============================================================
+# 操作系统
+# ============================================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+.fseventsd
+
+# Windows
 Thumbs.db
+Thumbs.db:encryptable
 ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+*.lnk
 
-# 项目特定文件
-# 添加你的项目特定忽略规则
+# Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+
+# ============================================================
+# 日志与临时文件
+# ============================================================
+
+logs/
+*.log
+log/
+tmp/
+temp/
+.worktrees/
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+
+
+# ============================================================
+# 安全敏感（双重保障，严禁提交）
+# ============================================================
+
+*.env
+.secrets
+secrets/
+credentials/
+credentials.json
+service-account*.json
+*_rsa
+*_rsa.pub
+*_dsa
+*_dsa.pub
+*_ed25519
+*_ed25519.pub
+*_ecdsa
+*_ecdsa.pub
+
+# 本地工具产物（不应入库）
+.claude/worktrees/
+.understand-anything/

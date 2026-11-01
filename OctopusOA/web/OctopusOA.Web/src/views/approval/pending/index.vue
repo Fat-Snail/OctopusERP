@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { Eye, Check, X } from 'lucide-vue-next'
+import { Eye, Check, X } from '@lucide/vue'
 import PageHeader from '@/components/app/PageHeader.vue'
 import Badge from '@/components/ui/badge.vue'
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogTitle } from '@/components/ui/dialog'
@@ -83,7 +83,12 @@ onMounted(loadData)
               <td class="px-3 py-2 font-medium truncate max-w-[200px]">{{ row.title }}</td>
               <td class="px-3 py-2 text-muted-foreground">{{ row.templateName }}</td>
               <td class="px-3 py-2">{{ row.applicantName }}</td>
-              <td class="px-3 py-2"><Badge variant="warning">{{ row.currentNodeName }}</Badge></td>
+              <td class="px-3 py-2">
+                <div class="flex items-center gap-1.5">
+                  <Badge variant="warning">{{ row.currentNodeName }}</Badge>
+                  <Badge v-if="row.isOverdue" variant="danger">超期</Badge>
+                </div>
+              </td>
               <td class="px-3 py-2 font-mono-tnum text-muted-foreground whitespace-nowrap">{{ row.createTime }}</td>
               <td class="px-3 py-2 whitespace-nowrap">
                 <div class="flex items-center gap-2">

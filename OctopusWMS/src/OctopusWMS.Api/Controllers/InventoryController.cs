@@ -37,6 +37,16 @@ public class InventoryController(InventoryService svc) : ControllerBase
         if (data is null) return Ok(new { code = 404, msg = "库存记录不存在", data = (object?)null });
         return Ok(new { code = 200, msg = "调整成功", data });
     }
+
+    /// <summary>批量查询多个 PlmProductId 的跨仓库存汇总（供 PLM 列表页拉取 totalStock）</summary>
+    [HttpPost("by-products")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetByProducts([FromBody] ByProductsRequest req)
+    {
+        var data = await svc.GetByProductsAsync(req.ProductIds ?? Array.Empty<long>());
+        return Ok(new { code = 200, msg = "ok", data });
+    }
 }
 
 public record AdjustRequest(decimal Delta, string? Reason);
+public record ByProductsRequest(long[] ProductIds);

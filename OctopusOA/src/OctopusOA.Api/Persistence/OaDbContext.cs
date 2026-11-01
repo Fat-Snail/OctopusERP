@@ -19,6 +19,7 @@ public class OaDbContext : DbContext
     public DbSet<WorkflowNode> Nodes => Set<WorkflowNode>();
     public DbSet<Approval> Approvals => Set<Approval>();
     public DbSet<ApprovalRecord> ApprovalRecords => Set<ApprovalRecord>();
+    public DbSet<ApprovalDelegate> ApprovalDelegates => Set<ApprovalDelegate>();
 
     // ── 职员档案 ──
     public DbSet<Employee> Employees => Set<Employee>();
@@ -102,6 +103,15 @@ public class OaDbContext : DbContext
             e.ToTable("oa_approval_record");
             e.HasKey(x => x.RecordId);
             e.Property(x => x.RecordId).ValueGeneratedOnAdd();
+        });
+
+        // P17：审批转交记录
+        b.Entity<ApprovalDelegate>(e =>
+        {
+            e.ToTable("oa_approval_delegate");
+            e.HasKey(x => x.DelegateId);
+            e.Property(x => x.DelegateId).ValueGeneratedOnAdd();
+            e.HasIndex(x => new { x.ApprovalId, x.NodeOrder });
         });
 
         b.Entity<Employee>(e =>

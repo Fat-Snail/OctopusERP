@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { inject, type Ref, type ComputedRef } from 'vue'
-import { ChevronDown } from 'lucide-vue-next'
+import { ChevronDown } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 
 interface SelectCtx {

@@ -148,9 +148,39 @@ public class CrmContract
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
 
+    // 服装行业字段
+    /// <summary>客户款号(如 SYN00001)。同一客户该值唯一</summary>
+    public string? CustomerOrderNo { get; set; }
+    /// <summary>是否加单(返单/补单)</summary>
+    public bool IsAdditional { get; set; }
+    /// <summary>原合同 ID(加单时引用最初下单的合同)</summary>
+    public long? OriginalContractId { get; set; }
+    /// <summary>季节: 22春夏 / 22秋冬</summary>
+    public string? Season { get; set; }
+
     public CrmQuote? Quote { get; set; }
     public List<CrmContractItem> Items { get; set; } = new();
     public List<CrmPayment> Payments { get; set; } = new();
+}
+
+// 客户款号字典(服装客户特有：客户款号 ↔ PLM 商品 的稳定映射)
+// 同一客户对同一款式可能多次下单/加单，本表记录一次,合同复用
+public class CrmCustomerStyle
+{
+    public long CustomerStyleId { get; set; }
+    public long CustomerId { get; set; }
+    /// <summary>客户款号: 98071 / CC1557</summary>
+    public string CustomerOrderNo { get; set; } = string.Empty;
+    /// <summary>关联 PLM 商品(款式)</summary>
+    public long? PlmProductId { get; set; }
+    /// <summary>款式编码快照(LB5210100龟背绣花)</summary>
+    public string? StyleCodeSnapshot { get; set; }
+    /// <summary>季节</summary>
+    public string? Season { get; set; }
+    public string? Remark { get; set; }
+    public DateTime CreatedAt { get; set; }
+
+    public CrmCustomer? Customer { get; set; }
 }
 
 // 合同明细

@@ -54,6 +54,8 @@ public class CategoryModelVersionSummary
     public DateTime? PublishedAt { get; set; }
     public long? PublishedBy { get; set; }
     public string? ChangeSummary { get; set; }
+    public string? CreatedByName { get; set; }
+    public string? PublishedByName { get; set; }
 }
 
 public class CategoryRuleResponse

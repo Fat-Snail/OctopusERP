@@ -44,6 +44,30 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/workorder/WorkOrderListView.vue'),
         meta: { title: '工单管理' }
       },
+      {
+        path: 'garment-schedule',
+        name: 'GarmentSchedule',
+        component: () => import('@/views/garment/GarmentScheduleView.vue'),
+        meta: { title: '服装春夏排程' }
+      },
+      {
+        path: 'scheduling',
+        name: 'SchedulingBoard',
+        component: () => import('@/views/scheduling/SchedulingBoardView.vue'),
+        meta: { title: '通用生产排程' }
+      },
+      {
+        path: 'plm-sync',
+        name: 'PlmSyncManagement',
+        component: () => import('@/views/scheduling/PlmSyncManagementView.vue'),
+        meta: { title: 'PLM 同步管理' }
+      },
+      {
+        path: 'garment-team',
+        name: 'GarmentTeam',
+        component: () => import('@/views/garment/GarmentTeamView.vue'),
+        meta: { title: '车间组管理' }
+      },
     ]
   },
   {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
-import { X, XCircle } from 'lucide-vue-next'
+import { X, XCircle } from '@lucide/vue'
 import { useTabsStore } from '@/store/modules/tabs'
 
 const router = useRouter()

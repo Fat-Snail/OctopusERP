@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted, onUnmounted } from 'vue'
-import { Search, RefreshCw, UserX, Wifi } from 'lucide-vue-next'
+import { Search, RefreshCw, UserX, Wifi } from '@lucide/vue'
 import { del } from '@/utils/http'
 import { startOnlineUserHub, stopOnlineUserHub } from '@/utils/hubService'
 import type { OnlineUserResponse } from '@/api/monitor/types'

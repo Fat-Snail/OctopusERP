@@ -21,6 +21,17 @@ public class UserSyncService
 
     public async Task NotifyUserChangedAsync(UserSyncPayload payload)
     {
+        // ADR-010：只有平台员工才下发到 OA 等下游系统。
+        // 零售域邀请进来的客户/店员虽然也在 sys_user（统一用户中心），
+        // 但绝不能出现在 OA 通讯录里——这正是当初否掉「零售用户进 UMC」的理由，
+        // 用一次类型过滤就能解决，不需要把用户挡在 UMC 之外。
+        if (!string.Equals(payload.UserType, "employee", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogDebug("跳过非员工用户的同步：UserId={UserId} Type={Type}",
+                payload.UserId, payload.UserType);
+            return;
+        }
+
         var oaBaseUrl = _config["UserSync:OaBaseUrl"];
         var secret = _config["UserSync:SharedSecret"];
 
@@ -65,5 +76,9 @@ public class UserSyncPayload
     public string Email { get; set; } = string.Empty;
     public string? PhoneNumber { get; set; }
     public int Status { get; set; }
+
+    /// <summary>employee | customer | partner；只有 employee 会被下发</summary>
+    public string UserType { get; set; } = "employee";
+
     public DateTime SyncAt { get; set; } = DateTime.UtcNow;
 }

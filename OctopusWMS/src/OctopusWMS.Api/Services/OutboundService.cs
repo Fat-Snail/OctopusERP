@@ -3,7 +3,7 @@ using OctopusWMS.Api.Persistence;
 
 namespace OctopusWMS.Api.Services;
 
-public class OutboundService(WmsDbContext db)
+public class OutboundService(WmsDbContext db, WebhookSender webhook)
 {
     public async Task<object> GetListAsync(string? status, int pageNum, int pageSize)
     {
@@ -37,18 +37,50 @@ public class OutboundService(WmsDbContext db)
 
         foreach (var item in order.Items)
         {
-            var inv = await db.Inventories.FirstOrDefaultAsync(x => x.WarehouseId == order.WarehouseId && x.ProductName == item.ProductName);
-            if (inv is not null)
+            // P11：FEFO 出库 — 同仓 + 同 PlmProductId 的库存按批次有效期升序优先消耗
+            var invs = await db.Inventories
+                .Where(x => x.WarehouseId == order.WarehouseId
+                    && (x.PlmProductId == item.PlmProductId || (x.PlmProductId == null && x.ProductName == item.ProductName)))
+                .ToListAsync();
+
+            if (invs.Count == 0) continue;
+
+            var batchById = invs.Where(x => x.BatchId.HasValue).Select(x => x.BatchId!.Value).Distinct().ToArray();
+            var batches = batchById.Length == 0
+                ? new Dictionary<long, DateTime?>()
+                : await db.Batches
+                    .Where(b => batchById.Contains(b.BatchId))
+                    .ToDictionaryAsync(b => b.BatchId, b => b.ExpireDate);
+
+            var ordered = invs
+                .OrderBy(x => x.BatchId.HasValue && batches.TryGetValue(x.BatchId.Value, out var d) && d.HasValue
+                    ? d.Value : DateTime.MaxValue)
+                .ToList();
+
+            var remaining = item.RequestedQty;
+            foreach (var inv in ordered)
             {
-                item.ShippedQty = item.RequestedQty;
-                inv.Quantity = Math.Max(0, inv.Quantity - item.RequestedQty);
+                if (remaining <= 0) break;
+                var take = Math.Min(inv.Quantity, remaining);
+                inv.Quantity -= take;
                 inv.UpdatedAt = DateTime.UtcNow;
+                remaining -= take;
             }
+            item.ShippedQty = item.RequestedQty - remaining;
         }
 
         order.Status = "shipped";
         order.ShippedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
+
+        if (order.CrmContractId.HasValue)
+        {
+            webhook.PostToCrm("/api/webhook/ship-confirm", new
+            {
+                CrmContractId = order.CrmContractId.Value,
+                ShippedAt = order.ShippedAt
+            });
+        }
         return order;
     }
 }

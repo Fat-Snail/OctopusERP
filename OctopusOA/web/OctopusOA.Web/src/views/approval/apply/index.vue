@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChevronLeft, FileText } from 'lucide-vue-next'
+import { ChevronLeft, FileText } from '@lucide/vue'
 import PageHeader from '@/components/app/PageHeader.vue'
 import { toast } from '@/components/ui/toast'
 import { getAvailableTemplates, submitApproval } from '@/api/approval'

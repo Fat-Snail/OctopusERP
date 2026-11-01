@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Warehouse, ArrowRight } from 'lucide-vue-next'
+import { Warehouse, ArrowRight } from '@lucide/vue'
 import { oidcService } from '@/services/oidcService'
 
 function handleSSOLogin() {

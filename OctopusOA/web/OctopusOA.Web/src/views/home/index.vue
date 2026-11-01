@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import {
   ClipboardList, Bell, Clock, CalendarDays,
   Plus, Megaphone, Users, BookOpen, ArrowRight
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import PageHeader from '@/components/app/PageHeader.vue'
 import Card from '@/components/ui/card.vue'
 import CardHeader from '@/components/ui/card-header.vue'

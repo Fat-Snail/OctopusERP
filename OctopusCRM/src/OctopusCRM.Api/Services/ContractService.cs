@@ -15,7 +15,7 @@ public record ContractListRow(
     DateTime? DeliveryDate,
     DateTime CreatedAt);
 
-public class ContractService(CrmDbContext db)
+public class ContractService(CrmDbContext db, WebhookSender webhook)
 {
     public async Task<(List<ContractListRow> Rows, int Total)> GetListAsync(
         long? customerId, string? status, int page = 1, int size = 20)
@@ -151,14 +151,26 @@ public class ContractService(CrmDbContext db)
         if (approved)
         {
             contract.Status = "active";
+            contract.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+
+            var items = await db.ContractItems.Where(x => x.ContractId == contract.ContractId).ToListAsync();
+            webhook.PostToWms("/api/webhook/reserve-stock", new
+            {
+                CrmContractId = contract.ContractId,
+                Items = items.Select(i => new { i.ProductName, i.PlmProductId, i.Quantity }).ToArray()
+            });
+
+            // 服装行业：合同激活 → 通知 MES 创建排程订单池条目
+            await NotifyMesGarmentOrderAsync(contract, items);
         }
         else
         {
             contract.Status = "draft";
             contract.OaApprovalId = null;
+            contract.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
         }
-        contract.UpdatedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync();
         return null;
     }
 
@@ -171,6 +183,9 @@ public class ContractService(CrmDbContext db)
         contract.Status = "active";
         contract.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
+
+        var items = await db.ContractItems.Where(x => x.ContractId == contract.ContractId).ToListAsync();
+        await NotifyMesGarmentOrderAsync(contract, items);
         return null;
     }
 
@@ -211,6 +226,37 @@ public class ContractService(CrmDbContext db)
         contract.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
         return null;
+    }
+
+    private async Task NotifyMesGarmentOrderAsync(CrmContract contract, List<CrmContractItem> items)
+    {
+        var customer = await db.Customers.FirstOrDefaultAsync(x => x.CustomerId == contract.CustomerId);
+        if (customer == null) return;
+
+        // 仅服装行业客户触发
+        if (!string.Equals(customer.IndustryType, "服装", StringComparison.OrdinalIgnoreCase)) return;
+
+        // 取首条 item 作为代表(服装行业一个合同对应一个款式; 多款应该拆多合同)
+        var item = items.FirstOrDefault();
+        if (item == null) return;
+
+        var customerStyle = await db.CustomerStyles.FirstOrDefaultAsync(
+            x => x.CustomerId == contract.CustomerId && x.CustomerOrderNo == contract.CustomerOrderNo);
+
+        webhook.PostToMes("/api/webhook/garment-order-created", new
+        {
+            ContractId = contract.ContractId,
+            CustomerId = contract.CustomerId,
+            CustomerName = customer.CustomerName,
+            OrderNo = contract.CustomerOrderNo ?? contract.ContractCode,
+            PlmProductId = item.PlmProductId ?? customerStyle?.PlmProductId,
+            StyleCode = customerStyle?.StyleCodeSnapshot ?? item.ProductName,
+            Quantity = items.Sum(i => i.Quantity),
+            Season = contract.Season,
+            DueDate = contract.DeliveryDate,
+            IsAdditional = contract.IsAdditional,
+            OriginalContractId = contract.OriginalContractId,
+        });
     }
 
     private async Task<string> GenerateCodeAsync()

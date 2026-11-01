@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from 'vue'
-import { Plus, Pencil, Trash2, ArrowRight, Globe, Tag } from 'lucide-vue-next'
+import { Plus, Pencil, Trash2, ArrowRight, Globe, Tag } from '@lucide/vue'
 import ButtonVue from '@/components/ui/button.vue'
 import InputVue from '@/components/ui/input.vue'
 import BadgeVue from '@/components/ui/badge.vue'

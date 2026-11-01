@@ -35,7 +35,15 @@ public class JobSchedulerService(IServiceProvider serviceProvider, ILogger<JobSc
         {
             if (!ShouldRun(job, now)) continue;
             _lastRun[job.JobId] = now;
-            await ExecuteJobAsync(db, job, now, ct);
+            // 单个任务失败绝不能拖垮整个调度循环
+            try
+            {
+                await ExecuteJobAsync(db, job, now, ct);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Job [{Name}] 调度异常，已跳过", job.JobName);
+            }
         }
     }
 
@@ -90,8 +98,19 @@ public class JobSchedulerService(IServiceProvider serviceProvider, ILogger<JobSc
             logger.LogError("Job [{Name}] 执行失败: {Msg}", job.JobName, ex.Message);
         }
 
-        db.JobLogs.Add(log);
-        db.SaveChanges();
+        // ⚠️ 写执行日志也必须兜异常。
+        // 历史事故：sys_job_log 表缺失时这里抛 no such table，异常一路冒到 BackgroundService，
+        // 触发 HostOptions.BackgroundServiceExceptionBehavior = StopHost，整个 UMC 停服。
+        try
+        {
+            db.JobLogs.Add(log);
+            await db.SaveChangesAsync(ct);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning("Job [{Name}] 执行日志写入失败（不影响服务运行）: {Msg}",
+                job.JobName, ex.Message);
+        }
     }
 
     private static Task RunTargetAsync(string invokeTarget, ApplicationDbContext db, CancellationToken ct)

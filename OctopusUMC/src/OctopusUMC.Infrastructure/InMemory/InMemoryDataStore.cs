@@ -8,10 +8,10 @@ public class InMemoryDataStore
     public List<User> Users { get; } = new()
     {
         new User { UserId=1, UserName="admin",   NickName="超级管理员", Email="admin@octopus.com",   PhoneNumber="13800000001", Sex="1", Status=1, PasswordHash=BCrypt.Net.BCrypt.HashPassword("Admin@123"),  CreateTime=DateTime.UtcNow.AddDays(-60) },
-        new User { UserId=2, UserName="zhangsan", NickName="张三",     Email="zhangsan@octopus.com", PhoneNumber="13800000002", Sex="1", Status=1, PasswordHash=BCrypt.Net.BCrypt.HashPassword("User@123"),   CreateTime=DateTime.UtcNow.AddDays(-30) },
-        new User { UserId=3, UserName="lisi",     NickName="李四",     Email="lisi@octopus.com",     PhoneNumber="13800000003", Sex="0", Status=1, PasswordHash=BCrypt.Net.BCrypt.HashPassword("User@123"),   CreateTime=DateTime.UtcNow.AddDays(-20) },
-        new User { UserId=4, UserName="wangwu",   NickName="王五",     Email="wangwu@octopus.com",   PhoneNumber=null,          Sex="1", Status=0, PasswordHash=BCrypt.Net.BCrypt.HashPassword("User@123"),   CreateTime=DateTime.UtcNow.AddDays(-10) },
-        new User { UserId=5, UserName="editor",   NickName="编辑员",   Email="editor@octopus.com",   PhoneNumber="13800000005", Sex="0", Status=1, PasswordHash=BCrypt.Net.BCrypt.HashPassword("Editor@123"), CreateTime=DateTime.UtcNow.AddDays(-5)  },
+        new User { UserId=2, UserName="zhangsan", NickName="张三",     Email="zhangsan@octopus.com", PhoneNumber="13800000002", Sex="1", Status=1, PasswordHash=BCrypt.Net.BCrypt.HashPassword("Admin@123"),   CreateTime=DateTime.UtcNow.AddDays(-30) },
+        new User { UserId=3, UserName="lisi",     NickName="李四",     Email="lisi@octopus.com",     PhoneNumber="13800000003", Sex="0", Status=1, PasswordHash=BCrypt.Net.BCrypt.HashPassword("Admin@123"),   CreateTime=DateTime.UtcNow.AddDays(-20) },
+        new User { UserId=4, UserName="wangwu",   NickName="王五",     Email="wangwu@octopus.com",   PhoneNumber=null,          Sex="1", Status=0, PasswordHash=BCrypt.Net.BCrypt.HashPassword("Admin@123"),   CreateTime=DateTime.UtcNow.AddDays(-10) },
+        new User { UserId=5, UserName="editor",   NickName="编辑员",   Email="editor@octopus.com",   PhoneNumber="13800000005", Sex="0", Status=1, PasswordHash=BCrypt.Net.BCrypt.HashPassword("Admin@123"), CreateTime=DateTime.UtcNow.AddDays(-5)  },
     };
 
     // ── 用户-部门-职位 关联 ────────────────────────────────
@@ -210,7 +210,7 @@ public class InMemoryDataStore
     public List<SysConfig> Configs { get; } = new()
     {
         new SysConfig { ConfigId=1, ConfigName="系统名称",          ConfigKey="sys.name",         ConfigValue="OctopusUMC", ConfigType=true,  Remark="系统名称配置" },
-        new SysConfig { ConfigId=2, ConfigName="用户初始密码",      ConfigKey="sys.user.initPwd", ConfigValue="User@123",   ConfigType=true,  Remark="新增用户初始密码" },
+        new SysConfig { ConfigId=2, ConfigName="用户初始密码",      ConfigKey="sys.user.initPwd", ConfigValue="Admin@123",   ConfigType=true,  Remark="新增用户初始密码" },
         new SysConfig { ConfigId=3, ConfigName="Token有效期(小时)", ConfigKey="sys.token.expiry", ConfigValue="24",         ConfigType=true,  Remark="Token 有效时长" },
     };
 

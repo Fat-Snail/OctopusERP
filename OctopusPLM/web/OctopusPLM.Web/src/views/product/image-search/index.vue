@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Upload, ScanSearch, X, ArrowLeft, Loader2, Info, AlertTriangle } from 'lucide-vue-next'
+import { Upload, ScanSearch, X, ArrowLeft, Loader2, Info, AlertTriangle } from '@lucide/vue'
 import ButtonVue from '@/components/ui/button.vue'
 import BadgeVue from '@/components/ui/badge.vue'
 import { searchByImage } from '@/api/product'

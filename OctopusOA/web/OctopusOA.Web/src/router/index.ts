@@ -149,6 +149,70 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/h5/onboard/index.vue'),
     meta: { requiresAuth: false }
   },
+  // ── H5 mobile routes ──
+  {
+    path: '/h5',
+    component: () => import('@/layouts/H5Layout.vue'),
+    meta: { requiresAuth: true },
+    redirect: '/h5/home',
+    children: [
+      {
+        path: 'home',
+        name: 'H5Home',
+        component: () => import('@/views/h5/home/index.vue'),
+        meta: { title: '首页' }
+      },
+      {
+        path: 'approval',
+        name: 'H5Approval',
+        component: () => import('@/views/h5/approval/index.vue'),
+        meta: { title: '审批' }
+      },
+      {
+        path: 'attendance',
+        name: 'H5Attendance',
+        component: () => import('@/views/h5/attendance/index.vue'),
+        meta: { title: '考勤' }
+      },
+      {
+        path: 'profile',
+        name: 'H5Profile',
+        component: () => import('@/views/h5/profile/index.vue'),
+        meta: { title: '我的' }
+      },
+    ]
+  },
+  // H5 pages outside the TabBar layout (full screen with back button)
+  {
+    path: '/h5/approval/detail/:id',
+    name: 'H5ApprovalDetail',
+    component: () => import('@/views/h5/approval/detail/index.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/h5/notice',
+    name: 'H5Notice',
+    component: () => import('@/views/h5/notice/index.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/h5/notice/:id',
+    name: 'H5NoticeDetail',
+    component: () => import('@/views/h5/notice/detail/index.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/h5/contact',
+    name: 'H5Contact',
+    component: () => import('@/views/h5/contact/index.vue'),
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/h5/meeting',
+    name: 'H5Meeting',
+    component: () => import('@/views/h5/meeting/index.vue'),
+    meta: { requiresAuth: true }
+  },
   {
     path: '/:pathMatch(.*)*',
     redirect: '/home'
@@ -254,15 +318,52 @@ router.afterEach((to) => {
   }
 })
 
+const isMobile = () => window.matchMedia('(max-width: 767px)').matches
+
+// Desktop path → H5 equivalent (best-effort, falls back to /h5/home)
+const H5_MAP: Record<string, string> = {
+  '/home': '/h5/home',
+  '/approval/apply': '/h5/approval',
+  '/approval/mine': '/h5/approval',
+  '/approval/pending': '/h5/approval',
+  '/attendance/mine': '/h5/attendance',
+  '/notice/list': '/h5/notice',
+  '/contact': '/h5/contact',
+  '/meeting/mine': '/h5/meeting',
+  '/profile': '/h5/profile',
+}
+
 router.beforeEach((to, _from, next) => {
-  if (to.meta['requiresAuth'] === false) {
+  const mobile = isMobile()
+  const isH5Path = to.path.startsWith('/h5/')
+  const isPublicPath = to.meta['requiresAuth'] === false
+
+  // Mobile visiting desktop route → redirect to H5
+  if (mobile && !isH5Path && !isPublicPath) {
+    const h5 = H5_MAP[to.path] ?? '/h5/home'
+    next(h5)
+    return
+  }
+
+  // Desktop visiting H5 route → redirect to desktop home
+  if (!mobile && isH5Path) {
+    next('/home')
+    return
+  }
+
+  if (isPublicPath) {
     if (oidcService.isLoggedIn() && to.path === '/login') {
-      next('/home')
+      const saved = sessionStorage.getItem('oa_redirect')
+      sessionStorage.removeItem('oa_redirect')
+      next(saved || (mobile ? '/h5/home' : '/home'))
     } else {
       next()
     }
   } else {
     if (!oidcService.isLoggedIn()) {
+      if (to.path !== '/callback') {
+        sessionStorage.setItem('oa_redirect', to.fullPath)
+      }
       next('/login')
     } else {
       next()

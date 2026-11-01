@@ -27,3 +27,12 @@ public class LoginResponse
     /// <summary>权限标识列表</summary>
     public List<string> Permissions { get; set; } = new();
 }
+
+/// <summary>用户自助重置密码请求（凭邮件 token）</summary>
+public class SelfResetPasswordRequest
+{
+    /// <summary>邮件链接中的重置 token</summary>
+    public string Token { get; set; } = string.Empty;
+    /// <summary>新密码</summary>
+    public string NewPassword { get; set; } = string.Empty;
+}

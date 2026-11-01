@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { Plus, X, Image as ImageIcon, Upload } from 'lucide-vue-next'
+import { Plus, X, Image as ImageIcon, Upload } from '@lucide/vue'
 import ButtonVue from '@/components/ui/button.vue'
 import InputVue from '@/components/ui/input.vue'
 import BadgeVue from '@/components/ui/badge.vue'

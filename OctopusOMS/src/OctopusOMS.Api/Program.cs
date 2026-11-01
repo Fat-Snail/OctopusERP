@@ -1,0 +1,110 @@
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
+using OctopusOMS.Api.Persistence;
+using OctopusOMS.Api.Services;
+using System.Threading.RateLimiting;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// 分布式缓存：Redis（生产）或内存（开发/测试）
+var omsRedis = builder.Configuration["Redis:Connection"];
+if (!string.IsNullOrWhiteSpace(omsRedis))
+{
+    builder.Services.AddStackExchangeRedisCache(o =>
+    {
+        o.Configuration = omsRedis;
+        o.InstanceName = builder.Configuration["Redis:InstanceName"] ?? "oms:";
+    });
+}
+else
+{
+    builder.Services.AddDistributedMemoryCache();
+}
+
+builder.Services.AddControllers(o => o.Filters.Add<OctopusOMS.Api.Filters.OperationLogFilter>())
+    .AddJsonOptions(opts =>
+        opts.JsonSerializerOptions.ReferenceHandler =
+            System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles);
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen();
+
+builder.Services.AddCors(o => o.AddPolicy("OmsPolicy", p =>
+    p.WithOrigins("http://localhost:5183").AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
+
+builder.Services.AddDbContext<OmsDbContext>(opt =>
+    opt.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")
+                  ?? $"Data Source={GetDbPath("octopus_oms.db")}"));
+
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(o =>
+    {
+        o.Authority = builder.Configuration["Jwt:Authority"] ?? "http://localhost:5001";
+        o.Audience = builder.Configuration["Jwt:Audience"] ?? "octopus-oms-web";
+        o.RequireHttpsMetadata = false;
+        o.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+        {
+            ValidateAudience = false,
+            ValidateIssuer = true,
+            ClockSkew = TimeSpan.FromMinutes(5),
+        };
+    });
+builder.Services.AddAuthorization();
+
+builder.Services.AddHttpClient();
+builder.Services.AddRateLimiter(o =>
+{
+    o.RejectionStatusCode = 429;
+    o.AddFixedWindowLimiter("api", opt =>
+    {
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.PermitLimit = 100;
+        opt.QueueLimit = 0;
+        opt.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+    });
+});
+
+builder.Services.AddScoped<OrderService>();
+builder.Services.AddScoped<CatalogService>();
+builder.Services.AddScoped<AfterSaleService>();
+
+var app = builder.Build();
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<OmsDbContext>();
+    db.Database.EnsureCreated();
+    OmsDbSeeder.Seed(db);
+}
+
+app.UseMiddleware<OctopusOMS.Api.Middleware.GlobalExceptionMiddleware>();
+app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+app.Use(async (ctx, next) => { ctx.Request.EnableBuffering(); await next(); });
+app.UseSwagger();
+app.UseSwaggerUI();
+app.UseCors("OmsPolicy");
+app.UseRateLimiter();
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers().RequireRateLimiting("api");
+app.Run();
+
+static string GetDbPath(string fileName)
+{
+    var dir = new DirectoryInfo(AppContext.BaseDirectory);
+    while (dir != null)
+    {
+        if (File.Exists(Path.Combine(dir.FullName, "CLAUDE.md")))
+        {
+            var dataDir = Path.Combine(dir.FullName, "data");
+            Directory.CreateDirectory(dataDir);
+            return Path.Combine(dataDir, fileName);
+        }
+        dir = dir.Parent;
+    }
+    var fallback = Path.Combine(AppContext.BaseDirectory, "data");
+    Directory.CreateDirectory(fallback);
+    return Path.Combine(fallback, fileName);
+}
+
+public partial class Program { }

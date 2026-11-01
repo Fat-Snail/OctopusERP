@@ -16,6 +16,22 @@ builder.Host.UseSerilog((ctx, cfg) =>
 
 builder.Services.AddMemoryCache();
 
+// 分布式缓存：Redis（生产）或内存（开发/测试）
+// 配置：Redis:Connection 存在时启用 Redis；否则降级到 IDistributedCache 内存实现
+var redisConn = builder.Configuration["Redis:Connection"];
+if (!string.IsNullOrWhiteSpace(redisConn))
+{
+    builder.Services.AddStackExchangeRedisCache(o =>
+    {
+        o.Configuration = redisConn;
+        o.InstanceName = builder.Configuration["Redis:InstanceName"] ?? "umc:";
+    });
+}
+else
+{
+    builder.Services.AddDistributedMemoryCache();
+}
+
 builder.Services.AddControllers(options =>
     options.Filters.AddService<OctopusUMC.Api.Filters.OperLogFilter>());
 builder.Services.AddScoped<OctopusUMC.Api.Filters.OperLogFilter>();
@@ -87,7 +103,11 @@ builder.Services.AddAuthorization();
 // CORS
 builder.Services.AddCors(options =>
     options.AddPolicy("OctopusPolicy", policy =>
-        policy.WithOrigins("http://localhost:5173", "http://localhost:5174", "http://localhost:5175", "http://localhost:5176", "http://localhost:5177", "http://localhost:5178")
+        policy.WithOrigins(
+                "http://localhost:5173", "http://localhost:5174", "http://localhost:5175",
+                "http://localhost:5176", "http://localhost:5177", "http://localhost:5178",
+                "http://localhost:5179", "http://localhost:5180",
+                "http://localhost:5181", "http://localhost:5182", "http://localhost:5183")
               .AllowAnyMethod()
               .AllowAnyHeader()
               .AllowCredentials()));
@@ -99,7 +119,7 @@ builder.Services.AddDbContext<ApplicationDbContext>(opt =>
     if (umcConnStr is not null)
         opt.UseMySQL(umcConnStr);
     else
-        opt.UseSqlite("Data Source=octopus_umc.db");
+        opt.UseSqlite($"Data Source={GetDbPath("octopus_umc.db")}");
     opt.UseOpenIddict();
 });
 
@@ -148,15 +168,52 @@ builder.Services.AddHttpClient();
 builder.Services.AddScoped<OctopusUMC.Api.Services.UserSyncService>();
 builder.Services.AddScoped<OctopusUMC.Api.Services.DeptSyncService>();
 builder.Services.AddScoped<OctopusUMC.Api.Services.NoticeSyncService>();
+// P9 M2: UMC → Keycloak 单向用户同步
+builder.Services.AddScoped<OctopusUMC.Api.Services.KeycloakSyncService>();
+// ADR-010：客户资料（手机号/姓名）变更后回推零售域快照
+builder.Services.AddScoped<OctopusUMC.Api.Services.RetailProfileSyncService>();
+// 存量用户回填：仅开开关不会同步已有用户，启动后补一次全量 upsert
+builder.Services.AddHostedService<OctopusUMC.Api.Services.KeycloakBackfillWorker>();
+// M0: Keycloak Group 同步（组原语 + 受前缀保护的 reconcile）
+builder.Services.AddScoped<OctopusUMC.Api.Services.KeycloakGroupService>();
+
+// SMTP 邮件服务
+builder.Services.Configure<OctopusUMC.Api.Services.EmailSettings>(
+    builder.Configuration.GetSection("EmailSettings"));
+builder.Services.AddTransient<OctopusUMC.Api.Services.IEmailService,
+    OctopusUMC.Api.Services.SmtpEmailService>();
+
+// 微信 OAuth 服务
+builder.Services.Configure<OctopusUMC.Api.Services.WechatSettings>(
+    builder.Configuration.GetSection("WechatSettings"));
+builder.Services.AddHttpClient<OctopusUMC.Api.Services.IWechatOAuthService,
+    OctopusUMC.Api.Services.WechatOAuthService>();
 
 var app = builder.Build();
+
+// 启动可观测：readiness 标志（DB 种子 + OpenIddict 客户端注册完成后置 true）
+var startupLogger = app.Services.GetRequiredService<ILoggerFactory>().CreateLogger("Startup");
+var startupSw = System.Diagnostics.Stopwatch.StartNew();
+var ready = false;
 
 // 初始化数据库并执行种子数据
 using (var scope = app.Services.CreateScope())
 {
+    startupLogger.LogInformation("[startup] EnsureCreated 开始");
     var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
     db.Database.EnsureCreated();
+    startupLogger.LogInformation("[startup] EnsureCreated 完成 ({Ms}ms) — 开始 Schema 自愈", startupSw.ElapsedMilliseconds);
+
+    // ADR-007：老库补表/补列（EnsureCreated 对已存在的库不做任何增量变更）
+    OctopusUMC.Infrastructure.Persistence.SchemaUpgrader.EnsureUpToDate(
+        db, msg => startupLogger.LogWarning("[startup][schema] {Msg}", msg));
+    startupLogger.LogInformation("[startup] Schema 自愈完成 ({Ms}ms)", startupSw.ElapsedMilliseconds);
     DbSeeder.Seed(db);
+    startupLogger.LogInformation("[startup] DbSeeder 完成 ({Ms}ms)", startupSw.ElapsedMilliseconds);
+
+    // 存量数据订正（Seeder 只在空库插入，老库里的历史内容必须靠迁移清理）
+    OctopusUMC.Infrastructure.Persistence.DataMigrationRunner.Apply(
+        db, msg => startupLogger.LogWarning("[startup][migration] {Msg}", msg));
 
     // 种入 OpenIddict OA 客户端
     var manager = scope.ServiceProvider.GetRequiredService<IOpenIddictApplicationManager>();
@@ -169,6 +226,37 @@ using (var scope = app.Services.CreateScope())
             DisplayName = "OctopusOA Web",
             RedirectUris          = { new Uri("http://localhost:5174/callback") },
             PostLogoutRedirectUris = { new Uri("http://localhost:5174") },
+            Permissions =
+            {
+                OpenIddictConstants.Permissions.Endpoints.Authorization,
+                OpenIddictConstants.Permissions.Endpoints.Token,
+                OpenIddictConstants.Permissions.Endpoints.EndSession,
+                OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
+                OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
+                OpenIddictConstants.Permissions.ResponseTypes.Code,
+                OpenIddictConstants.Permissions.Scopes.Email,
+                OpenIddictConstants.Permissions.Scopes.Profile,
+                OpenIddictConstants.Permissions.Scopes.Roles,
+                OpenIddictConstants.Permissions.Prefixes.Scope + "offline_access",
+                OpenIddictConstants.Permissions.Prefixes.Scope + "roles",
+            },
+            Requirements =
+            {
+                OpenIddictConstants.Requirements.Features.ProofKeyForCodeExchange,
+            },
+        });
+    }
+
+    // 种入 OpenIddict OA H5 客户端
+    if (await manager.FindByClientIdAsync("octopus-oa-h5") is null)
+    {
+        await manager.CreateAsync(new OpenIddictApplicationDescriptor
+        {
+            ClientId = "octopus-oa-h5",
+            ClientType = OpenIddictConstants.ClientTypes.Public,
+            DisplayName = "OctopusOA H5",
+            RedirectUris          = { new Uri("http://localhost:5180/callback") },
+            PostLogoutRedirectUris = { new Uri("http://localhost:5180") },
             Permissions =
             {
                 OpenIddictConstants.Permissions.Endpoints.Authorization,
@@ -313,10 +401,133 @@ using (var scope = app.Services.CreateScope())
             },
         });
     }
+
+    // P16：HRM Web 客户端（端口 5182）
+    if (await manager.FindByClientIdAsync("octopus-hrm-web") is null)
+    {
+        await manager.CreateAsync(new OpenIddictApplicationDescriptor
+        {
+            ClientId = "octopus-hrm-web",
+            ClientType = OpenIddictConstants.ClientTypes.Public,
+            DisplayName = "OctopusHRM Web",
+            RedirectUris          = { new Uri("http://localhost:5182/callback") },
+            PostLogoutRedirectUris = { new Uri("http://localhost:5182") },
+            Permissions =
+            {
+                OpenIddictConstants.Permissions.Endpoints.Authorization,
+                OpenIddictConstants.Permissions.Endpoints.Token,
+                OpenIddictConstants.Permissions.Endpoints.EndSession,
+                OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
+                OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
+                OpenIddictConstants.Permissions.ResponseTypes.Code,
+                OpenIddictConstants.Permissions.Scopes.Email,
+                OpenIddictConstants.Permissions.Scopes.Profile,
+                OpenIddictConstants.Permissions.Scopes.Roles,
+                OpenIddictConstants.Permissions.Prefixes.Scope + "offline_access",
+                OpenIddictConstants.Permissions.Prefixes.Scope + "roles",
+            },
+            Requirements = { OpenIddictConstants.Requirements.Features.ProofKeyForCodeExchange },
+        });
+    }
+
+    // P16：OMS Web 客户端（端口 5183）
+    if (await manager.FindByClientIdAsync("octopus-oms-web") is null)
+    {
+        await manager.CreateAsync(new OpenIddictApplicationDescriptor
+        {
+            ClientId = "octopus-oms-web",
+            ClientType = OpenIddictConstants.ClientTypes.Public,
+            DisplayName = "OctopusOMS Web",
+            RedirectUris          = { new Uri("http://localhost:5183/callback") },
+            PostLogoutRedirectUris = { new Uri("http://localhost:5183") },
+            Permissions =
+            {
+                OpenIddictConstants.Permissions.Endpoints.Authorization,
+                OpenIddictConstants.Permissions.Endpoints.Token,
+                OpenIddictConstants.Permissions.Endpoints.EndSession,
+                OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
+                OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
+                OpenIddictConstants.Permissions.ResponseTypes.Code,
+                OpenIddictConstants.Permissions.Scopes.Email,
+                OpenIddictConstants.Permissions.Scopes.Profile,
+                OpenIddictConstants.Permissions.Scopes.Roles,
+                OpenIddictConstants.Permissions.Prefixes.Scope + "offline_access",
+                OpenIddictConstants.Permissions.Prefixes.Scope + "roles",
+            },
+            Requirements = { OpenIddictConstants.Requirements.Features.ProofKeyForCodeExchange },
+        });
+    }
+
+    // P16：客户门户（端口 5184，独立 H5/PWA）
+    if (await manager.FindByClientIdAsync("octopus-customer-portal") is null)
+    {
+        await manager.CreateAsync(new OpenIddictApplicationDescriptor
+        {
+            ClientId = "octopus-customer-portal",
+            ClientType = OpenIddictConstants.ClientTypes.Public,
+            DisplayName = "Octopus 客户门户",
+            RedirectUris          = { new Uri("http://localhost:5184/callback") },
+            PostLogoutRedirectUris = { new Uri("http://localhost:5184") },
+            Permissions =
+            {
+                OpenIddictConstants.Permissions.Endpoints.Authorization,
+                OpenIddictConstants.Permissions.Endpoints.Token,
+                OpenIddictConstants.Permissions.Endpoints.EndSession,
+                OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
+                OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
+                OpenIddictConstants.Permissions.ResponseTypes.Code,
+                OpenIddictConstants.Permissions.Scopes.Email,
+                OpenIddictConstants.Permissions.Scopes.Profile,
+                OpenIddictConstants.Permissions.Scopes.Roles,
+                OpenIddictConstants.Permissions.Prefixes.Scope + "offline_access",
+                OpenIddictConstants.Permissions.Prefixes.Scope + "roles",
+            },
+            Requirements = { OpenIddictConstants.Requirements.Features.ProofKeyForCodeExchange },
+        });
+    }
+
+    // P16：供应商门户（端口 5185）
+    if (await manager.FindByClientIdAsync("octopus-supplier-portal") is null)
+    {
+        await manager.CreateAsync(new OpenIddictApplicationDescriptor
+        {
+            ClientId = "octopus-supplier-portal",
+            ClientType = OpenIddictConstants.ClientTypes.Public,
+            DisplayName = "Octopus 供应商门户",
+            RedirectUris          = { new Uri("http://localhost:5185/callback") },
+            PostLogoutRedirectUris = { new Uri("http://localhost:5185") },
+            Permissions =
+            {
+                OpenIddictConstants.Permissions.Endpoints.Authorization,
+                OpenIddictConstants.Permissions.Endpoints.Token,
+                OpenIddictConstants.Permissions.Endpoints.EndSession,
+                OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
+                OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
+                OpenIddictConstants.Permissions.ResponseTypes.Code,
+                OpenIddictConstants.Permissions.Scopes.Email,
+                OpenIddictConstants.Permissions.Scopes.Profile,
+                OpenIddictConstants.Permissions.Scopes.Roles,
+                OpenIddictConstants.Permissions.Prefixes.Scope + "offline_access",
+                OpenIddictConstants.Permissions.Prefixes.Scope + "roles",
+            },
+            Requirements = { OpenIddictConstants.Requirements.Features.ProofKeyForCodeExchange },
+        });
+    }
 }
 
+// 启动完成 — 标记 ready=true，子系统的 OIDC 发现请求从此刻起才能成功
+ready = true;
+startupSw.Stop();
+startupLogger.LogInformation("[startup] UMC 已就绪 ({Ms}ms)，OIDC 发现文档可用", startupSw.ElapsedMilliseconds);
+
 app.UseMiddleware<OctopusUMC.Api.Middleware.GlobalExceptionMiddleware>();
-app.MapGet("/health", () => Results.Ok(new { status = "ok" }));
+
+// 健康检查：liveness（进程活着）vs readiness（DB+OIDC 客户端就绪）
+app.MapGet("/health/live", () => Results.Ok(new { status = "live" }));
+app.MapGet("/health/ready", () => ready
+    ? Results.Ok(new { status = "ready", elapsedMs = startupSw.ElapsedMilliseconds })
+    : Results.Json(new { status = "starting", elapsedMs = startupSw.ElapsedMilliseconds }, statusCode: 503));
+app.MapGet("/health", () => Results.Ok(new { status = ready ? "ready" : "starting" }));
 app.UseRateLimiter();
 app.UseCors("OctopusPolicy");
 app.MapHub<OctopusUMC.Api.Hubs.OnlineUserHub>("/hubs/online");
@@ -327,6 +538,24 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+static string GetDbPath(string fileName)
+{
+    var dir = new DirectoryInfo(AppContext.BaseDirectory);
+    while (dir != null)
+    {
+        if (File.Exists(Path.Combine(dir.FullName, "CLAUDE.md")))
+        {
+            var dataDir = Path.Combine(dir.FullName, "data");
+            Directory.CreateDirectory(dataDir);
+            return Path.Combine(dataDir, fileName);
+        }
+        dir = dir.Parent;
+    }
+    var fallback = Path.Combine(AppContext.BaseDirectory, "data");
+    Directory.CreateDirectory(fallback);
+    return Path.Combine(fallback, fileName);
+}
 
 // 供测试项目使用
 public partial class Program { }

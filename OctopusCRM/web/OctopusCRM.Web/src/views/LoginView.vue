@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { TrendingUp, ArrowRight } from 'lucide-vue-next'
+import { TrendingUp, ArrowRight } from '@lucide/vue'
 import { oidcService } from '@/services/oidcService'
 
 function handleSSOLogin() {

@@ -40,4 +40,36 @@ public class InventoryService(WmsDbContext db)
         await db.SaveChangesAsync();
         return inv;
     }
+
+    /// <summary>批量按 PlmProductId 汇总库存（跨仓相加；返回 totalQty / availableQty / lockedQty / warehouseCount）</summary>
+    public async Task<List<ProductStockSummary>> GetByProductsAsync(IEnumerable<long> productIds)
+    {
+        var ids = productIds.Where(x => x > 0).Distinct().ToList();
+        if (ids.Count == 0) return new();
+
+        var rows = await db.Inventories
+            .Where(x => x.PlmProductId.HasValue && ids.Contains(x.PlmProductId!.Value))
+            .ToListAsync();
+
+        return rows
+            .GroupBy(x => x.PlmProductId!.Value)
+            .Select(g => new ProductStockSummary
+            {
+                PlmProductId = g.Key,
+                TotalQty = g.Sum(x => x.Quantity),
+                AvailableQty = g.Sum(x => x.Quantity - x.LockedQuantity),
+                LockedQty = g.Sum(x => x.LockedQuantity),
+                WarehouseCount = g.Select(x => x.WarehouseId).Distinct().Count(),
+            })
+            .ToList();
+    }
+}
+
+public record ProductStockSummary
+{
+    public long PlmProductId { get; set; }
+    public decimal TotalQty { get; set; }
+    public decimal AvailableQty { get; set; }
+    public decimal LockedQty { get; set; }
+    public int WarehouseCount { get; set; }
 }

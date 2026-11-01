@@ -57,7 +57,7 @@ public class SupplierTests : IClassFixture<MesTestFactory>
         var resp = await _client.PutAsJsonAsync("/api/supplier", new
         {
             supplierId = 1,
-            supplierName = "富士康（更新）",
+            supplierName = "示例供应商1（更新）",
             contactName = "郭明",
             phone = "13800138001",
             status = "active",
@@ -71,11 +71,11 @@ public class SupplierTests : IClassFixture<MesTestFactory>
     [Fact]
     public async Task FilterSupplierByKeyword_ReturnsMatching()
     {
-        var resp = await _client.GetAsync("/api/supplier?keyword=富士康");
+        var resp = await _client.GetAsync("/api/supplier?keyword=示例供应商1");
         var doc = await resp.Content.ReadFromJsonAsync<JsonDocument>(_json);
         var rows = doc!.RootElement.GetProperty("data").GetProperty("rows");
         rows.GetArrayLength().Should().BeGreaterThan(0);
         foreach (var row in rows.EnumerateArray())
-            row.GetProperty("supplierName").GetString()!.Should().Contain("富士康");
+            row.GetProperty("supplierName").GetString()!.Should().Contain("示例供应商1");
     }
 }

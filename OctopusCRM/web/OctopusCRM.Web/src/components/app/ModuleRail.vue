@@ -2,7 +2,7 @@
 import {
   LayoutDashboard, Users, Briefcase, Package, Warehouse,
   Factory, TrendingUp, Settings
-} from 'lucide-vue-next'
+} from '@lucide/vue'
 import { cn } from '@/lib/utils'
 
 const props = defineProps<{

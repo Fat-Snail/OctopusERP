@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { Warehouse, PackagePlus, PackageMinus, AlertTriangle } from 'lucide-vue-next'
+import { Warehouse, PackagePlus, PackageMinus, AlertTriangle } from '@lucide/vue'
 import { useUserStore } from '@/store/modules/user'
 import { getSummary } from '@/api/stats'
 import type { StatsSummaryResponse } from '@/api/stats/types'

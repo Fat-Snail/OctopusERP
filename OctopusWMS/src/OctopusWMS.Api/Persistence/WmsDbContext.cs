@@ -16,6 +16,14 @@ public class WmsDbContext : DbContext
     public DbSet<WmsOutboundItem> OutboundItems => Set<WmsOutboundItem>();
     public DbSet<WmsStocktake> Stocktakes => Set<WmsStocktake>();
     public DbSet<WmsStocktakeItem> StocktakeItems => Set<WmsStocktakeItem>();
+    // P11
+    public DbSet<WmsOwner> Owners => Set<WmsOwner>();
+    public DbSet<WmsZone> Zones => Set<WmsZone>();
+    public DbSet<WmsBatch> Batches => Set<WmsBatch>();
+    public DbSet<WmsTransfer> Transfers => Set<WmsTransfer>();
+    // 服装行业
+    public DbSet<WmsFabricInventory> FabricInventories => Set<WmsFabricInventory>();
+    public DbSet<WmsFabricArrival> FabricArrivals => Set<WmsFabricArrival>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -96,5 +104,55 @@ public class WmsDbContext : DbContext
             .WithOne(x => x.Stocktake)
             .HasForeignKey(x => x.StocktakeId)
             .OnDelete(DeleteBehavior.Cascade);
+
+        // P11：货主 / 库区 / 批次 / 跨仓调拨
+        b.Entity<WmsOwner>().ToTable("wms_owner");
+        b.Entity<WmsOwner>().HasKey(x => x.OwnerId);
+        b.Entity<WmsOwner>().Property(x => x.OwnerId).ValueGeneratedOnAdd();
+        b.Entity<WmsOwner>().HasIndex(x => x.OwnerCode).IsUnique();
+
+        b.Entity<WmsZone>().ToTable("wms_zone");
+        b.Entity<WmsZone>().HasKey(x => x.ZoneId);
+        b.Entity<WmsZone>().Property(x => x.ZoneId).ValueGeneratedOnAdd();
+        b.Entity<WmsZone>().HasIndex(x => new { x.WarehouseId, x.ZoneCode }).IsUnique();
+
+        b.Entity<WmsBatch>().ToTable("wms_batch");
+        b.Entity<WmsBatch>().HasKey(x => x.BatchId);
+        b.Entity<WmsBatch>().Property(x => x.BatchId).ValueGeneratedOnAdd();
+        b.Entity<WmsBatch>().HasIndex(x => x.BatchNo).IsUnique();
+
+        b.Entity<WmsTransfer>().ToTable("wms_transfer");
+        b.Entity<WmsTransfer>().HasKey(x => x.TransferId);
+        b.Entity<WmsTransfer>().Property(x => x.TransferId).ValueGeneratedOnAdd();
+        b.Entity<WmsTransfer>().Property(x => x.Quantity).HasColumnType("decimal(18,4)");
+        b.Entity<WmsTransfer>().HasIndex(x => x.TransferCode).IsUnique();
+
+        b.Entity<WmsWarehouse>()
+            .HasMany(x => x.Zones)
+            .WithOne(x => x.Warehouse)
+            .HasForeignKey(x => x.WarehouseId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        b.Entity<WmsInventory>()
+            .HasOne(x => x.Batch)
+            .WithMany()
+            .HasForeignKey(x => x.BatchId)
+            .OnDelete(DeleteBehavior.SetNull);
+
+        b.Entity<WmsFabricInventory>().ToTable("wms_fabric_inventory");
+        b.Entity<WmsFabricInventory>().HasKey(x => x.FabricInventoryId);
+        b.Entity<WmsFabricInventory>().Property(x => x.FabricInventoryId).ValueGeneratedOnAdd();
+        b.Entity<WmsFabricInventory>().Property(x => x.Quantity).HasColumnType("decimal(18,4)");
+        b.Entity<WmsFabricInventory>().Property(x => x.LockedQuantity).HasColumnType("decimal(18,4)");
+        b.Entity<WmsFabricInventory>().HasIndex(x => new { x.WarehouseId, x.FabricCode, x.ColorCode, x.BatchCode }).IsUnique();
+
+        b.Entity<WmsFabricArrival>().ToTable("wms_fabric_arrival");
+        b.Entity<WmsFabricArrival>().HasKey(x => x.ArrivalId);
+        b.Entity<WmsFabricArrival>().Property(x => x.ArrivalId).ValueGeneratedOnAdd();
+        b.Entity<WmsFabricArrival>().Property(x => x.ExpectedQty).HasColumnType("decimal(18,4)");
+        b.Entity<WmsFabricArrival>().Property(x => x.ReceivedQty).HasColumnType("decimal(18,4)");
+        b.Entity<WmsFabricArrival>().HasIndex(x => x.ArrivalCode).IsUnique();
+        b.Entity<WmsFabricArrival>().HasIndex(x => x.MesScheduleId);
+        b.Entity<WmsFabricArrival>().HasIndex(x => x.MesOrderId);
     }
 }

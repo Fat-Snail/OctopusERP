@@ -34,6 +34,19 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '以图搜商品' }
       },
       {
+        path: 'plm/manufacturing',
+        name: 'PlmManufacturing',
+        component: () => import('@/views/manufacturing/index.vue'),
+        meta: { title: '制造版本管理' }
+      },
+      { path:'plm/material', name:'PlmMaterial', component:()=>import('@/views/material/index.vue'), meta:{title:'物料库'} },
+      {
+        path: 'plm/product/detail/:id',
+        name: 'PlmProductDetail',
+        component: () => import('@/views/product/detail/index.vue'),
+        meta: { title: '商品详情' }
+      },
+      {
         path: 'plm/product/create',
         name: 'PlmProductCreate',
         component: () => import('@/views/product/create/index.vue'),

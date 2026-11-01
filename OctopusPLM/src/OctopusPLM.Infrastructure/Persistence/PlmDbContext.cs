@@ -26,6 +26,13 @@ public class PlmDbContext : DbContext
     public DbSet<ChannelDef> ChannelDefs => Set<ChannelDef>();
     public DbSet<ChannelCategoryMapping> ChannelCategoryMappings => Set<ChannelCategoryMapping>();
     public DbSet<ChannelAttributeMapping> ChannelAttributeMappings => Set<ChannelAttributeMapping>();
+    public DbSet<ManufacturingVersion> ManufacturingVersions => Set<ManufacturingVersion>();
+    public DbSet<ManufacturingBomItem> ManufacturingBomItems => Set<ManufacturingBomItem>();
+    public DbSet<ManufacturingOperation> ManufacturingOperations => Set<ManufacturingOperation>();
+    public DbSet<Material> Materials => Set<Material>();
+    public DbSet<CategoryBomTemplate> CategoryBomTemplates => Set<CategoryBomTemplate>();
+    public DbSet<CategoryBomTemplateItem> CategoryBomTemplateItems => Set<CategoryBomTemplateItem>();
+    public DbSet<MaterialTemplateAudit> MaterialTemplateAudits => Set<MaterialTemplateAudit>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -141,6 +148,8 @@ public class PlmDbContext : DbContext
             e.Property(x => x.ProductName).HasMaxLength(300).IsRequired();
             e.Property(x => x.Status).HasMaxLength(20).IsRequired();
             e.Property(x => x.MainImage).HasMaxLength(500);
+            e.HasIndex(x => x.SourceId);
+            e.HasIndex(x => x.ProductName);
             e.HasOne(x => x.Category).WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict);
             e.HasOne(x => x.ModelVersion).WithMany(x => x.Products).HasForeignKey(x => x.ModelVersionId).OnDelete(DeleteBehavior.SetNull);
         });
@@ -245,6 +254,67 @@ public class PlmDbContext : DbContext
             e.HasIndex(x => new { x.ChannelCategoryMappingId, x.AttributeId }).IsUnique();
             e.HasOne(x => x.ChannelCategoryMapping).WithMany(x => x.AttributeMappings).HasForeignKey(x => x.ChannelCategoryMappingId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.Attribute).WithMany().HasForeignKey(x => x.AttributeId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        modelBuilder.Entity<ManufacturingVersion>(e =>
+        {
+            e.ToTable("plm_manufacturing_version"); e.HasKey(x => x.ManufacturingVersionId);
+            e.HasIndex(x => new { x.ProductId, x.Version }).IsUnique();
+            e.Property(x => x.Version).HasMaxLength(50).IsRequired(); e.Property(x => x.Status).HasMaxLength(20).IsRequired();
+            e.HasOne(x => x.Product).WithMany().HasForeignKey(x => x.ProductId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<ManufacturingBomItem>(e =>
+        {
+            e.ToTable("plm_manufacturing_bom_item"); e.HasKey(x => x.BomItemId);
+            e.HasIndex(x => new { x.ManufacturingVersionId, x.LineNo }).IsUnique();
+            e.Property(x => x.Quantity).HasColumnType("decimal(18,4)"); e.Property(x => x.LossRate).HasColumnType("decimal(18,4)");
+            e.HasOne(x => x.ManufacturingVersion).WithMany(x => x.BomItems).HasForeignKey(x => x.ManufacturingVersionId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Material).WithMany().HasForeignKey(x => x.MaterialId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<ManufacturingOperation>(e =>
+        {
+            e.ToTable("plm_manufacturing_operation"); e.HasKey(x => x.OperationId);
+            e.HasIndex(x => new { x.ManufacturingVersionId, x.Sequence }).IsUnique();
+            e.HasOne(x => x.ManufacturingVersion).WithMany(x => x.Operations).HasForeignKey(x => x.ManufacturingVersionId).OnDelete(DeleteBehavior.Cascade);
+        });
+        modelBuilder.Entity<Material>(e =>
+        {
+            e.ToTable("plm_material"); e.HasKey(x => x.MaterialId);
+            e.Property(x => x.MaterialCode).HasMaxLength(100).UseCollation("NOCASE").IsRequired();
+            e.Property(x => x.MaterialName).HasMaxLength(200).IsRequired();
+            e.Property(x => x.BaseUnit).HasMaxLength(30).IsRequired();
+            e.Property(x => x.MaterialType).HasMaxLength(30).IsRequired();
+            e.Property(x => x.Status).HasMaxLength(20).IsRequired();
+            e.HasIndex(x => x.MaterialCode).IsUnique();
+            e.HasIndex(x => new { x.Status, x.MaterialName });
+        });
+        modelBuilder.Entity<CategoryBomTemplate>(e =>
+        {
+            e.ToTable("plm_category_bom_template"); e.HasKey(x => x.TemplateId);
+            e.Property(x => x.TemplateName).HasMaxLength(200).IsRequired();
+            e.Property(x => x.Version).HasMaxLength(50).IsRequired();
+            e.Property(x => x.Status).HasMaxLength(20).IsRequired();
+            e.HasIndex(x => new { x.CategoryId, x.Version }).IsUnique();
+            e.HasIndex(x => new { x.CategoryId, x.IsLatest });
+            e.HasOne(x => x.Category).WithMany().HasForeignKey(x => x.CategoryId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<CategoryBomTemplateItem>(e =>
+        {
+            e.ToTable("plm_category_bom_template_item"); e.HasKey(x => x.TemplateItemId);
+            e.Property(x => x.DefaultQuantity).HasColumnType("decimal(18,4)");
+            e.Property(x => x.DefaultLossRate).HasColumnType("decimal(18,4)");
+            e.HasIndex(x => new { x.TemplateId, x.LineNo }).IsUnique();
+            e.HasIndex(x => new { x.TemplateId, x.MaterialId }).IsUnique();
+            e.HasOne(x => x.Template).WithMany(x => x.Items).HasForeignKey(x => x.TemplateId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Material).WithMany().HasForeignKey(x => x.MaterialId).OnDelete(DeleteBehavior.Restrict);
+        });
+        modelBuilder.Entity<MaterialTemplateAudit>(e =>
+        {
+            e.ToTable("plm_material_template_audit"); e.HasKey(x => x.AuditId);
+            e.Property(x => x.Action).HasMaxLength(50).IsRequired();
+            e.Property(x => x.EntityType).HasMaxLength(50).IsRequired();
+            e.Property(x => x.OperatorName).HasMaxLength(100).IsRequired();
+            e.HasIndex(x => new { x.EntityType, x.EntityId, x.CreatedAt });
         });
     }
 }

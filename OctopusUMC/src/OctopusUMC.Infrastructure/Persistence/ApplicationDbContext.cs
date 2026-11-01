@@ -27,12 +27,16 @@ public class ApplicationDbContext : DbContext
     public DbSet<OperLog>   OperLogs   => Set<OperLog>();
     public DbSet<LoginInfo> LoginInfos => Set<LoginInfo>();
     public DbSet<OidcClient> OidcClients => Set<OidcClient>();
+    public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
 
     // 关联表
     public DbSet<UserDept> UserDepts => Set<UserDept>();
     public DbSet<UserRole> UserRoles => Set<UserRole>();
     public DbSet<RoleMenu> RoleMenus => Set<RoleMenu>();
     public DbSet<RoleDept> RoleDepts => Set<RoleDept>();
+
+    // 第三方登录
+    public DbSet<WechatExternalLogin> WechatLogins => Set<WechatExternalLogin>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -65,6 +69,12 @@ public class ApplicationDbContext : DbContext
         modelBuilder.Entity<User>(e =>
         {
             e.ToTable("sys_user");
+
+            // ADR-010：用户类型与来源，用于把「客户」挡在下游同步之外
+            e.Property(u => u.UserType).HasMaxLength(32).HasDefaultValue("employee");
+            e.Property(u => u.Source).HasMaxLength(32).HasDefaultValue("umc");
+            e.Property(u => u.KcSub).HasMaxLength(64);
+            e.HasIndex(u => u.KcSub);
             e.HasKey(u => u.UserId);
             e.Property(u => u.UserId).ValueGeneratedOnAdd();
             e.Ignore(u => u.UserDepts);
@@ -159,6 +169,16 @@ public class ApplicationDbContext : DbContext
             e.Property(n => n.NoticeId).ValueGeneratedOnAdd();
         });
 
+        // ── UserNotification (P9 跨系统通知中心) ──────────────
+        modelBuilder.Entity<UserNotification>(e =>
+        {
+            e.ToTable("sys_user_notification");
+            e.HasKey(n => n.NotificationId);
+            e.Property(n => n.NotificationId).ValueGeneratedOnAdd();
+            e.HasIndex(n => new { n.UserId, n.IsRead });
+            e.HasIndex(n => n.CreatedAt);
+        });
+
         // ── Job ──────────────────────────────────────────────
         modelBuilder.Entity<Job>(e =>
         {
@@ -218,6 +238,15 @@ public class ApplicationDbContext : DbContext
             e.Property(c => c.PostLogoutRedirectUris)
              .HasConversion(stringListConverter, stringListComparer)
              .HasColumnType("TEXT");
+        });
+
+        // ── WechatExternalLogin ──────────────────────────────
+        modelBuilder.Entity<WechatExternalLogin>(e =>
+        {
+            e.ToTable("sys_wechat_login");
+            e.HasKey(w => w.Id);
+            e.Property(w => w.Id).ValueGeneratedOnAdd();
+            e.HasIndex(w => w.OpenId).IsUnique();
         });
     }
 }

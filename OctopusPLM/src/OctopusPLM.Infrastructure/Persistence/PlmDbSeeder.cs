@@ -1,3 +1,7 @@
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Storage;
 using OctopusPLM.Core.Entities;
 
 namespace OctopusPLM.Infrastructure.Persistence;
@@ -5,6 +9,140 @@ namespace OctopusPLM.Infrastructure.Persistence;
 public static class PlmDbSeeder
 {
     public static void Seed(PlmDbContext db)
+    {
+        // 服装行业字段(SeasonCode/StyleCode/Series)是后期加入。
+        // 旧 octopus_plm.db 下 EnsureCreated 不会增量补齐，此处自愈避免阻塞 Seed。
+        EnsureSchemaUpToDate(db);
+
+        if (!db.SyncUsers.Any())
+        {
+            SeedMainData(db);
+        }
+        // 服装款式种子：幂等(以 StyleCode="LB5210100" 为 marker)
+        try { SeedGarmentStyles(db); }
+        catch (Exception ex) { Console.WriteLine($"[PlmDbSeeder] SeedGarmentStyles 失败(已跳过): {ex.Message}"); }
+    }
+
+    // ── Schema 自愈：通过 EF Core 模型反推所有缺失的表/列并自动补齐 ─────
+    private static void EnsureSchemaUpToDate(PlmDbContext db)
+    {
+        if (!db.Database.IsRelational()) return;
+
+        var conn = db.Database.GetDbConnection();
+        var wasOpen = conn.State == System.Data.ConnectionState.Open;
+        if (!wasOpen) conn.Open();
+        try
+        {
+            // 1) 表级兜底：用 GenerateCreateScript + IF NOT EXISTS 重放，覆盖新增表
+            try
+            {
+                var creator = (IRelationalDatabaseCreator)db.GetService<IDatabaseCreator>();
+                var script = creator.GenerateCreateScript();
+                foreach (var raw in script.Split(';'))
+                {
+                    var stmt = raw.Trim();
+                    if (stmt.Length == 0) continue;
+                    if (!stmt.StartsWith("CREATE TABLE", StringComparison.OrdinalIgnoreCase) &&
+                        !stmt.StartsWith("CREATE INDEX", StringComparison.OrdinalIgnoreCase) &&
+                        !stmt.StartsWith("CREATE UNIQUE INDEX", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    var safe = stmt
+                        .Replace("CREATE TABLE ", "CREATE TABLE IF NOT EXISTS ", StringComparison.OrdinalIgnoreCase)
+                        .Replace("CREATE UNIQUE INDEX ", "CREATE UNIQUE INDEX IF NOT EXISTS ", StringComparison.OrdinalIgnoreCase)
+                        .Replace("CREATE INDEX ", "CREATE INDEX IF NOT EXISTS ", StringComparison.OrdinalIgnoreCase);
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = safe;
+                    try { cmd.ExecuteNonQuery(); }
+                    catch { /* 已存在或冲突，忽略 */ }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[PlmDbSeeder] GenerateCreateScript 兜底失败(可忽略): {ex.Message}");
+            }
+
+            // 2) 列级自愈：枚举模型，每表对比 PRAGMA table_info，缺则 ALTER TABLE ADD COLUMN
+            foreach (var et in db.Model.GetEntityTypes())
+            {
+                var table = et.GetTableName();
+                if (string.IsNullOrEmpty(table)) continue;
+                if (!TableExists(conn, table)) continue;
+
+                var existingCols = ReadColumns(conn, table);
+                var storeId = StoreObjectIdentifier.Table(table, et.GetSchema());
+                foreach (var prop in et.GetProperties())
+                {
+                    var col = prop.GetColumnName(storeId);
+                    if (string.IsNullOrEmpty(col)) continue;
+                    if (existingCols.Contains(col)) continue;
+                    if (prop.IsPrimaryKey()) continue;
+
+                    var sqlType = prop.GetColumnType() ?? InferSqliteType(prop.ClrType);
+                    var nullable = prop.IsNullable ? "NULL" : "NOT NULL DEFAULT " + DefaultValueLiteral(prop.ClrType);
+                    var def = $"{sqlType} {nullable}";
+                    try
+                    {
+                        using var cmd = conn.CreateCommand();
+                        cmd.CommandText = $"ALTER TABLE \"{table}\" ADD COLUMN \"{col}\" {def}";
+                        cmd.ExecuteNonQuery();
+                        Console.WriteLine($"[PlmDbSeeder] 列级自愈: {table}.{col} 已补齐 ({def})");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"[PlmDbSeeder] ALTER TABLE 失败 {table}.{col}: {ex.Message}");
+                    }
+                }
+            }
+        }
+        finally
+        {
+            if (!wasOpen) conn.Close();
+        }
+    }
+
+    private static bool TableExists(System.Data.Common.DbConnection conn, string tableName)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT name FROM sqlite_master WHERE type='table' AND name=@n LIMIT 1";
+        var p = cmd.CreateParameter();
+        p.ParameterName = "@n";
+        p.Value = tableName;
+        cmd.Parameters.Add(p);
+        return cmd.ExecuteScalar() != null;
+    }
+
+    private static HashSet<string> ReadColumns(System.Data.Common.DbConnection conn, string tableName)
+    {
+        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = $"PRAGMA table_info(\"{tableName}\")";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read()) set.Add(reader.GetString(1));
+        return set;
+    }
+
+    private static string InferSqliteType(Type clr)
+    {
+        var t = Nullable.GetUnderlyingType(clr) ?? clr;
+        if (t == typeof(int) || t == typeof(long) || t == typeof(short) || t == typeof(byte) || t == typeof(bool))
+            return "INTEGER";
+        if (t == typeof(double) || t == typeof(float)) return "REAL";
+        if (t == typeof(decimal)) return "decimal(18,4)";
+        if (t == typeof(byte[])) return "BLOB";
+        return "TEXT";
+    }
+
+    private static string DefaultValueLiteral(Type clr)
+    {
+        var t = Nullable.GetUnderlyingType(clr) ?? clr;
+        if (t == typeof(int) || t == typeof(long) || t == typeof(short) || t == typeof(byte) || t == typeof(bool))
+            return "0";
+        if (t == typeof(double) || t == typeof(float) || t == typeof(decimal)) return "0";
+        if (t == typeof(DateTime)) return "'1970-01-01 00:00:00'";
+        return "''";
+    }
+
+    private static void SeedMainData(PlmDbContext db)
     {
         if (db.SyncUsers.Any()) return; // 幂等
 
@@ -472,6 +610,97 @@ public static class PlmDbSeeder
             new ProductReview { ProductId = pSnack.ProductId, ReviewerId = adminId, ReviewerName = "超级管理员", Action = "approve", CreatedAt = now.AddDays(-5) }
         );
 
+        db.SaveChanges();
+    }
+
+    // 22春夏 服装款式种子（幂等）
+    // 数据来源：22春夏 排程表中真实出现的款式编码 LA/LB/LC/LD 系列
+    private static void SeedGarmentStyles(PlmDbContext db)
+    {
+        if (db.Products.Any(p => p.StyleCode == "LB5210100")) return;
+
+        // 找服装根类目；如果不存在(测试场景下种子未运行)则创建
+        var apparelRoot = db.Categories.FirstOrDefault(c => c.Path == "002");
+        if (apparelRoot == null)
+        {
+            apparelRoot = new Category { Name = "服装", Path = "002", Level = 1, OrderNum = 2 };
+            db.Categories.Add(apparelRoot);
+            db.SaveChanges();
+        }
+
+        // 22春夏专属子类目（L 字头 = 男装系列）
+        var catSuit = db.Categories.FirstOrDefault(c => c.Name == "男装西服" && c.ParentId == apparelRoot.CategoryId);
+        if (catSuit == null)
+        {
+            catSuit = new Category
+            {
+                Name = "男装西服",
+                ParentId = apparelRoot.CategoryId,
+                Path = $"{apparelRoot.Path}.010",
+                Level = 2,
+                OrderNum = 10,
+            };
+            db.Categories.Add(catSuit);
+            db.SaveChanges();
+        }
+        var catShirt = db.Categories.FirstOrDefault(c => c.Name == "男装衬衣" && c.ParentId == apparelRoot.CategoryId);
+        if (catShirt == null)
+        {
+            catShirt = new Category
+            {
+                Name = "男装衬衣",
+                ParentId = apparelRoot.CategoryId,
+                Path = $"{apparelRoot.Path}.011",
+                Level = 2,
+                OrderNum = 11,
+            };
+            db.Categories.Add(catShirt);
+            db.SaveChanges();
+        }
+
+        var now = DateTime.UtcNow;
+
+        // (StyleCode, ProductName, CategoryId, Series)
+        var styles = new (string code, string name, long catId, string series)[]
+        {
+            ("LB5210100", "LB系列男西服 龟背绣花款",  catSuit.CategoryId,  "经典"),
+            ("LB5500200", "LB系列男西服 前幅绣花款",  catSuit.CategoryId,  "经典"),
+            ("LB6200000", "LB系列男西服 不绣不印款",  catSuit.CategoryId,  "经典"),
+            ("LB2200000", "LB系列男西服 标准款",      catSuit.CategoryId,  "经典"),
+            ("LA0000204", "LA系列男西服 不绣不印款",  catSuit.CategoryId,  "经典"),
+            ("LA0030000", "LA系列男西服 前幅绣花款",  catSuit.CategoryId,  "经典"),
+            ("LA2200000", "LA系列男西服 标准款",      catSuit.CategoryId,  "经典"),
+            ("LA2400121", "LA系列男西服 前幅绣花款",  catSuit.CategoryId,  "经典"),
+            ("LA2400200", "LA系列男西服 前幅绣花款2", catSuit.CategoryId,  "经典"),
+            ("LA5400200", "LA系列男西服 上领面印花款",catSuit.CategoryId,  "经典"),
+            ("LA5500121", "LA系列男西服 前幅绣花款3", catSuit.CategoryId,  "经典"),
+            ("LA6200321", "LA系列男西服 前幅绣花款4", catSuit.CategoryId,  "经典"),
+            ("LA6500300", "LA系列男西服 前幅绣花款5", catSuit.CategoryId,  "经典"),
+            ("LA9B00204", "LA系列男西服 不绣不印款2", catSuit.CategoryId,  "新锐"),
+            ("LC0000204", "LC系列男装 不绣不印款",    catShirt.CategoryId, "经典"),
+            ("LC6200000", "LC系列男装 不绣不印款2",   catShirt.CategoryId, "经典"),
+            ("LC6700000", "LC系列男装 印花款",        catShirt.CategoryId, "新锐"),
+            ("LD0000000", "LD系列男装 标准款",        catShirt.CategoryId, "经典"),
+            ("LD6700000", "LD系列男装 印花款",        catShirt.CategoryId, "新锐"),
+            ("FB5200100", "FB系列男西服 不绣不印款",  catSuit.CategoryId,  "经典"),  // 实际 Excel 中也存在
+        };
+
+        foreach (var s in styles)
+        {
+            db.Products.Add(new Product
+            {
+                ProductName = s.name,
+                CategoryId = s.catId,
+                StyleCode = s.code,
+                SeasonCode = "22SS",
+                Series = s.series,
+                Status = "active",
+                CreatedBy = 1,
+                CreatedAt = now.AddDays(-200),
+                UpdatedAt = now.AddDays(-30),
+                AttributesJson = "{\"面料\":\"羊毛混纺\",\"产地\":\"浙江\"}",
+            });
+        }
         db.SaveChanges();
     }
 }

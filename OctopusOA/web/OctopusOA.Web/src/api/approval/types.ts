@@ -43,6 +43,8 @@ export interface ApprovalResponse {
   formData: string
   createTime: string
   updateTime: string
+  currentNodeDeadline: string | null
+  isOverdue: boolean
   records: RecordResponse[]
 }
 

@@ -51,7 +51,10 @@ export const userHandlers = [
       postIds: body.postIds ?? [],
       roles: [],
       createTime: new Date().toISOString().replace('T', ' ').slice(0, 19),
-      remark: body.remark ?? null
+      remark: body.remark ?? null,
+      userType: 'employee',
+      source: 'umc',
+      kcSub: null
     }
     users.push(newUser)
     return HttpResponse.json({ code: 200, msg: '新增成功', data: newUser })

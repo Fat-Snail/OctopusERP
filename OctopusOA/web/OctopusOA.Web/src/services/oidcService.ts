@@ -1,8 +1,10 @@
 import { UserManager, WebStorageStateStore } from 'oidc-client-ts'
 import type { OidcUserClaims } from '@/api/oa/types'
 
+const UMC_AUTHORITY = 'http://localhost:5001'
+
 const userManager = new UserManager({
-  authority: 'http://localhost:5001',
+  authority: UMC_AUTHORITY,
   client_id: 'octopus-oa-web',
   redirect_uri: 'http://localhost:5174/callback',
   post_logout_redirect_uri: 'http://localhost:5174',
@@ -19,8 +21,45 @@ userManager.events.addSilentRenewError(() => {
   oidcService.login()
 })
 
+/**
+ * 预检 UMC 是否就绪 — 5 秒超时 + 优先 readiness 探针。
+ * 失败抛出友好错误，避免 oidc-client-ts 内部 fetch 无限挂起。
+ */
+async function probeUmcReady(timeoutMs = 5000): Promise<void> {
+  const tryProbe = async (path: string): Promise<boolean> => {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs)
+    try {
+      const r = await fetch(`${UMC_AUTHORITY}${path}`, { signal: ctrl.signal, cache: 'no-store' })
+      return r.ok
+    } catch { return false }
+    finally { clearTimeout(timer) }
+  }
+
+  // 优先 /health/ready（DB+OIDC 客户端注册完成）；旧版本回退 /health
+  if (await tryProbe('/health/ready')) return
+  if (await tryProbe('/health')) return
+  if (await tryProbe('/.well-known/openid-configuration')) return
+
+  throw new Error(
+    'UMC 后端未就绪（5s 内无响应）。\n' +
+    '请在 Aspire Dashboard (http://localhost:15256) 检查 umc-api 状态，\n' +
+    '或手动重启该资源后重试。'
+  )
+}
+
 export const oidcService = {
-  login(): void {
+  /** 在执行 signinRedirect 前先 ping UMC，避免浏览器无限 spinner */
+  async login(): Promise<void> {
+    try {
+      await probeUmcReady()
+    } catch (e) {
+      const msg = (e as Error).message
+      console.error('[OIDC] UMC 不可达：', msg)
+      // eslint-disable-next-line no-alert
+      alert(msg)
+      return
+    }
     userManager.signinRedirect()
   },
 

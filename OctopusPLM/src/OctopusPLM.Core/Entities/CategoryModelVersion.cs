@@ -18,6 +18,8 @@ public class CategoryModelVersion
     /// <summary>发布时快照，便于历史商品回放和配置差异比对</summary>
     public string? ModelSnapshotJson { get; set; }
 
+    public string? CreatedByName { get; set; }
+    public string? PublishedByName { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 

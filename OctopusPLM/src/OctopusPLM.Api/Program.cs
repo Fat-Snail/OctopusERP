@@ -43,7 +43,15 @@ builder.Services.AddAuthentication("Bearer")
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("MaterialView", policy => policy.RequireAuthenticatedUser());
+    options.AddPolicy("MaterialManage", policy => policy.RequireRole("admin", "editor"));
+    options.AddPolicy("BomTemplateView", policy => policy.RequireAuthenticatedUser());
+    options.AddPolicy("BomTemplateManage", policy => policy.RequireRole("admin", "editor"));
+    options.AddPolicy("BomTemplateApply", policy => policy.RequireRole("admin", "editor"));
+    options.AddPolicy("BomTemplateExtract", policy => policy.RequireRole("admin", "editor"));
+});
 
 // EF Core：优先使用 MySQL（ConnectionStrings:DefaultConnection），无则回退 SQLite
 var plmConnStr = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -52,13 +60,17 @@ builder.Services.AddDbContext<PlmDbContext>(opt =>
     if (plmConnStr is not null)
         opt.UseMySQL(plmConnStr);
     else
-        opt.UseSqlite("Data Source=octopus_plm.db");
+        opt.UseSqlite($"Data Source={GetDbPath("octopus_plm.db")}");
 });
 
 // 业务服务
 builder.Services.AddScoped<OctopusPLM.Api.Services.CategoryService>();
 builder.Services.AddScoped<OctopusPLM.Api.Services.ProductService>();
 builder.Services.AddScoped<OctopusPLM.Api.Services.ChannelService>();
+builder.Services.AddScoped<OctopusPLM.Api.Services.CrossSystemService>();
+builder.Services.AddScoped<OctopusPLM.Api.Services.MaterialService>();
+builder.Services.AddScoped<OctopusPLM.Api.Services.CategoryBomTemplateService>();
+builder.Services.AddScoped<OctopusPLM.Api.Services.ManufacturingBomService>();
 
 // 向量搜索服务（Singleton：CLIP ONNX Session + Qdrant 客户端复用，IDisposable 由 DI 托管）
 builder.Services.AddHttpClient();
@@ -74,6 +86,8 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<PlmDbContext>();
     db.Database.EnsureCreated();
     PlmDbSeeder.Seed(db);
+    await scope.ServiceProvider.GetRequiredService<OctopusPLM.Api.Services.CategoryBomTemplateService>()
+        .InitializeLeafCategoriesAsync(0, "system", CancellationToken.None);
 }
 
 // 确保 Qdrant collection 存在（异步，非阻塞启动）
@@ -103,6 +117,24 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+static string GetDbPath(string fileName)
+{
+    var dir = new DirectoryInfo(AppContext.BaseDirectory);
+    while (dir != null)
+    {
+        if (File.Exists(Path.Combine(dir.FullName, "CLAUDE.md")))
+        {
+            var dataDir = Path.Combine(dir.FullName, "data");
+            Directory.CreateDirectory(dataDir);
+            return Path.Combine(dataDir, fileName);
+        }
+        dir = dir.Parent;
+    }
+    var fallback = Path.Combine(AppContext.BaseDirectory, "data");
+    Directory.CreateDirectory(fallback);
+    return Path.Combine(fallback, fileName);
+}
 
 // 供测试项目使用
 public partial class Program { }

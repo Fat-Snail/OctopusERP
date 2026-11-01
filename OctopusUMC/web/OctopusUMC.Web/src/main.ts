@@ -15,7 +15,7 @@ async function bootstrap() {
 
     if (!backendAlive) {
       const { worker } = await import('./mock/index')
-      await worker.start({ onUnhandledRequest: 'bypass' })
+      await worker.start({ onUnhandledFrame: 'bypass' })
     }
   }
 

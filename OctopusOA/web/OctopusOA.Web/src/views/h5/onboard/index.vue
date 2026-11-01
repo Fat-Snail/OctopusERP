@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, reactive, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { CheckCircle2, XCircle } from 'lucide-vue-next'
+import { CheckCircle2, XCircle } from '@lucide/vue'
 import { toast } from '@/components/ui/toast'
 import { h5GetOnboard, h5Submit } from '@/api/employee'
 import type { H5OnboardResponse, H5SubmitRequest } from '@/api/employee/types'

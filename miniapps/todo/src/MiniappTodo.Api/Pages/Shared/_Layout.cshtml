@@ -1,0 +1,79 @@
+@{
+    var isAuthed = User.Identity?.IsAuthenticated == true;
+    var userName = User.FindFirst("name")?.Value
+        ?? User.FindFirst("preferred_username")?.Value
+        ?? "未登录";
+    var dept = User.FindFirst("primary_dept_name")?.Value;
+}
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] · Octopus Todo</title>
+    <link rel="stylesheet"
+          href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+          integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH"
+          crossorigin="anonymous" />
+    <style>
+        body { background: #f5f7fb; }
+        .navbar-brand strong { color: #2563eb; }
+        .card-todo.done { opacity: 0.55; }
+        .card-todo.done .todo-title { text-decoration: line-through; }
+        .priority-5 { border-left: 4px solid #ef4444; }
+        .priority-4 { border-left: 4px solid #f97316; }
+        .priority-3 { border-left: 4px solid #6b7280; }
+        .priority-2 { border-left: 4px solid #94a3b8; }
+        .priority-1 { border-left: 4px solid #cbd5e1; }
+        .claim-table td { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 12.5px; }
+        .claim-table td.claim-key { color: #64748b; }
+        .footer { font-size: 12px; color: #94a3b8; padding: 24px 0; text-align: center; }
+    </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-light bg-white border-bottom">
+    <div class="container">
+        <a class="navbar-brand" href="/">🐙 <strong>Octopus</strong> Todo <small class="text-muted">demo miniapp</small></a>
+        <div class="navbar-nav me-auto">
+            <a class="nav-link" href="/">首页</a>
+            <a class="nav-link" href="/Todos">待办</a>
+            <a class="nav-link" href="/Profile">JWT 检视</a>
+            <a class="nav-link" href="/swagger" target="_blank">Swagger</a>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            @if (isAuthed)
+            {
+                <span class="text-muted small">
+                    @userName
+                    @if (!string.IsNullOrEmpty(dept)) { <span class="badge bg-light text-secondary ms-1">@dept</span> }
+                </span>
+                <a class="btn btn-sm btn-outline-secondary" href="/logout">退出</a>
+            }
+            else
+            {
+                <a class="btn btn-sm btn-primary" href="/login">登录 (Keycloak SSO)</a>
+            }
+        </div>
+    </div>
+</nav>
+
+<main class="container py-4">
+    @if (TempData["Message"] is string msg && !string.IsNullOrEmpty(msg))
+    {
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            @msg
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    }
+    @RenderBody()
+</main>
+
+<footer class="footer">
+    Octopus ERP · MiniApp Platform Demo · Authority: <code>@(Context.RequestServices.GetService<IConfiguration>()?["services:keycloak:http:0"] ?? "(Keycloak)") /realms/octopus</code>
+</footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+        crossorigin="anonymous"></script>
+</body>
+</html>

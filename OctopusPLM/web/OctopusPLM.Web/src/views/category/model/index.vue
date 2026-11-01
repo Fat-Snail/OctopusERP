@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue'
-import { ChevronRight, ChevronDown, Plus, Send, Trash2, Link2, Unlink } from 'lucide-vue-next'
+import { ChevronRight, ChevronDown, Plus, Send, Trash2, Link2, Unlink } from '@lucide/vue'
 import ButtonVue from '@/components/ui/button.vue'
 import InputVue from '@/components/ui/input.vue'
 import BadgeVue from '@/components/ui/badge.vue'
@@ -396,9 +396,10 @@ onMounted(loadTree)
             <table class="w-full text-[12px]">
               <thead>
                 <tr class="border-b border-border">
-                  <th class="text-left py-2 pr-4 text-[11px] uppercase tracking-wide text-muted-foreground font-medium w-[110px]">版本号</th>
-                  <th class="text-left py-2 pr-4 text-[11px] uppercase tracking-wide text-muted-foreground font-medium w-[90px]">状态</th>
-                  <th class="text-left py-2 pr-4 text-[11px] uppercase tracking-wide text-muted-foreground font-medium">生效时间</th>
+                  <th class="text-left py-2 pr-4 text-[11px] uppercase tracking-wide text-muted-foreground font-medium w-[80px]">版本号</th>
+                  <th class="text-left py-2 pr-4 text-[11px] uppercase tracking-wide text-muted-foreground font-medium w-[80px]">状态</th>
+                  <th class="text-left py-2 pr-4 text-[11px] uppercase tracking-wide text-muted-foreground font-medium w-[80px]">新建人</th>
+                  <th class="text-left py-2 pr-4 text-[11px] uppercase tracking-wide text-muted-foreground font-medium w-[80px]">发布人</th>
                   <th class="text-left py-2 pr-4 text-[11px] uppercase tracking-wide text-muted-foreground font-medium">发布时间</th>
                   <th class="text-left py-2 pr-4 text-[11px] uppercase tracking-wide text-muted-foreground font-medium">变更说明</th>
                   <th class="text-left py-2 text-[11px] uppercase tracking-wide text-muted-foreground font-medium w-[120px]">操作</th>
@@ -420,7 +421,8 @@ onMounted(loadTree)
                       {{ statusLabel(v.status) }}
                     </span>
                   </td>
-                  <td class="py-2 pr-4 font-mono-tnum text-muted-foreground">{{ formatDate(v.effectiveFrom) }}</td>
+                  <td class="py-2 pr-4 text-muted-foreground">{{ v.createdByName || '-' }}</td>
+                  <td class="py-2 pr-4 text-muted-foreground">{{ v.publishedByName || '-' }}</td>
                   <td class="py-2 pr-4 font-mono-tnum text-muted-foreground">{{ formatDate(v.publishedAt) }}</td>
                   <td class="py-2 pr-4 text-muted-foreground truncate max-w-[180px]">{{ v.changeSummary || '-' }}</td>
                   <td class="py-2" @click.stop>
@@ -441,7 +443,7 @@ onMounted(loadTree)
                   </td>
                 </tr>
                 <tr v-if="!versions.length">
-                  <td colspan="6" class="py-4 text-center text-muted-foreground">暂无版本记录</td>
+                  <td colspan="7" class="py-4 text-center text-muted-foreground">暂无版本记录</td>
                 </tr>
               </tbody>
             </table>

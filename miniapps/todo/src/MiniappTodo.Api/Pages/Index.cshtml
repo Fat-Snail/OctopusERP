@@ -1,0 +1,103 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "首页";
+}
+
+@if (!Model.IsAuthed)
+{
+    <div class="row align-items-center py-5">
+        <div class="col-md-7">
+            <h1 class="display-5 mb-3">欢迎来到 Octopus Todo</h1>
+            <p class="lead text-secondary">
+                这是 OctopusERP 小程序平台的演示应用。<br />
+                登录采用统一身份 IdP（Keycloak），用户数据 / 部门 / 公司 完全来自 JWT claims，
+                <strong>不读 UMC 数据库、不调 UMC API</strong>，独立容器独立 DB。
+            </p>
+            <a class="btn btn-primary btn-lg mt-2" href="/login">使用 Keycloak SSO 登录</a>
+            <p class="text-muted small mt-3">
+                测试账号：<code>zhangsan</code> / <code>Admin@123</code> 或 <code>admin</code> / <code>Admin@123</code>
+            </p>
+        </div>
+        <div class="col-md-5">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h6 class="text-muted text-uppercase small">技术栈速览</h6>
+                    <ul class="mb-0 small">
+                        <li>身份：<strong>Keycloak</strong>（OIDC + PKCE，自定义 claims 注入）</li>
+                        <li>会话：Cookie（HttpOnly，浏览器）/ Bearer JWT（API）双通道</li>
+                        <li>后端：.NET 10 + EF Core + 独立 SQLite</li>
+                        <li>用户隔离：业务表外键 <code>kc_sub</code> (Keycloak UUID)</li>
+                        <li>Lazy Provisioning：首次登录按 JWT claims 建本地 profile</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+else
+{
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <div class="text-muted small">待办</div>
+                    <div class="display-6">@Model.Pending</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <div class="text-muted small">已完成</div>
+                    <div class="display-6 text-success">@Model.Done</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <div class="text-muted small">逾期</div>
+                    <div class="display-6 text-danger">@Model.Overdue</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <div class="text-muted small">总计</div>
+                    <div class="display-6 text-secondary">@Model.Total</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-3">
+        <div class="col-md-7">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <h5 class="card-title">JWT 透出的用户上下文</h5>
+                    <p class="text-muted small mb-3">
+                        这些数据全部来自 Keycloak 颁发的 access token 的 claims —— 没有任何一行代码访问 UMC 数据库。
+                    </p>
+                    <table class="table table-borderless mb-0 claim-table">
+                        <tr><td class="claim-key">name</td><td>@Model.UserName</td></tr>
+                        <tr><td class="claim-key">octopus_user_id</td><td>@Model.OctopusUserId</td></tr>
+                        <tr><td class="claim-key">primary_dept_name</td><td>@Model.DeptName</td></tr>
+                        <tr><td class="claim-key">company_name</td><td>@Model.CompanyName</td></tr>
+                        <tr><td class="claim-key">miniapp_scope</td><td><span class="badge bg-info text-dark">@Model.Scope</span></td></tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-5">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body d-flex flex-column">
+                    <h5 class="card-title">下一步</h5>
+                    <p class="text-muted">管理你的待办、创建新任务。</p>
+                    <a class="btn btn-primary mt-auto" href="/Todos">进入待办列表 →</a>
+                </div>
+            </div>
+        </div>
+    </div>
+}

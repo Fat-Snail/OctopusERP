@@ -11,6 +11,21 @@
 # UMC_AUTHORITY env var below.
 
 services:
+  # ── 共享基础设施：Redis 分布式缓存 ──────────────────────────────────
+  # 6 个后端共享一个实例，InstanceName 前缀（umc:/oa:/crm:/wms:/mes:）做 key 命名空间隔离
+  redis:
+    image: redis:7-alpine
+    container_name: octopus-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   # ── UMC ────────────────────────────────────────────────────────────
   umc-api:
     build:
@@ -23,6 +38,11 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
+      - Redis__Connection=redis:6379
+      - "Redis__InstanceName=umc:"
+    depends_on:
+      redis:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
       interval: 10s
@@ -52,6 +72,8 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
+      - Redis__Connection=redis:6379
+      - "Redis__InstanceName=oa:"
       # Override UMC authority for container-to-container JWT validation
       - UMC_AUTHORITY=http://umc-api:8080
     depends_on:
@@ -87,6 +109,8 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
       - UMC_AUTHORITY=http://umc-api:8080
+      - Redis__Connection=redis:6379
+      - "Redis__InstanceName=plm:"
     depends_on:
       umc-api:
         condition: service_healthy
@@ -120,6 +144,8 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
       - UMC_AUTHORITY=http://umc-api:8080
+      - Redis__Connection=redis:6379
+      - "Redis__InstanceName=crm:"
     depends_on:
       umc-api:
         condition: service_healthy
@@ -153,6 +179,8 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
       - UMC_AUTHORITY=http://umc-api:8080
+      - Redis__Connection=redis:6379
+      - "Redis__InstanceName=wms:"
     depends_on:
       umc-api:
         condition: service_healthy
@@ -186,6 +214,8 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - ASPNETCORE_URLS=http://+:8080
       - UMC_AUTHORITY=http://umc-api:8080
+      - Redis__Connection=redis:6379
+      - "Redis__InstanceName=mes:"
     depends_on:
       umc-api:
         condition: service_healthy
@@ -206,6 +236,87 @@ services:
       mes-api:
         condition: service_healthy
 
+  # ── FIN 财务（P13）─────────────────────────────────────────────────
+  fin-api:
+    build:
+      context: ./OctopusFIN
+      dockerfile: Dockerfile
+    ports:
+      - "5007:8080"
+    volumes:
+      - fin-data:/app
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - UMC_AUTHORITY=http://umc-api:8080
+      - Redis__Connection=redis:6379
+      - "Redis__InstanceName=fin:"
+    depends_on:
+      umc-api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── HRM 人力资源（P14）─────────────────────────────────────────────
+  hrm-api:
+    build:
+      context: ./OctopusHRM
+      dockerfile: Dockerfile
+    ports:
+      - "5008:8080"
+    volumes:
+      - hrm-data:/app
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - UMC_AUTHORITY=http://umc-api:8080
+      - Redis__Connection=redis:6379
+      - "Redis__InstanceName=hrm:"
+    depends_on:
+      umc-api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  # ── OMS 订单中台（P15）─────────────────────────────────────────────
+  oms-api:
+    build:
+      context: ./OctopusOMS
+      dockerfile: Dockerfile
+    ports:
+      - "5009:8080"
+    volumes:
+      - oms-data:/app
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - UMC_AUTHORITY=http://umc-api:8080
+      - Redis__Connection=redis:6379
+      - "Redis__InstanceName=oms:"
+    depends_on:
+      umc-api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
 volumes:
   umc-data:
   oa-data:
@@ -213,3 +324,7 @@ volumes:
   crm-data:
   wms-data:
   mes-data:
+  fin-data:
+  hrm-data:
+  oms-data:
+  redis-data:

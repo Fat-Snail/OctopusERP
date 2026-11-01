@@ -1,0 +1,76 @@
+@page
+@model ProfileModel
+@{
+    ViewData["Title"] = "JWT 检视";
+    // 高亮自定义 Octopus claims
+    var keyClaims = new[] { "sub", "preferred_username", "name", "email",
+        "octopus_user_id", "primary_dept_id", "primary_dept_name",
+        "company_name", "miniapp_scope" };
+}
+
+<h2>JWT Token 透视</h2>
+<p class="text-muted small mb-4">
+    Keycloak 颁发的 OIDC ID Token 解析结果。<strong>这是小程序后端获取用户上下文的<u>唯一来源</u></strong>。
+</p>
+
+<div class="row g-3">
+    <div class="col-md-6">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-primary text-white">关键业务 Claims（高频使用）</div>
+            <div class="card-body p-0">
+                <table class="table mb-0 claim-table">
+                    <tbody>
+                        @foreach (var key in keyClaims)
+                        {
+                            var c = Model.Claims.FirstOrDefault(x => x.Type == key);
+                            <tr>
+                                <td class="claim-key" style="width: 40%;">@key</td>
+                                <td>
+                                    @if (c is null)
+                                    {
+                                        <span class="text-muted">—</span>
+                                    }
+                                    else
+                                    {
+                                        @c.Value
+                                    }
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card shadow-sm border-0">
+            <div class="card-header">全部 @Model.Claims.Count 个 Claims</div>
+            <div class="card-body p-0" style="max-height: 480px; overflow: auto;">
+                <table class="table table-sm table-striped mb-0 claim-table">
+                    <thead>
+                        <tr class="small text-muted">
+                            <th style="width: 40%;">Type</th>
+                            <th>Value</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var c in Model.Claims)
+                        {
+                            <tr>
+                                <td class="claim-key text-truncate" style="max-width: 200px;" title="@c.Type">@c.Type</td>
+                                <td class="text-break"><code>@c.Value</code></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="alert alert-info mt-4 small">
+    <strong>关键设计点</strong>：上面的所有信息都来自 JWT，<u>不查 UMC 任何数据</u>。
+    如果 UMC 改了用户的部门，下次用户重新登录 / token 刷新后，<code>primary_dept_name</code> 自动更新 ——
+    这是通过 UMC <code>KeycloakSyncService</code> 把变更推到 Keycloak User Attribute 实现的（M2 完成）。
+</div>

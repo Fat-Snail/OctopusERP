@@ -1,0 +1,240 @@
+{
+  "realm": "octopus",
+  "displayName": "OctopusERP Mini-App Platform",
+  "enabled": true,
+  "loginTheme": "keycloak",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
+  "verifyEmail": false,
+  "accessTokenLifespan": 3600,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "offlineSessionIdleTimeout": 2592000,
+
+  "requiredActions": [
+    { "alias": "VERIFY_PROFILE", "name": "Verify Profile", "providerId": "VERIFY_PROFILE", "enabled": false, "defaultAction": false, "priority": 90, "config": {} }
+  ],
+
+  "clients": [
+    {
+      "clientId": "octopus-portal",
+      "name": "OctopusERP 主门户",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "http://localhost:5173/*", "http://localhost:5174/*", "http://localhost:5175/*",
+        "http://localhost:5176/*", "http://localhost:5177/*", "http://localhost:5178/*",
+        "http://localhost:5179/*", "http://localhost:5180/*", "http://localhost:5181/*",
+        "http://localhost:5182/*", "http://localhost:5183/*"
+      ],
+      "webOrigins": ["+"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      },
+      "protocolMappers": [
+        { "name": "octopus_user_id", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": { "user.attribute": "octopus_user_id", "claim.name": "octopus_user_id",
+                      "jsonType.label": "String", "id.token.claim": "true",
+                      "access.token.claim": "true", "userinfo.token.claim": "true" } },
+        { "name": "primary_dept_id", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": { "user.attribute": "primary_dept_id", "claim.name": "primary_dept_id",
+                      "jsonType.label": "String", "id.token.claim": "true",
+                      "access.token.claim": "true", "userinfo.token.claim": "true" } },
+        { "name": "primary_dept_name", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": { "user.attribute": "primary_dept_name", "claim.name": "primary_dept_name",
+                      "jsonType.label": "String", "id.token.claim": "true",
+                      "access.token.claim": "true", "userinfo.token.claim": "true" } },
+        { "name": "company_name", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": { "user.attribute": "company_name", "claim.name": "company_name",
+                      "jsonType.label": "String", "id.token.claim": "true",
+                      "access.token.claim": "true", "userinfo.token.claim": "true" } },
+        { "name": "miniapp_scope", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": { "user.attribute": "miniapp_scope", "claim.name": "miniapp_scope",
+                      "jsonType.label": "String", "id.token.claim": "true",
+                      "access.token.claim": "true", "userinfo.token.claim": "true" } },
+        { "name": "dept_ids", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": { "user.attribute": "dept_ids", "claim.name": "dept_ids",
+                      "jsonType.label": "String", "multivalued": "true",
+                      "id.token.claim": "true", "access.token.claim": "true", "userinfo.token.claim": "true" } },
+        { "name": "groups", "protocol": "openid-connect", "protocolMapper": "oidc-group-membership-mapper",
+          "config": { "claim.name": "groups", "full.path": "true",
+                      "id.token.claim": "true", "access.token.claim": "true", "userinfo.token.claim": "true" } }
+      ]
+    },
+    {
+      "clientId": "miniapp-todo",
+      "name": "Demo 小程序：待办事项",
+      "description": "演示用：每个小程序应有独立的 client，独立容器，独立域名",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "http://localhost:5201/*",
+        "http://localhost:5301/*",
+        "https://todo.miniapp.octopus.com/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5201",
+        "http://localhost:5301",
+        "https://todo.miniapp.octopus.com"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      },
+      "protocolMappers": [
+        { "name": "octopus_user_id", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": { "user.attribute": "octopus_user_id", "claim.name": "octopus_user_id",
+                      "jsonType.label": "String", "id.token.claim": "true",
+                      "access.token.claim": "true", "userinfo.token.claim": "true" } },
+        { "name": "primary_dept_id", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": { "user.attribute": "primary_dept_id", "claim.name": "primary_dept_id",
+                      "jsonType.label": "String", "id.token.claim": "true",
+                      "access.token.claim": "true", "userinfo.token.claim": "true" } },
+        { "name": "primary_dept_name", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": { "user.attribute": "primary_dept_name", "claim.name": "primary_dept_name",
+                      "jsonType.label": "String", "id.token.claim": "true",
+                      "access.token.claim": "true", "userinfo.token.claim": "true" } },
+        { "name": "company_name", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": { "user.attribute": "company_name", "claim.name": "company_name",
+                      "jsonType.label": "String", "id.token.claim": "true",
+                      "access.token.claim": "true", "userinfo.token.claim": "true" } },
+        { "name": "miniapp_scope", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": { "user.attribute": "miniapp_scope", "claim.name": "miniapp_scope",
+                      "jsonType.label": "String", "id.token.claim": "true",
+                      "access.token.claim": "true", "userinfo.token.claim": "true" } },
+        { "name": "dept_ids", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": { "user.attribute": "dept_ids", "claim.name": "dept_ids",
+                      "jsonType.label": "String", "multivalued": "true",
+                      "id.token.claim": "true", "access.token.claim": "true", "userinfo.token.claim": "true" } },
+        { "name": "groups", "protocol": "openid-connect", "protocolMapper": "oidc-group-membership-mapper",
+          "config": { "claim.name": "groups", "full.path": "true",
+                      "id.token.claim": "true", "access.token.claim": "true", "userinfo.token.claim": "true" } }
+      ]
+    },
+    {
+      "clientId": "umc-sync-bot",
+      "name": "UMC 用户同步机器人（服务账号）",
+      "description": "UMC.Api 内的 KeycloakSyncService 使用此 client 调用 Keycloak Admin REST API",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "umc-sync-bot-secret-dev",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "authorizationServicesEnabled": false
+    },
+    {
+      "clientId": "octopus-retail",
+      "name": "OctopusRetail 零售域",
+      "description": "零售域前端（PKCE）。注意：零售域不读 UMC，身份完全来自本 client 的 token",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "redirectUris": [
+        "http://localhost:5186/*",
+        "https://retail.octopus.com/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5186",
+        "https://retail.octopus.com"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      },
+      "protocolMappers": [
+        { "name": "octopus_user_id", "protocol": "openid-connect", "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": { "user.attribute": "octopus_user_id", "claim.name": "octopus_user_id",
+                      "jsonType.label": "String", "id.token.claim": "true",
+                      "access.token.claim": "true", "userinfo.token.claim": "true" } },
+        { "name": "groups", "protocol": "openid-connect", "protocolMapper": "oidc-group-membership-mapper",
+          "config": { "claim.name": "groups", "full.path": "true",
+                      "id.token.claim": "true", "access.token.claim": "true", "userinfo.token.claim": "true" } }
+      ]
+    },
+    {
+      "clientId": "retail-invite-bot",
+      "name": "零售邀请机器人（服务账号）",
+      "description": "Retail.Api 的 KeycloakAdminClient 用它调用 Admin REST 做受控建号与 group 双写。凭据绝不下发给前端或租户",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "retail-invite-bot-secret-dev",
+      "serviceAccountsEnabled": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "authorizationServicesEnabled": false
+    }
+  ],
+
+  "users": [
+    {
+      "username": "service-account-umc-sync-bot",
+      "enabled": true,
+      "serviceAccountClientId": "umc-sync-bot",
+      "clientRoles": {
+        "realm-management": [
+          "manage-users", "view-users", "query-users",
+          "manage-groups", "view-groups", "query-groups"
+        ]
+      }
+    },
+    {
+      "username": "service-account-retail-invite-bot",
+      "enabled": true,
+      "serviceAccountClientId": "retail-invite-bot",
+      "clientRoles": {
+        "realm-management": [
+          "manage-users", "view-users", "query-users",
+          "manage-groups", "view-groups", "query-groups"
+        ]
+      }
+    },
+    {
+      "username": "admin",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "admin@octopus.com",
+      "firstName": "超级管理员",
+      "lastName": "·",
+      "credentials": [{ "type": "password", "value": "Admin@123", "temporary": false }],
+      "realmRoles": ["offline_access", "uma_authorization"],
+      "attributes": {
+        "octopus_user_id": ["1"],
+        "dept_ids": ["2"],
+        "primary_dept_id": ["2"],
+        "primary_dept_name": ["总裁办"],
+        "company_name": ["章鱼科技"],
+        "miniapp_scope": ["all"]
+      }
+    },
+    {
+      "username": "zhangsan",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "zhangsan@octopus.com",
+      "firstName": "张三",
+      "lastName": "·",
+      "credentials": [{ "type": "password", "value": "User@123", "temporary": false }],
+      "attributes": {
+        "octopus_user_id": ["2"],
+        "dept_ids": ["3", "10"],
+        "primary_dept_id": ["3"],
+        "primary_dept_name": ["技术部"],
+        "company_name": ["章鱼科技"],
+        "miniapp_scope": ["team"]
+      }
+    }
+  ],
+
+  "groups": [
+    { "name": "tenants", "subGroups": [] },
+    { "name": "depts", "subGroups": [] }
+  ]
+}

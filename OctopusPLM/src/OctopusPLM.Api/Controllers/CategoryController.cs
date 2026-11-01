@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OctopusPLM.Api.Services;
+using System.Security.Claims;
 
 namespace OctopusPLM.Api.Controllers;
 
@@ -71,8 +72,19 @@ public class UpdateModelVersionRequest
 public class CategoryController : ControllerBase
 {
     private readonly CategoryService _service;
+    private readonly CategoryBomTemplateService _bomTemplates;
 
-    public CategoryController(CategoryService service) => _service = service;
+    public CategoryController(CategoryService service, CategoryBomTemplateService bomTemplates) { _service = service; _bomTemplates = bomTemplates; }
+
+    private (long Id, string Name) GetCurrentUserInfo()
+    {
+        var id = long.TryParse(User.FindFirst("sub")?.Value ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var uid) ? uid : 0;
+        var name = User.FindFirst("name")?.Value
+            ?? User.FindFirst("preferred_username")?.Value
+            ?? User.FindFirst(ClaimTypes.Name)?.Value
+            ?? id.ToString();
+        return (id, name);
+    }
 
     /// <summary>类目树（含子节点）</summary>
     [HttpGet("tree")]
@@ -88,7 +100,9 @@ public class CategoryController : ControllerBase
     {
         var (cat, err) = await _service.CreateCategoryAsync(req.Name, req.ParentId, req.OrderNum);
         if (err != null) return Ok(new { code = 400, msg = err });
-        return Ok(new { code = 200, msg = "创建成功", data = new { cat!.CategoryId } });
+        var (uid, name) = GetCurrentUserInfo();
+        await _bomTemplates.EnsureLeafTemplateAsync(cat!.CategoryId, uid, name, HttpContext.RequestAborted);
+        return Ok(new { code = 200, msg = "创建成功", data = new { cat.CategoryId } });
     }
 
     /// <summary>更新类目</summary>
@@ -155,7 +169,8 @@ public class CategoryController : ControllerBase
     [HttpPost("{id:long}/model/versions")]
     public async Task<IActionResult> CreateModelVersion(long id, [FromBody] CreateModelVersionRequest req)
     {
-        var (ver, err) = await _service.CreateModelVersionAsync(id, req.ChangeSummary);
+        var (_, name) = GetCurrentUserInfo();
+        var (ver, err) = await _service.CreateModelVersionAsync(id, req.ChangeSummary, name);
         if (err != null) return Ok(new { code = 400, msg = err });
         return Ok(new { code = 200, msg = "创建成功", data = new { ver!.ModelVersionId, ver.VersionNo } });
     }
@@ -173,7 +188,8 @@ public class CategoryController : ControllerBase
     [HttpPost("{id:long}/model/versions/{versionId:long}/publish")]
     public async Task<IActionResult> PublishModelVersion(long id, long versionId)
     {
-        var err = await _service.PublishModelVersionAsync(id, versionId);
+        var (uid, name) = GetCurrentUserInfo();
+        var err = await _service.PublishModelVersionAsync(id, versionId, uid, name);
         if (err != null) return Ok(new { code = 400, msg = err });
         return Ok(new { code = 200, msg = "发布成功" });
     }

@@ -1,6 +1,7 @@
 import type { ApiResponse } from '../types'
 import type {
   ProductListResult,
+  ProductListQuery,
   ProductResponse,
   CreateProductRequest,
   UpdateProductRequest,
@@ -20,13 +21,7 @@ function unwrap<T>(res: { data: ApiResponse<T> }): T {
 }
 
 /** 商品列表（分页 + 筛选） */
-export async function getProductList(params: {
-  page?: number
-  size?: number
-  categoryId?: number
-  keyword?: string
-  status?: string
-}): Promise<ProductListResult> {
+export async function getProductList(params: ProductListQuery): Promise<ProductListResult> {
   return unwrap(await http.get<ApiResponse<ProductListResult>>('/product/list', { params }))
 }
 

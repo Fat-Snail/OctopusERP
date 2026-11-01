@@ -4,8 +4,16 @@ public static class CrmDbSeeder
 {
     public static void Seed(CrmDbContext db)
     {
-        if (db.SyncUsers.Any()) return;
+        if (!db.SyncUsers.Any())
+        {
+            SeedMainData(db);
+        }
+        // 服装客户与款号字典：幂等，每次启动都尝试补齐(以 CustomerCode "CUS-GARM-001" 为 marker)
+        SeedGarmentCustomers(db);
+    }
 
+    private static void SeedMainData(CrmDbContext db)
+    {
         var now = DateTime.UtcNow;
 
         // 同步用户（对应 UMC UserId 1/2/3）
@@ -31,12 +39,12 @@ public static class CrmDbSeeder
         var customerHuawei = new CrmCustomer
         {
             CustomerCode = "CUS-20260101-001",
-            CustomerName = "华为技术有限公司",
+            CustomerName = "示例客户1",
             IndustryType = "电子",
             Level = "A",
             Status = "active",
-            Address = "广东省深圳市龙岗区坂田华为基地",
-            Website = "https://www.huawei.com",
+            Address = "示例省示例市示例区示例路1号",
+            Website = "https://example.invalid/customer1",
             Remark = "重点客户，优先服务",
             CreatedBy = 1,
             CreatedAt = now.AddDays(-60),
@@ -46,12 +54,12 @@ public static class CrmDbSeeder
         var customerAlibaba = new CrmCustomer
         {
             CustomerCode = "CUS-20260101-002",
-            CustomerName = "阿里巴巴集团控股有限公司",
+            CustomerName = "示例客户2",
             IndustryType = "互联网",
             Level = "B",
             Status = "active",
-            Address = "浙江省杭州市余杭区五常街道",
-            Website = "https://www.alibaba.com",
+            Address = "示例省示例市示例区示例路2号",
+            Website = "https://example.invalid/customer2",
             Remark = "互联网头部企业",
             CreatedBy = 2,
             CreatedAt = now.AddDays(-45),
@@ -61,12 +69,12 @@ public static class CrmDbSeeder
         var customerByteDance = new CrmCustomer
         {
             CustomerCode = "CUS-20260101-003",
-            CustomerName = "字节跳动有限公司",
+            CustomerName = "示例客户3",
             IndustryType = "互联网",
             Level = "C",
             Status = "prospect",
-            Address = "北京市海淀区知春路抖音大厦",
-            Website = "https://www.bytedance.com",
+            Address = "示例省示例市示例区示例路3号",
+            Website = "https://example.invalid/customer3",
             Remark = "潜在客户，持续跟进",
             CreatedBy = 2,
             CreatedAt = now.AddDays(-20),
@@ -77,13 +85,13 @@ public static class CrmDbSeeder
         var customerSuning = new CrmCustomer
         {
             CustomerCode = "CUS-20260101-004",
-            CustomerName = "苏宁易购集团股份有限公司",
+            CustomerName = "示例客户4",
             IndustryType = "零售",
             Level = "A",
             Status = "active",
-            Address = "江苏省南京市玄武区苏宁总部",
-            Website = "https://www.suning.com",
-            Remark = "全国连锁零售商，主要采购智能手机分销",
+            Address = "示例省示例市示例区示例路4号",
+            Website = "https://example.invalid/customer4",
+            Remark = "全国连锁零售商，采购智能手机分销",
             CreatedBy = 2,
             CreatedAt = now.AddDays(-30),
             UpdatedAt = now.AddDays(-2)
@@ -92,12 +100,12 @@ public static class CrmDbSeeder
         var customerJD = new CrmCustomer
         {
             CustomerCode = "CUS-20260101-005",
-            CustomerName = "京东科技控股股份有限公司",
+            CustomerName = "示例客户5",
             IndustryType = "零售",
             Level = "B",
             Status = "prospect",
-            Address = "北京市朝阳区京东大厦",
-            Website = "https://www.jd.com",
+            Address = "示例省示例市示例区示例路5号",
+            Website = "https://example.invalid/customer5",
             Remark = "正在洽谈年度框架合同",
             CreatedBy = 3,
             CreatedAt = now.AddDays(-10),
@@ -112,60 +120,60 @@ public static class CrmDbSeeder
             new CrmContact
             {
                 CustomerId = customerHuawei.CustomerId,
-                Name = "王采购",
+                Name = "联系人A",
                 Title = "采购总监",
                 Phone = "13900139001",
-                Email = "wang.caigou@huawei.com",
+                Email = "contacta@example.invalid",
                 IsPrimary = true,
                 CreatedAt = now.AddDays(-60)
             },
             new CrmContact
             {
                 CustomerId = customerHuawei.CustomerId,
-                Name = "李技术",
+                Name = "联系人B",
                 Title = "技术经理",
                 Phone = "13900139002",
-                Email = "li.jishu@huawei.com",
+                Email = "contactb@example.invalid",
                 IsPrimary = false,
                 CreatedAt = now.AddDays(-58)
             },
             new CrmContact
             {
                 CustomerId = customerAlibaba.CustomerId,
-                Name = "赵采购",
+                Name = "联系人C",
                 Title = "采购经理",
                 Phone = "13900139003",
-                Email = "zhao.caigou@alibaba.com",
+                Email = "contactc@example.invalid",
                 IsPrimary = true,
                 CreatedAt = now.AddDays(-45)
             },
             new CrmContact
             {
                 CustomerId = customerByteDance.CustomerId,
-                Name = "钱总",
+                Name = "联系人D",
                 Title = "硬件负责人",
                 Phone = "13900139004",
-                Email = "qian@bytedance.com",
+                Email = "contactd@example.invalid",
                 IsPrimary = true,
                 CreatedAt = now.AddDays(-20)
             },
             new CrmContact
             {
                 CustomerId = customerSuning.CustomerId,
-                Name = "孙采购",
+                Name = "联系人E",
                 Title = "手机品类采购总监",
                 Phone = "13900139005",
-                Email = "sun.caigou@suning.com",
+                Email = "contacte@example.invalid",
                 IsPrimary = true,
                 CreatedAt = now.AddDays(-30)
             },
             new CrmContact
             {
                 CustomerId = customerJD.CustomerId,
-                Name = "周经理",
+                Name = "联系人F",
                 Title = "供应链负责人",
                 Phone = "13900139006",
-                Email = "zhou@jd.com",
+                Email = "contactf@example.invalid",
                 IsPrimary = true,
                 CreatedAt = now.AddDays(-10)
             }
@@ -176,7 +184,7 @@ public static class CrmDbSeeder
         {
             InquiryCode = "INQ-20260101-001",
             CustomerId = customerHuawei.CustomerId,
-            Title = "华为手机屏幕及相机模组采购询盘",
+            Title = "示例客户1手机屏幕及相机模组采购询盘",
             Description = "需要采购新款旗舰手机屏幕和相机模组，数量较大",
             Status = "quoted",
             ExpectedDelivery = now.AddDays(30),
@@ -191,7 +199,7 @@ public static class CrmDbSeeder
         {
             InquiryCode = "INQ-20260101-002",
             CustomerId = customerAlibaba.CustomerId,
-            Title = "阿里巴巴服务器配件采购询盘",
+            Title = "示例客户2服务器配件采购询盘",
             Description = "数据中心扩容，需要采购一批服务器配件",
             Status = "open",
             ExpectedDelivery = now.AddDays(45),
@@ -202,12 +210,12 @@ public static class CrmDbSeeder
             UpdatedAt = now.AddDays(-15)
         };
 
-        // 苏宁询盘（关联 PLM 商品 iPhone 15 Pro + 小米 14）
+        // 示例客户4询盘（关联 PLM 商品 iPhone 15 Pro + 小米 14）
         var inquirySuning = new CrmInquiry
         {
             InquiryCode = "INQ-20260101-003",
             CustomerId = customerSuning.CustomerId,
-            Title = "苏宁易购 Q2 智能手机采购询盘",
+            Title = "示例客户4 Q2 智能手机采购询盘",
             Description = "面向 Q2 旺季备货，需要大批量采购主流智能手机机型",
             Status = "in_progress",
             ExpectedDelivery = now.AddDays(20),
@@ -218,12 +226,12 @@ public static class CrmDbSeeder
             UpdatedAt = now.AddDays(-2)
         };
 
-        // 京东询盘（关联 PLM 小米 14）
+        // 示例客户5询盘（关联 PLM 小米 14）
         var inquiryJD = new CrmInquiry
         {
             InquiryCode = "INQ-20260101-004",
             CustomerId = customerJD.CustomerId,
-            Title = "京东商城手机品类试销询盘",
+            Title = "示例客户5手机品类试销询盘",
             Description = "先小批量试销，测试销量后决定年度框架采购量",
             Status = "open",
             ExpectedDelivery = now.AddDays(60),
@@ -239,7 +247,7 @@ public static class CrmDbSeeder
 
         // 询盘明细
         db.InquiryItems.AddRange(
-            // 华为询盘：屏幕+摄像头组件
+            // 示例客户1询盘：屏幕+摄像头组件
             new CrmInquiryItem
             {
                 InquiryId = inquiryHuawei.InquiryId,
@@ -247,7 +255,7 @@ public static class CrmDbSeeder
                 Spec = "6.7英寸 2K 120Hz",
                 Quantity = 10000,
                 Unit = "块",
-                Remark = "需要通过华为认证"
+                Remark = "需要通过示例客户1认证"
             },
             new CrmInquiryItem
             {
@@ -258,7 +266,7 @@ public static class CrmDbSeeder
                 Unit = "套",
                 Remark = "含支架和连接线"
             },
-            // 阿里巴巴询盘：服务器配件
+            // 示例客户2询盘：服务器配件
             new CrmInquiryItem
             {
                 InquiryId = inquiryAlibaba.InquiryId,
@@ -277,7 +285,7 @@ public static class CrmDbSeeder
                 Unit = "块",
                 Remark = "企业级"
             },
-            // 苏宁询盘：关联 PLM 商品（PLM ProductId = 1: iPhone 15 Pro, 2: 小米 14）
+            // 示例客户4询盘：关联 PLM 商品（PLM ProductId = 1: iPhone 15 Pro, 2: 小米 14）
             new CrmInquiryItem
             {
                 InquiryId = inquirySuning.InquiryId,
@@ -298,7 +306,7 @@ public static class CrmDbSeeder
                 PlmProductId = 2,   // PLM: 小米 14
                 Remark = "附赠原装充电套装"
             },
-            // 京东询盘：关联 PLM 小米 14
+            // 示例客户5询盘：关联 PLM 小米 14
             new CrmInquiryItem
             {
                 InquiryId = inquiryJD.InquiryId,
@@ -311,7 +319,7 @@ public static class CrmDbSeeder
             }
         );
 
-        // 报价单（华为）
+        // 报价单（示例客户1）
         var quoteHuawei = new CrmQuote
         {
             QuoteCode = "QUO-20260101-001",
@@ -330,7 +338,7 @@ public static class CrmDbSeeder
             UpdatedAt = now.AddDays(-10)
         };
 
-        // 报价单（苏宁，关联 PLM 商品）
+        // 报价单（示例客户4，关联 PLM 商品）
         var quoteSuning = new CrmQuote
         {
             QuoteCode = "QUO-20260101-002",
@@ -342,7 +350,7 @@ public static class CrmDbSeeder
             ValidUntil = now.AddDays(15),
             ExpectedDelivery = now.AddDays(20),
             Terms = "款到发货，分两批交付",
-            Remark = "苏宁 Q2 备货报价",
+            Remark = "示例客户4 Q2 备货报价",
             OaApprovalId = 2,      // OA 审批 ID=2（李四的报销申请——演示数据中复用）
             CreatedBy = 2,
             CreatedAt = now.AddDays(-3),
@@ -354,7 +362,7 @@ public static class CrmDbSeeder
 
         // 报价明细
         db.QuoteItems.AddRange(
-            // 华为报价明细
+            // 示例客户1报价明细
             new CrmQuoteItem
             {
                 QuoteId = quoteHuawei.QuoteId,
@@ -377,7 +385,7 @@ public static class CrmDbSeeder
                 Amount = 100000m,
                 Remark = null
             },
-            // 苏宁报价明细（关联 PLM 商品）
+            // 示例客户4报价明细（关联 PLM 商品）
             new CrmQuoteItem
             {
                 QuoteId = quoteSuning.QuoteId,
@@ -404,13 +412,13 @@ public static class CrmDbSeeder
             }
         );
 
-        // 合同（华为）
+        // 合同（示例客户1）
         var contractHuawei = new CrmContract
         {
             ContractCode = "CON-20260101-001",
             QuoteId = quoteHuawei.QuoteId,
             CustomerId = customerHuawei.CustomerId,
-            Title = "华为手机屏幕及相机模组采购合同",
+            Title = "示例客户1手机屏幕及相机模组采购合同",
             TotalAmount = 280000m,
             Currency = "CNY",
             SignDate = now.AddDays(-10),
@@ -476,35 +484,35 @@ public static class CrmDbSeeder
         var inqH1 = new CrmInquiry
         {
             InquiryCode = "INQ-HIST-001", CustomerId = customerSuning.CustomerId,
-            Title = "苏宁 iPhone 春季大批量备货询盘", Status = "won",
+            Title = "示例客户4 iPhone 春季大批量备货询盘", Status = "won",
             AssignedTo = 2, AssignedToName = "张三", CreatedBy = 2,
             CreatedAt = m5.AddDays(-22), UpdatedAt = m5.AddDays(-10)
         };
         var inqH2 = new CrmInquiry
         {
             InquiryCode = "INQ-HIST-002", CustomerId = customerHuawei.CustomerId,
-            Title = "华为手机维修配件年度采购询盘", Status = "won",
+            Title = "示例客户1手机维修配件年度采购询盘", Status = "won",
             AssignedTo = 2, AssignedToName = "张三", CreatedBy = 2,
             CreatedAt = m4.AddDays(-16), UpdatedAt = m4.AddDays(-5)
         };
         var inqH3 = new CrmInquiry
         {
             InquiryCode = "INQ-HIST-003", CustomerId = customerAlibaba.CustomerId,
-            Title = "阿里巴巴数据中心服务器扩容硬件询盘", Status = "won",
+            Title = "示例客户2数据中心服务器扩容硬件询盘", Status = "won",
             AssignedTo = 3, AssignedToName = "李四", CreatedBy = 3,
             CreatedAt = m3.AddDays(-20), UpdatedAt = m3.AddDays(-8)
         };
         var inqH4 = new CrmInquiry
         {
             InquiryCode = "INQ-HIST-004", CustomerId = customerByteDance.CustomerId,
-            Title = "字节跳动服务器硬件试购询盘", Status = "won",
+            Title = "示例客户3服务器硬件试购询盘", Status = "won",
             AssignedTo = 3, AssignedToName = "李四", CreatedBy = 3,
             CreatedAt = m2.AddDays(-16), UpdatedAt = m2.AddDays(-5)
         };
         var inqH5 = new CrmInquiry
         {
             InquiryCode = "INQ-HIST-005", CustomerId = customerSuning.CustomerId,
-            Title = "苏宁小米 14 Q1 备货询盘", Status = "won",
+            Title = "示例客户4小米 14 Q1 备货询盘", Status = "won",
             AssignedTo = 2, AssignedToName = "张三", CreatedBy = 2,
             CreatedAt = m1.AddDays(-11), UpdatedAt = m1.AddDays(-3)
         };
@@ -549,7 +557,7 @@ public static class CrmDbSeeder
             TotalAmount = 3999000m, Currency = "CNY", CreatedBy = 2,
             CreatedAt = m1.AddDays(-9), UpdatedAt = m1.AddDays(-7)     // 2d approval
         };
-        // 京东报价：审批积压（4天前提交，超2天SLA → overdue）
+        // 示例客户5报价：审批积压（4天前提交，超2天SLA → overdue）
         var quoPendingJD = new CrmQuote
         {
             QuoteCode = "QUO-PENDING-001", InquiryId = inquiryJD.InquiryId,
@@ -568,7 +576,7 @@ public static class CrmDbSeeder
         {
             ContractCode = "CON-HIST-001", QuoteId = quoH1.QuoteId,
             CustomerId = customerSuning.CustomerId,
-            Title = "苏宁 iPhone 15 Pro 春季采购合同",
+            Title = "示例客户4 iPhone 15 Pro 春季采购合同",
             TotalAmount = 9998000m, Currency = "CNY",
             SignDate = m5.AddDays(-15), DeliveryDate = m5.AddDays(2),
             ActualDeliveryDate = m5,                                    // ON TIME（提前2天）
@@ -579,7 +587,7 @@ public static class CrmDbSeeder
         {
             ContractCode = "CON-HIST-002", QuoteId = quoH2.QuoteId,
             CustomerId = customerHuawei.CustomerId,
-            Title = "华为手机维修配件年度采购合同",
+            Title = "示例客户1手机维修配件年度采购合同",
             TotalAmount = 580000m, Currency = "CNY",
             SignDate = m4.AddDays(-10), DeliveryDate = m4.AddDays(3),
             ActualDeliveryDate = m4,                                    // ON TIME（提前3天）
@@ -590,7 +598,7 @@ public static class CrmDbSeeder
         {
             ContractCode = "CON-HIST-003", QuoteId = quoH3.QuoteId,
             CustomerId = customerAlibaba.CustomerId,
-            Title = "阿里巴巴数据中心服务器配件采购合同",
+            Title = "示例客户2数据中心服务器配件采购合同",
             TotalAmount = 1350000m, Currency = "CNY",
             SignDate = m3.AddDays(-12), DeliveryDate = m3,
             ActualDeliveryDate = m3.AddDays(5),                         // LATE（逾期5天）
@@ -601,7 +609,7 @@ public static class CrmDbSeeder
         {
             ContractCode = "CON-HIST-004", QuoteId = quoH4.QuoteId,
             CustomerId = customerByteDance.CustomerId,
-            Title = "字节跳动服务器硬件采购合同",
+            Title = "示例客户3服务器硬件采购合同",
             TotalAmount = 720000m, Currency = "CNY",
             SignDate = m2.AddDays(-10), DeliveryDate = m2.AddDays(2),
             ActualDeliveryDate = m2.AddDays(-1),                        // ON TIME（提前1天）
@@ -612,7 +620,7 @@ public static class CrmDbSeeder
         {
             ContractCode = "CON-HIST-005", QuoteId = quoH5.QuoteId,
             CustomerId = customerSuning.CustomerId,
-            Title = "苏宁小米 14 Q1 批次采购合同",
+            Title = "示例客户4小米 14 Q1 批次采购合同",
             TotalAmount = 3999000m, Currency = "CNY",
             SignDate = m1.AddDays(-5), DeliveryDate = m1.AddDays(5),
             ActualDeliveryDate = m1,                                    // ON TIME（提前5天）
@@ -669,6 +677,99 @@ public static class CrmDbSeeder
                 CreatedAt = now.AddDays(-4)
             }
         );
+        db.SaveChanges();
+    }
+
+    // 服装客户 + 客户款号字典种子（幂等）
+    // 数据来源：22春夏 排程表中真实出现的核心服装客户(按出现频次取 Top 15)
+    private static void SeedGarmentCustomers(CrmDbContext db)
+    {
+        if (db.Customers.Any(c => c.CustomerCode == "CUS-GARM-001")) return;
+
+        var now = DateTime.UtcNow;
+
+        // 数据格式: (Code, Name, Level, Address)
+        var data = new (string code, string name, string level, string addr)[]
+        {
+            ("CUS-GARM-001", "服装客户01",     "A", "示例省示例市示例区"),
+            ("CUS-GARM-002", "服装客户02",   "A", "示例省示例市示例区"),
+            ("CUS-GARM-003", "服装客户03",       "A", "示例省示例市示例区"),
+            ("CUS-GARM-004", "服装客户04",     "B", "示例省示例市示例区"),
+            ("CUS-GARM-005", "服装客户05",       "A", "示例省示例市示例区"),
+            ("CUS-GARM-006", "服装客户06",     "A", "示例省示例市示例区"),
+            ("CUS-GARM-007", "服装客户07",       "A", "示例省示例市示例区"),
+            ("CUS-GARM-008", "服装客户08",     "A", "示例省示例市示例区"),
+            ("CUS-GARM-009", "服装客户09",     "B", "示例省示例市示例区"),
+            ("CUS-GARM-010", "服装客户10",     "B", "示例省示例市示例区"),
+            ("CUS-GARM-011", "服装客户11",     "B", "示例省示例市示例区"),
+            ("CUS-GARM-012", "服装客户12",   "B", "示例省示例市示例区"),
+            ("CUS-GARM-013", "服装客户13",     "A", "示例省示例市示例区"),
+            ("CUS-GARM-014", "服装客户14",       "B", "示例省示例市示例区"),
+            ("CUS-GARM-015", "服装客户15",     "C", "示例省示例市示例区"),
+            ("CUS-GARM-016", "服装客户16",       "C", "示例省示例市示例区"),
+            ("CUS-GARM-017", "服装客户17",   "C", "示例省示例市示例区"),
+            ("CUS-GARM-018", "服装客户18",     "B", "示例省示例市示例区"),
+        };
+
+        foreach (var d in data)
+        {
+            db.Customers.Add(new CrmCustomer
+            {
+                CustomerCode = d.code,
+                CustomerName = d.name,
+                IndustryType = "服装",
+                Level = d.level,
+                Status = "active",
+                Address = d.addr,
+                Remark = $"22春夏 排程客户",
+                CreatedBy = 1,
+                CreatedAt = now.AddDays(-180),
+                UpdatedAt = now.AddDays(-30),
+            });
+        }
+        db.SaveChanges();
+
+        // 客户款号字典：用真实 Excel 出现的客户款号种子
+        // (CustomerCode, CustomerOrderNo, StyleCodeSnapshot)
+        var styleData = new (string custCode, string orderNo, string styleCode)[]
+        {
+            ("CUS-GARM-001", "98071",    "LB5210100龟背绣花"),
+            ("CUS-GARM-001", "98072",    "FB5200100不绣不印"),
+            ("CUS-GARM-001", "98221",    "LA5210100"),
+            ("CUS-GARM-002", "96225",    "LA5400200上领面印花"),
+            ("CUS-GARM-002", "96321",    "LA5500121前幅绣花"),
+            ("CUS-GARM-002", "98232",    "LA2400121前幅绣花"),
+            ("CUS-GARM-003", "98090",    "LC0000204不绣不印"),
+            ("CUS-GARM-003", "98096",    "LC6200000不绣不印"),
+            ("CUS-GARM-004", "CC1557",   "LA0000204不绣不印"),
+            ("CUS-GARM-004", "CC1685",   "LB6200000不绣不印"),
+            ("CUS-GARM-004", "CC1717",   "LA2200000不绣不印"),
+            ("CUS-GARM-005", "97797加2", "LA9B00204不绣不印"),
+            ("CUS-GARM-005", "98167",    "LB5500200前幅绣花"),
+            ("CUS-GARM-006", "98062",    "LA0030000前幅绣花"),
+            ("CUS-GARM-006", "98064",    "LA2200000不绣不印"),
+            ("CUS-GARM-007", "98114",    "LA6500300前幅绣花"),
+            ("CUS-GARM-008", "98229",    "LA6200321前幅绣花"),
+            ("CUS-GARM-009", "98282",    "LA2400200前幅绣花"),
+        };
+
+        var custIdByCode = db.Customers
+            .Where(c => c.CustomerCode.StartsWith("CUS-GARM-"))
+            .ToDictionary(c => c.CustomerCode, c => c.CustomerId);
+
+        foreach (var s in styleData)
+        {
+            if (!custIdByCode.TryGetValue(s.custCode, out var custId)) continue;
+            db.CustomerStyles.Add(new CrmCustomerStyle
+            {
+                CustomerId = custId,
+                CustomerOrderNo = s.orderNo,
+                PlmProductId = null,  // PLM 端补完后由 A3 任务回填脚本关联
+                StyleCodeSnapshot = s.styleCode,
+                Season = "22春夏",
+                CreatedAt = now.AddDays(-90),
+            });
+        }
         db.SaveChanges();
     }
 }

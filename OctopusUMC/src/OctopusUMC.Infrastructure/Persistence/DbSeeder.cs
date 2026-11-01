@@ -6,9 +6,18 @@ public static class DbSeeder
 {
     public static void Seed(ApplicationDbContext context)
     {
-        // 只在空库时插入种子数据
-        if (context.Users.Any()) return;
+        // 主种子：只在空库时插入
+        if (!context.Users.Any())
+        {
+            SeedMainData(context);
+        }
 
+        // 服装行业身份种子：幂等(以 DeptId=100 为 marker)，每次启动都尝试补齐
+        SeedGarmentIdentity(context);
+    }
+
+    private static void SeedMainData(ApplicationDbContext context)
+    {
         var baseTime = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
 
         // ── 部门 ──────────────────────────────────────────────
@@ -88,20 +97,29 @@ public static class DbSeeder
 
         // ── 角色（无 MenuIds/DeptIds 字段） ──────────────────
         context.Roles.AddRange(
-            new Role { RoleId = 1, RoleName = "超级管理员", RoleKey = "admin",  RoleSort = 1, DataScope = "1", Status = 1, CreateTime = baseTime },
-            new Role { RoleId = 2, RoleName = "普通用户",   RoleKey = "common", RoleSort = 2, DataScope = "4", Status = 1, CreateTime = baseTime },
-            new Role { RoleId = 3, RoleName = "编辑员",     RoleKey = "editor", RoleSort = 3, DataScope = "3", Status = 1, CreateTime = baseTime }
+            new Role { RoleId = 1, RoleName = "超级管理员", RoleKey = "admin",    RoleSort = 1,  DataScope = "1", Status = 1, CreateTime = baseTime },
+            new Role { RoleId = 2, RoleName = "普通用户",   RoleKey = "common",   RoleSort = 2,  DataScope = "4", Status = 1, CreateTime = baseTime },
+            new Role { RoleId = 3, RoleName = "编辑员",     RoleKey = "editor",   RoleSort = 3,  DataScope = "3", Status = 1, CreateTime = baseTime },
+            // P16：门户角色 — customer 仅访问客户门户；supplier 仅访问供应商门户
+            new Role { RoleId = 4, RoleName = "客户",       RoleKey = "customer", RoleSort = 10, DataScope = "4", Status = 1, CreateTime = baseTime },
+            new Role { RoleId = 5, RoleName = "供应商",     RoleKey = "supplier", RoleSort = 11, DataScope = "4", Status = 1, CreateTime = baseTime }
         );
 
         // ── 用户（无 DeptId/PostId/RoleIds 字段） ─────────────
         context.Users.AddRange(
+            // ── 种子账号密码统一为 Admin@123 ──────────────────────────────
+            // 历史遗留：zhangsan/lisi/wangwu… 用 User@123、editor 用 Editor@123，
+            // 而 Keycloak 的 realm JSON 给 zhangsan 种的是 Admin@123，
+            // 导致"同一个用户名两个系统两套密码"，登录失败时极难判断原因。
+            // 现在统一为 Admin@123（开发环境约定），生产环境请勿沿用。
+            // wangwu 的 Status=0 仍然使它无法登录，与密码无关。
             new User { UserId = 1, UserName = "admin",      NickName = "超级管理员",     Email = "admin@octopus.com",      PhoneNumber = "13800000001", Sex = "1", Status = 1, PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123"),    CreateTime = baseTime.AddDays(-60) },
-            new User { UserId = 2, UserName = "zhangsan",   NickName = "张三",           Email = "zhangsan@octopus.com",   PhoneNumber = "13800000002", Sex = "1", Status = 1, PasswordHash = BCrypt.Net.BCrypt.HashPassword("User@123"),     CreateTime = baseTime.AddDays(-30) },
-            new User { UserId = 3, UserName = "lisi",       NickName = "李四",           Email = "lisi@octopus.com",       PhoneNumber = "13800000003", Sex = "0", Status = 1, PasswordHash = BCrypt.Net.BCrypt.HashPassword("User@123"),     CreateTime = baseTime.AddDays(-20) },
-            new User { UserId = 4, UserName = "wangwu",     NickName = "王五",           Email = "wangwu@octopus.com",     PhoneNumber = null,          Sex = "1", Status = 0, PasswordHash = BCrypt.Net.BCrypt.HashPassword("User@123"),     CreateTime = baseTime.AddDays(-10) },
-            new User { UserId = 5, UserName = "editor",     NickName = "编辑员",         Email = "editor@octopus.com",     PhoneNumber = "13800000005", Sex = "0", Status = 1, PasswordHash = BCrypt.Net.BCrypt.HashPassword("Editor@123"),   CreateTime = baseTime.AddDays(-5) },
+            new User { UserId = 2, UserName = "zhangsan",   NickName = "张三",           Email = "zhangsan@octopus.com",   PhoneNumber = "13800000002", Sex = "1", Status = 1, PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123"),     CreateTime = baseTime.AddDays(-30) },
+            new User { UserId = 3, UserName = "lisi",       NickName = "李四",           Email = "lisi@octopus.com",       PhoneNumber = "13800000003", Sex = "0", Status = 1, PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123"),     CreateTime = baseTime.AddDays(-20) },
+            new User { UserId = 4, UserName = "wangwu",     NickName = "王五",           Email = "wangwu@octopus.com",     PhoneNumber = null,          Sex = "1", Status = 0, PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123"),     CreateTime = baseTime.AddDays(-10) },
+            new User { UserId = 5, UserName = "editor",     NickName = "编辑员",         Email = "editor@octopus.com",     PhoneNumber = "13800000005", Sex = "0", Status = 1, PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123"),   CreateTime = baseTime.AddDays(-5) },
             // 公司B 海星科技专属员工：赵六，仅属于海星技术部，不在章鱼科技
-            new User { UserId = 6, UserName = "zhaoliu",    NickName = "赵六(海星技术)", Email = "zhaoliu@haixing.com",    PhoneNumber = "13900000006", Sex = "1", Status = 1, PasswordHash = BCrypt.Net.BCrypt.HashPassword("User@123"),     CreateTime = baseTime.AddDays(-3) }
+            new User { UserId = 6, UserName = "zhaoliu",    NickName = "赵六(海星技术)", Email = "zhaoliu@haixing.com",    PhoneNumber = "13900000006", Sex = "1", Status = 1, PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123"),     CreateTime = baseTime.AddDays(-3) }
         );
 
         // ── 字典类型 ──────────────────────────────────────────
@@ -174,7 +192,7 @@ public static class DbSeeder
         // ── 系统配置 ───────────────────────────────────────────
         context.Configs.AddRange(
             new SysConfig { ConfigId = 1, ConfigName = "系统名称",          ConfigKey = "sys.name",         ConfigValue = "OctopusUMC", ConfigType = true,  Remark = "系统名称配置",    CreateTime = baseTime },
-            new SysConfig { ConfigId = 2, ConfigName = "用户初始密码",      ConfigKey = "sys.user.initPwd", ConfigValue = "User@123",   ConfigType = true,  Remark = "新增用户初始密码", CreateTime = baseTime },
+            new SysConfig { ConfigId = 2, ConfigName = "用户初始密码",      ConfigKey = "sys.user.initPwd", ConfigValue = "Admin@123",   ConfigType = true,  Remark = "新增用户初始密码", CreateTime = baseTime },
             new SysConfig { ConfigId = 3, ConfigName = "Token有效期(小时)", ConfigKey = "sys.token.expiry", ConfigValue = "24",         ConfigType = true,  Remark = "Token 有效时长", CreateTime = baseTime }
         );
 
@@ -266,6 +284,73 @@ public static class DbSeeder
             context.RoleMenus.Add(new RoleMenu { RoleId = 3, MenuId = menuId });
 
         // SaveChanges 第二批（关联表）
+        context.SaveChanges();
+    }
+
+    // 服装行业身份种子：生产部 + 5 个车间组 + 6 个组长用户 + 服装工种职位
+    // 设计：幂等 — 用 marker 检测（DeptId=100=生产部 是否存在）；独立 ID 段(100+) 避免冲突。
+    public static void SeedGarmentIdentity(ApplicationDbContext context)
+    {
+        // marker：生产部存在则视为已植入
+        if (context.Depts.Any(d => d.DeptId == 100)) return;
+
+        var baseTime = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        // ── 部门：章鱼科技下挂"生产部" + 5 子部门(A/B/C/D/L 组)；L 组下再挂 2 个子组（104/105）
+        context.Depts.AddRange(
+            new Dept { DeptId = 100, ParentId = 1,   DeptName = "生产部",       OrderNum = 5, Status = 1, CreateTime = baseTime },
+            new Dept { DeptId = 101, ParentId = 100, DeptName = "A组(车缝)",   OrderNum = 1, Status = 1, CreateTime = baseTime },
+            new Dept { DeptId = 102, ParentId = 100, DeptName = "B组(车缝)",   OrderNum = 2, Status = 1, CreateTime = baseTime },
+            new Dept { DeptId = 103, ParentId = 100, DeptName = "C组(车缝)",   OrderNum = 3, Status = 1, CreateTime = baseTime },
+            new Dept { DeptId = 104, ParentId = 100, DeptName = "D组(车缝)",   OrderNum = 4, Status = 1, CreateTime = baseTime },
+            new Dept { DeptId = 105, ParentId = 100, DeptName = "L组(车缝)",   OrderNum = 5, Status = 1, CreateTime = baseTime },
+            new Dept { DeptId = 106, ParentId = 105, DeptName = "L组-104",  OrderNum = 1, Status = 1, CreateTime = baseTime },
+            new Dept { DeptId = 107, ParentId = 105, DeptName = "L组-105", OrderNum = 2, Status = 1, CreateTime = baseTime }
+        );
+
+        // ── 服装行业职位（PostId 100+）
+        context.Posts.AddRange(
+            new Post { PostId = 100, PostName = "生产经理",  PostCode = "prod_mgr",   PostSort = 100, Status = 1, CreateTime = baseTime },
+            new Post { PostId = 101, PostName = "车间组长",  PostCode = "team_lead",  PostSort = 101, Status = 1, CreateTime = baseTime },
+            new Post { PostId = 102, PostName = "车缝工",    PostCode = "sewer",      PostSort = 102, Status = 1, CreateTime = baseTime },
+            new Post { PostId = 103, PostName = "裁床工",    PostCode = "cutter",     PostSort = 103, Status = 1, CreateTime = baseTime },
+            new Post { PostId = 104, PostName = "熨烫工",    PostCode = "ironer",     PostSort = 104, Status = 1, CreateTime = baseTime },
+            new Post { PostId = 105, PostName = "质检工",    PostCode = "qc",         PostSort = 105, Status = 1, CreateTime = baseTime }
+        );
+
+        // ── 6 名真实组长用户（UserId 100+）
+        context.Users.AddRange(
+            new User { UserId = 100, UserName = "worker100", NickName = "员工100", Email = "worker100@example.invalid", PhoneNumber = "13900100001", Sex = "1", Status = 1, PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123"), CreateTime = baseTime.AddDays(-365) },
+            new User { UserId = 101, UserName = "worker101",  NickName = "员工101", Email = "worker101@example.invalid",  PhoneNumber = "13900100002", Sex = "1", Status = 1, PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123"), CreateTime = baseTime.AddDays(-365) },
+            new User { UserId = 102, UserName = "worker102", NickName = "员工102", Email = "worker102@example.invalid", PhoneNumber = "13900100003", Sex = "0", Status = 1, PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123"), CreateTime = baseTime.AddDays(-365) },
+            new User { UserId = 103, UserName = "worker103",  NickName = "员工103", Email = "worker103@example.invalid",  PhoneNumber = "13900100004", Sex = "0", Status = 1, PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123"), CreateTime = baseTime.AddDays(-365) },
+            new User { UserId = 104, UserName = "worker104",     NickName = "员工104",   Email = "worker104@example.invalid",     PhoneNumber = "13900100005", Sex = "1", Status = 1, PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123"), CreateTime = baseTime.AddDays(-365) },
+            new User { UserId = 105, UserName = "worker105",   NickName = "员工105", Email = "worker105@example.invalid",   PhoneNumber = "13900100006", Sex = "1", Status = 1, PasswordHash = BCrypt.Net.BCrypt.HashPassword("Admin@123"), CreateTime = baseTime.AddDays(-365) }
+        );
+
+        // SaveChanges 主实体后再做关联
+        context.SaveChanges();
+
+        // ── UserDept：组长 → 各自的车间子部门 + 车间组长职位
+        context.UserDepts.AddRange(
+            new UserDept { UserId = 100, DeptId = 101, PostId = 101, IsPrimary = true }, // worker100 → A组, 车间组长
+            new UserDept { UserId = 101, DeptId = 102, PostId = 101, IsPrimary = true }, // worker101 → B组, 车间组长
+            new UserDept { UserId = 102, DeptId = 103, PostId = 101, IsPrimary = true }, // worker102 → C组, 车间组长
+            new UserDept { UserId = 103, DeptId = 104, PostId = 101, IsPrimary = true }, // worker103 → D组, 车间组长
+            new UserDept { UserId = 104, DeptId = 106, PostId = 101, IsPrimary = true }, // worker104 → L组-104, 车间组长
+            new UserDept { UserId = 105, DeptId = 107, PostId = 101, IsPrimary = true }  // worker105 → L组-105, 车间组长
+        );
+
+        // ── UserRole：6 名组长统一普通用户角色（RoleId=2 普通用户；OA 端 oa_manager 在 OA 同步时映射）
+        context.UserRoles.AddRange(
+            new UserRole { UserId = 100, RoleId = 2 },
+            new UserRole { UserId = 101, RoleId = 2 },
+            new UserRole { UserId = 102, RoleId = 2 },
+            new UserRole { UserId = 103, RoleId = 2 },
+            new UserRole { UserId = 104, RoleId = 2 },
+            new UserRole { UserId = 105, RoleId = 2 }
+        );
+
         context.SaveChanges();
     }
 }

@@ -93,7 +93,7 @@ public class TestAuthHandler : AuthenticationHandler<AuthenticationSchemeOptions
             new Claim("name", name),
             new Claim(ClaimTypes.Name, name),
             new Claim("email", email),
-            new Claim("role", "plm_admin"),
+            new Claim(ClaimTypes.Role, userIdStr == "1" ? "admin" : "editor"),
         };
 
         var identity = new ClaimsIdentity(claims, "Test");

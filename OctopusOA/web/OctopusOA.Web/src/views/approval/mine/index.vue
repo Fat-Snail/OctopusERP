@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { Eye, Undo2 } from 'lucide-vue-next'
+import { Eye, Undo2 } from '@lucide/vue'
 import PageHeader from '@/components/app/PageHeader.vue'
 import Badge from '@/components/ui/badge.vue'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -74,7 +74,10 @@ onMounted(loadData)
               <td class="px-3 py-2 font-medium truncate max-w-[240px]">{{ row.title }}</td>
               <td class="px-3 py-2 text-muted-foreground">{{ row.templateName }}</td>
               <td class="px-3 py-2">
-                <Badge :variant="statusVariant(row.status)">{{ statusLabel(row.status) }}</Badge>
+                <div class="flex items-center gap-1.5">
+                  <Badge :variant="statusVariant(row.status)">{{ statusLabel(row.status) }}</Badge>
+                  <Badge v-if="row.isOverdue && row.status === 'pending'" variant="danger">超期</Badge>
+                </div>
               </td>
               <td class="px-3 py-2 font-mono-tnum">{{ row.currentNodeOrder }}/{{ row.totalNodes }}</td>
               <td class="px-3 py-2 font-mono-tnum text-muted-foreground whitespace-nowrap">{{ row.createTime }}</td>

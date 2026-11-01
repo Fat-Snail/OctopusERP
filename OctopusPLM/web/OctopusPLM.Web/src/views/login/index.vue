@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Package, ArrowRight } from 'lucide-vue-next'
+import { Package, ArrowRight } from '@lucide/vue'
 import { oidcService } from '@/services/oidcService'
 
 function handleSSOLogin() {

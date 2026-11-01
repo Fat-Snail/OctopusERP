@@ -36,8 +36,8 @@ public static class WmsDbSeeder
         );
 
         db.InboundOrders.AddRange(
-            new WmsInboundOrder { InboundId = 1, InboundCode = "IN-2024-0001", InboundType = "purchase", WarehouseId = 1, MesPurchaseOrderId = 1, Status = "completed", Supplier = "富士康科技集团", CreatedBy = 2, CreatedAt = now.AddDays(-10), ReceivedAt = now.AddDays(-8) },
-            new WmsInboundOrder { InboundId = 2, InboundCode = "IN-2024-0002", InboundType = "purchase", WarehouseId = 1, MesPurchaseOrderId = 2, Status = "receiving", Supplier = "伟创力制造", CreatedBy = 2, CreatedAt = now.AddDays(-3) },
+            new WmsInboundOrder { InboundId = 1, InboundCode = "IN-2024-0001", InboundType = "purchase", WarehouseId = 1, MesPurchaseOrderId = 1, Status = "completed", Supplier = "示例供应商1", CreatedBy = 2, CreatedAt = now.AddDays(-10), ReceivedAt = now.AddDays(-8) },
+            new WmsInboundOrder { InboundId = 2, InboundCode = "IN-2024-0002", InboundType = "purchase", WarehouseId = 1, MesPurchaseOrderId = 2, Status = "receiving", Supplier = "示例供应商2", CreatedBy = 2, CreatedAt = now.AddDays(-3) },
             new WmsInboundOrder { InboundId = 3, InboundCode = "IN-2024-0003", InboundType = "return", WarehouseId = 2, Status = "pending", Remark = "客户退货", CreatedBy = 3, CreatedAt = now.AddDays(-1) }
         );
 
@@ -48,8 +48,8 @@ public static class WmsDbSeeder
         );
 
         db.OutboundOrders.AddRange(
-            new WmsOutboundOrder { OutboundId = 1, OutboundCode = "OUT-2024-0001", OutboundType = "sales", WarehouseId = 1, CrmContractId = 1, Status = "shipped", Recipient = "华为技术有限公司", ShipAddress = "广东省深圳市龙岗区", CreatedBy = 2, CreatedAt = now.AddDays(-7), ShippedAt = now.AddDays(-5) },
-            new WmsOutboundOrder { OutboundId = 2, OutboundCode = "OUT-2024-0002", OutboundType = "sales", WarehouseId = 1, CrmContractId = 2, Status = "pending", Recipient = "阿里巴巴集团", ShipAddress = "浙江省杭州市余杭区", CreatedBy = 3, CreatedAt = now.AddDays(-2) }
+            new WmsOutboundOrder { OutboundId = 1, OutboundCode = "OUT-2024-0001", OutboundType = "sales", WarehouseId = 1, CrmContractId = 1, Status = "shipped", Recipient = "示例客户1", ShipAddress = "示例省示例市示例区", CreatedBy = 2, CreatedAt = now.AddDays(-7), ShippedAt = now.AddDays(-5) },
+            new WmsOutboundOrder { OutboundId = 2, OutboundCode = "OUT-2024-0002", OutboundType = "sales", WarehouseId = 1, CrmContractId = 2, Status = "pending", Recipient = "示例客户2", ShipAddress = "示例省示例市示例区", CreatedBy = 3, CreatedAt = now.AddDays(-2) }
         );
 
         db.OutboundItems.AddRange(
@@ -66,6 +66,30 @@ public static class WmsDbSeeder
             new WmsStocktakeItem { ItemId = 1, StocktakeId = 1, PlmProductId = 1, ProductName = "iPhone 15 Pro", Spec = "256GB 钛金色", Unit = "台", BookQty = 500, ActualQty = 498, DiffQty = -2 },
             new WmsStocktakeItem { ItemId = 2, StocktakeId = 1, PlmProductId = 2, ProductName = "小米 14", Spec = "256GB 黑色", Unit = "台", BookQty = 800, ActualQty = 800, DiffQty = 0 },
             new WmsStocktakeItem { ItemId = 3, StocktakeId = 2, PlmProductId = 1, ProductName = "iPhone 15 Pro", Spec = "256GB 钛金色", Unit = "台", BookQty = 500, ActualQty = 0, DiffQty = 0 }
+        );
+
+        // P11：货主（默认货主 + 一家代发）
+        db.Owners.AddRange(
+            new WmsOwner { OwnerId = 1, OwnerCode = "OWN-SELF", OwnerName = "自营业务", Contact = "admin", Phone = "13800138000", Status = "active", CreatedAt = now },
+            new WmsOwner { OwnerId = 2, OwnerCode = "OWN-3PL01", OwnerName = "深圳代发客户A", Contact = "王经理", Phone = "13800138888", Status = "active", CreatedAt = now }
+        );
+
+        // P11：库区（华南主仓 5 类 + 备货仓 2 类）
+        db.Zones.AddRange(
+            new WmsZone { ZoneId = 1, WarehouseId = 1, ZoneCode = "PICK", ZoneName = "拣货区", ZoneType = "picking", Status = "active" },
+            new WmsZone { ZoneId = 2, WarehouseId = 1, ZoneCode = "STORAGE", ZoneName = "存储区", ZoneType = "storage", Status = "active" },
+            new WmsZone { ZoneId = 3, WarehouseId = 1, ZoneCode = "RETURNS", ZoneName = "退货区", ZoneType = "returns", Status = "active" },
+            new WmsZone { ZoneId = 4, WarehouseId = 1, ZoneCode = "QC", ZoneName = "质检区", ZoneType = "qc", Status = "active" },
+            new WmsZone { ZoneId = 5, WarehouseId = 1, ZoneCode = "DEFECT", ZoneName = "不良品区", ZoneType = "defect", Status = "active" },
+            new WmsZone { ZoneId = 6, WarehouseId = 2, ZoneCode = "PICK", ZoneName = "拣货区", ZoneType = "picking", Status = "active" },
+            new WmsZone { ZoneId = 7, WarehouseId = 2, ZoneCode = "STORAGE", ZoneName = "存储区", ZoneType = "storage", Status = "active" }
+        );
+
+        // P11：批次（含有效期，FEFO 出库依据）
+        db.Batches.AddRange(
+            new WmsBatch { BatchId = 1, BatchNo = "BATCH-IPH-202604", PlmProductId = 1, ProductName = "iPhone 15 Pro", ProductionDate = now.AddDays(-90), ExpireDate = now.AddDays(640), QcStatus = "passed", CreatedAt = now.AddDays(-90) },
+            new WmsBatch { BatchNo = "BATCH-IPH-202602", BatchId = 2, PlmProductId = 1, ProductName = "iPhone 15 Pro", ProductionDate = now.AddDays(-180), ExpireDate = now.AddDays(550), QcStatus = "passed", CreatedAt = now.AddDays(-180) },
+            new WmsBatch { BatchId = 3, BatchNo = "BATCH-MI14-202605", PlmProductId = 2, ProductName = "小米 14", ProductionDate = now.AddDays(-60), ExpireDate = now.AddDays(670), QcStatus = "passed", CreatedAt = now.AddDays(-60) }
         );
 
         db.SaveChanges();

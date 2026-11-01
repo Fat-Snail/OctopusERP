@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { inject, onMounted, ref, computed, type Ref, type ComputedRef } from 'vue'
-import { Check } from 'lucide-vue-next'
+import { Check } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 
 interface SelectCtx {

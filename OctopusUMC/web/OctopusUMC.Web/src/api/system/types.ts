@@ -21,6 +21,12 @@ export interface UserResponse {
   roles: string[]
   createTime: string
   remark: string | null
+  /** ADR-010：employee | customer | partner */
+  userType: string
+  /** umc | retail */
+  source: string
+  /** 对应 Keycloak 用户 id */
+  kcSub: string | null
 }
 
 export interface CreateUserRequest {

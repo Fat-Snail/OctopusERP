@@ -86,6 +86,9 @@ public class ApprovalResponse
     public string FormData { get; set; } = "{}";
     public DateTime CreateTime { get; set; }
     public DateTime UpdateTime { get; set; }
+    public DateTime? CurrentNodeDeadline { get; set; }
+    public bool IsOverdue { get; set; }
+    public bool IsSlaWarned { get; set; }
     public List<RecordResponse> Records { get; set; } = new();
 }
 

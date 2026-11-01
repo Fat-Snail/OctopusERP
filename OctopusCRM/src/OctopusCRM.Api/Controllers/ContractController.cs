@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using OctopusCRM.Api.Filters;
 using OctopusCRM.Api.Persistence;
 using OctopusCRM.Api.Services;
 
@@ -32,6 +33,7 @@ public class ContractController(ContractService contractService, CrmDbContext db
     }
 
     [HttpPost]
+    [OperationLog("创建合同")]
     public async Task<IActionResult> Create([FromBody] CreateContractRequest req)
     {
         var (contract, error) = await contractService.CreateFromQuoteAsync(
@@ -50,6 +52,7 @@ public class ContractController(ContractService contractService, CrmDbContext db
     }
 
     [HttpPut("{id:long}/submit")]
+    [OperationLog("提交合同审批")]
     public async Task<IActionResult> Submit(long id)
     {
         var (approvalId, error) = await contractService.SubmitAsync(id);
@@ -66,6 +69,7 @@ public class ContractController(ContractService contractService, CrmDbContext db
     }
 
     [HttpPut("{id:long}/ship")]
+    [OperationLog("合同发货")]
     public async Task<IActionResult> Ship(long id, [FromBody] ShipContractRequest req)
     {
         var error = await contractService.ShipAsync(id, req.TrackingNumber, req.ActualDeliveryDate);
@@ -74,6 +78,7 @@ public class ContractController(ContractService contractService, CrmDbContext db
     }
 
     [HttpPut("{id:long}/complete")]
+    [OperationLog("完成合同")]
     public async Task<IActionResult> Complete(long id)
     {
         var error = await contractService.CompleteAsync(id);
@@ -82,6 +87,7 @@ public class ContractController(ContractService contractService, CrmDbContext db
     }
 
     [HttpPut("{id:long}/terminate")]
+    [OperationLog("终止合同")]
     public async Task<IActionResult> Terminate(long id, [FromBody] TerminateContractRequest req)
     {
         var error = await contractService.TerminateAsync(id, req.Reason);
@@ -90,6 +96,7 @@ public class ContractController(ContractService contractService, CrmDbContext db
     }
 
     [HttpPost("{id:long}/payment")]
+    [OperationLog("添加回款")]
     public async Task<IActionResult> AddPayment(long id, [FromBody] CreatePaymentRequest req)
     {
         var contract = await db.Contracts.FindAsync(id);

@@ -11,12 +11,27 @@
       自动将 ProjectReference 转换为 Projects.OctopusUMC_Api / Projects.OctopusOA_Api 类型。
     -->
     <RootNamespace>OctopusAspire.AppHost</RootNamespace>
+    <!--
+      必须声明 UserSecretsId：Aspire 用它持久化「自动分配给持久化资源的公网端口」。
+      没有它时每次启动 keycloak-db / keycloak 都会拿到新端口，Aspire 因此判定
+      「端口变了 → 容器必须重建」，于是每次都冷启动 Keycloak（空卷时还要重新导入 realm）。
+      冷启动超过 DCP 的 60s 创建超时会导致 AppHost 直接 SIGABRT 崩溃，
+      表现为「整套服务一个都起不来 + 看不到 keycloak 容器」。
+
+      ID 一旦确定就不要再改，否则已持久化的端口会丢失、退回重建行为。
+    -->
+    <UserSecretsId>octopus-aspire-apphost</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
     <!-- Aspire 13.x（与 .NET 10 SDK 对齐，无需 workload） -->
-    <PackageReference Include="Aspire.Hosting.AppHost"  Version="13.2.4" />
-    <PackageReference Include="Aspire.Hosting.JavaScript" Version="13.2.4" />
+    <!-- 所有 Aspire 包必须使用相同版本！否则会触发 MissingMethodException
+         （13.3 引入了 ExecutableResource 构造函数新参数，旧 JavaScript 包调用会崩） -->
+    <PackageReference Include="Aspire.Hosting.AppHost"    Version="13.6.1" />
+    <PackageReference Include="Aspire.Hosting.JavaScript" Version="13.6.1" />
+    <!-- 小程序平台基础设施：Keycloak（IdP）+ PostgreSQL（Keycloak/小程序后端 DB） -->
+    <PackageReference Include="Aspire.Hosting.Keycloak"   Version="13.6.1-preview.1.26506.6" />
+    <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.6.1" />
   </ItemGroup>
 
   <ItemGroup>
@@ -44,12 +59,34 @@
     <ProjectReference Include="..\..\OctopusMES\src\OctopusMES.Api\OctopusMES.Api.csproj">
       <IsAspireProjectResource>true</IsAspireProjectResource>
     </ProjectReference>
+    <ProjectReference Include="..\..\OctopusFIN\src\OctopusFIN.Api\OctopusFIN.Api.csproj">
+      <IsAspireProjectResource>true</IsAspireProjectResource>
+    </ProjectReference>
+    <ProjectReference Include="..\..\OctopusHRM\src\OctopusHRM.Api\OctopusHRM.Api.csproj">
+      <IsAspireProjectResource>true</IsAspireProjectResource>
+    </ProjectReference>
+    <ProjectReference Include="..\..\OctopusOMS\src\OctopusOMS.Api\OctopusOMS.Api.csproj">
+      <IsAspireProjectResource>true</IsAspireProjectResource>
+    </ProjectReference>
+    <ProjectReference Include="..\..\miniapps\todo\src\MiniappTodo.Api\MiniappTodo.Api.csproj">
+      <IsAspireProjectResource>true</IsAspireProjectResource>
+    </ProjectReference>
+    <ProjectReference Include="..\..\OctopusRetail\src\OctopusRetail.Api\OctopusRetail.Api.csproj">
+      <IsAspireProjectResource>true</IsAspireProjectResource>
+    </ProjectReference>
   </ItemGroup>
 
   <ItemGroup>
     <!-- 运行时依赖：自动匹配当前机器架构（osx-arm64 / osx-x64 / win-x64 等） -->
-    <PackageReference Include="Aspire.Hosting.Orchestration.$(NETCoreSdkRuntimeIdentifier)" Version="13.2.4" />
-    <PackageReference Include="Aspire.Dashboard.Sdk.$(NETCoreSdkRuntimeIdentifier)" Version="13.2.4" />
+    <PackageReference Include="Aspire.Hosting.Orchestration.$(NETCoreSdkRuntimeIdentifier)" Version="13.6.1" />
+    <PackageReference Include="Aspire.Dashboard.Sdk.$(NETCoreSdkRuntimeIdentifier)" Version="13.6.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Keycloak realm 自动导入 JSON（输出到 bin，AddKeycloak().WithRealmImport 引用） -->
+    <None Update="keycloak\realms\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

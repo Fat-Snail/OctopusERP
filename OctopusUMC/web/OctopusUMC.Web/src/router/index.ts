@@ -137,6 +137,32 @@ const routes: RouteRecordRaw[] = [
       }
     ]
   },
+  // ── H5 mobile routes (TabBar layout) ──
+  {
+    path: '/h5',
+    component: () => import('@/layouts/H5Layout.vue'),
+    meta: { requiresAuth: true },
+    redirect: '/h5/home',
+    children: [
+      {
+        path: 'home',
+        name: 'H5Home',
+        component: () => import('@/views/h5/home/index.vue'),
+      },
+      {
+        path: 'profile',
+        name: 'H5Profile',
+        component: () => import('@/views/h5/profile/index.vue'),
+      },
+    ]
+  },
+  // Full-screen page outside the TabBar layout
+  {
+    path: '/h5/profile/pwd',
+    name: 'H5ProfilePwd',
+    component: () => import('@/views/h5/profile/pwd/index.vue'),
+    meta: { requiresAuth: true }
+  },
   {
     path: '/:pathMatch(.*)*',
     redirect: '/dashboard/workbench'
@@ -148,13 +174,38 @@ const router = createRouter({
   routes
 })
 
+// UMC owns /h5/home, /h5/profile, /h5/profile/pwd — everything else belongs to OA H5
+const UMC_H5_PATHS = ['/h5/home', '/h5/profile', '/h5/profile/pwd']
+const OA_H5_BASE = 'http://localhost:5174'
+const isMobile = () => window.matchMedia('(max-width: 767px)').matches
+
 router.beforeEach((to, _from) => {
+  const mobile = isMobile()
+
+  // Redirect non-profile H5 paths to OA's H5 frontend
+  if (to.path.startsWith('/h5/') && !UMC_H5_PATHS.some(p => to.path === p || to.path.startsWith(p + '/'))) {
+    const search = to.fullPath.includes('?') ? to.fullPath.slice(to.fullPath.indexOf('?')) : ''
+    window.location.href = `${OA_H5_BASE}${to.path}${search}`
+    // Redirect to /login so Vue renders something while the browser navigates away
+    // (avoids blank page if the browser can't reach OA)
+    return '/login'
+  }
+
   const userStore = useUserStore()
   if (to.meta['requiresAuth'] === false) {
-    if (userStore.isLoggedIn && to.path === '/login') return '/dashboard/workbench'
+    if (userStore.isLoggedIn && to.path === '/login') {
+      return mobile ? '/h5/home' : '/dashboard/workbench'
+    }
     return true
   }
+
   if (!userStore.isLoggedIn) return '/login'
+
+  // Mobile visiting desktop admin routes → H5 hub
+  if (mobile && !to.path.startsWith('/h5/')) {
+    return '/h5/home'
+  }
+
   return true
 })
 

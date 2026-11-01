@@ -15,10 +15,14 @@ public class UserController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
     private readonly UserSyncService _syncService;
-    public UserController(ApplicationDbContext context, UserSyncService syncService)
+    private readonly KeycloakSyncService _keycloak;
+    private readonly RetailProfileSyncService _retailProfile;
+    public UserController(ApplicationDbContext context, UserSyncService syncService, KeycloakSyncService keycloak, RetailProfileSyncService retailProfile)
     {
         _context = context;
         _syncService = syncService;
+        _keycloak = keycloak;
+        _retailProfile = retailProfile;
     }
 
     private async Task SyncUserToOAAsync(User user)
@@ -31,8 +35,13 @@ public class UserController : ControllerBase
             Email = user.Email,
             PhoneNumber = user.PhoneNumber,
             Status = user.Status,
+            UserType = user.UserType,
         });
     }
+
+    /// <summary>P9 M2：同步到 Keycloak（fire-and-forget，失败不阻塞主流程）</summary>
+    private void SyncUserToKeycloak(User user) =>
+        _ = _keycloak.SyncUserAsync(user);
 
     private UserResponse MapUser(User u)
     {
@@ -78,6 +87,9 @@ public class UserController : ControllerBase
             Roles = roles.Select(r => r.RoleKey).ToList(),
             CreateTime = u.CreateTime,
             Remark = u.Remark,
+            UserType = u.UserType,
+            Source = u.Source,
+            KcSub = u.KcSub,
         };
     }
 
@@ -88,10 +100,17 @@ public class UserController : ControllerBase
         [FromQuery] string? phoneNumber,
         [FromQuery] int? status,
         [FromQuery] long? deptId,
+        [FromQuery] string? userType,
+        [FromQuery] string? source,
         [FromQuery] int pageNum = 1,
         [FromQuery] int pageSize = 10)
     {
         var query = _context.Users.AsQueryable();
+        // ADR-010：员工与零售客户在同一张表，必须能按类型/来源分开看
+        if (!string.IsNullOrEmpty(userType))
+            query = query.Where(u => u.UserType == userType);
+        if (!string.IsNullOrEmpty(source))
+            query = query.Where(u => u.Source == source);
         if (!string.IsNullOrEmpty(userName))
             query = query.Where(u => u.UserName.Contains(userName));
         if (!string.IsNullOrEmpty(phoneNumber))
@@ -166,6 +185,7 @@ public class UserController : ControllerBase
         _context.SaveChanges();
 
         _ = SyncUserToOAAsync(user);
+        SyncUserToKeycloak(user);
         return ApiResponse<UserResponse>.Success(MapUser(user), "新增成功");
     }
 
@@ -206,6 +226,9 @@ public class UserController : ControllerBase
 
         _context.SaveChanges();
         _ = SyncUserToOAAsync(u);
+        SyncUserToKeycloak(u);
+        // 客户的手机号/姓名可能被改过：回推零售域，避免成员列表长期显示旧值
+        _ = _retailProfile.NotifyProfileChangedAsync(u.KcSub, u.UserName, u.NickName, u.PhoneNumber);
         return ApiResponse<UserResponse>.Success(MapUser(u), "修改成功");
     }
 
@@ -224,8 +247,12 @@ public class UserController : ControllerBase
         var userIds = items.Select(u => u.UserId).ToList();
         _context.UserDepts.RemoveRange(_context.UserDepts.Where(ud => userIds.Contains(ud.UserId)));
         _context.UserRoles.RemoveRange(_context.UserRoles.Where(ur => userIds.Contains(ur.UserId)));
+        // P9 M2：删除前快照 UserName，删除后异步同步 Keycloak
+        var deletedUserNames = items.Select(u => u.UserName).ToList();
         _context.Users.RemoveRange(items);
         _context.SaveChanges();
+        foreach (var un in deletedUserNames)
+            _ = _keycloak.DeleteUserAsync(un);
         return ApiResponse<object?>.Success(null, "删除成功");
     }
 
@@ -240,6 +267,7 @@ public class UserController : ControllerBase
         u.Status = req.Status;
         _context.SaveChanges();
         _ = SyncUserToOAAsync(u);
+        SyncUserToKeycloak(u);
         return ApiResponse<object?>.Success(null, "状态更新成功");
     }
 
@@ -248,10 +276,16 @@ public class UserController : ControllerBase
     [HttpPut("resetPwd")]
     public ApiResponse<object?> ResetPassword([FromBody] ResetPasswordRequest req)
     {
+        // ⚠️ 必须校验：不校验会把 BCrypt("") 写进库，等于给该账号开了空密码登录后门
+        if (string.IsNullOrWhiteSpace(req.NewPassword) || req.NewPassword.Length < 8)
+            return ApiResponse<object?>.Fail("密码至少 8 位", 400);
+
         var u = _context.Users.FirstOrDefault(u => u.UserId == req.UserId);
         if (u == null) return ApiResponse<object?>.Fail("用户不存在", 404);
         u.PasswordHash = BCrypt.Net.BCrypt.HashPassword(req.NewPassword);
         _context.SaveChanges();
+        // P9 M2：Keycloak 密码也同步重置
+        _ = _keycloak.ResetPasswordAsync(u.UserId, u.UserName, req.NewPassword);
         return ApiResponse<object?>.Success(null, "密码重置成功");
     }
 

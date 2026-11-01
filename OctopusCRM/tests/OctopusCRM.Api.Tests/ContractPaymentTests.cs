@@ -44,8 +44,8 @@ public class ContractPaymentTests : IClassFixture<CrmTestFactory>
 
     private async Task<long> CreateApprovedQuoteAsync()
     {
-        // 获取华为客户
-        var custResp = await _client.GetAsync("/api/customer?keyword=华为");
+        // 获取示例客户1
+        var custResp = await _client.GetAsync("/api/customer?keyword=示例客户1");
         var custDoc = await custResp.Content.ReadFromJsonAsync<JsonDocument>(_json);
         var customerId = custDoc!.RootElement.GetProperty("data").GetProperty("rows")[0]
             .GetProperty("customerId").GetInt64();
@@ -104,7 +104,7 @@ public class ContractPaymentTests : IClassFixture<CrmTestFactory>
     {
         var quoteId = await CreateApprovedQuoteAsync();
 
-        var custResp = await _client.GetAsync("/api/customer?keyword=华为");
+        var custResp = await _client.GetAsync("/api/customer?keyword=示例客户1");
         var customerId = (await custResp.Content.ReadFromJsonAsync<JsonDocument>(_json))!
             .RootElement.GetProperty("data").GetProperty("rows")[0]
             .GetProperty("customerId").GetInt64();

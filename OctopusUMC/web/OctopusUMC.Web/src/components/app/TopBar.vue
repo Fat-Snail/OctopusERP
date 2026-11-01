@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Search, Bell, LogOut } from 'lucide-vue-next'
+import { Search, Bell, LogOut } from '@lucide/vue'
 import AvatarVue from '@/components/ui/avatar.vue'
 import { useUserStore } from '@/store/modules/user'
 
@@ -21,8 +21,19 @@ const userInitials = computed(() => {
 })
 
 async function handleLogout() {
-  await userStore.logout()
-  router.push('/login')
+  // 后端不可达/卡住时也必须能"退出"：加超时兜底，无论如何都跳登录页。
+  // 历史事故：UMC 被后台任务搞停时 /account/logout 永远不返回，
+  // 这里 await 卡死 → 点退出毫无反应。
+  try {
+    await Promise.race([
+      userStore.logout(),
+      new Promise((resolve) => setTimeout(resolve, 3000)),
+    ])
+  } catch {
+    // 忽略：本地状态已在 store 的 finally 里清空
+  } finally {
+    router.push('/login')
+  }
 }
 </script>
 

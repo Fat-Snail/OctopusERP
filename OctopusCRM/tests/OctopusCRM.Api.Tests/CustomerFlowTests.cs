@@ -110,8 +110,8 @@ public class CustomerFlowTests : IClassFixture<CrmTestFactory>
     [Fact]
     public async Task GetContacts_ReturnsSeedContacts()
     {
-        // 先找华为客户 ID
-        var listResp = await _client.GetAsync("/api/customer?keyword=华为");
+        // 先找示例客户1的 ID
+        var listResp = await _client.GetAsync("/api/customer?keyword=示例客户1");
         var listDoc = await listResp.Content.ReadFromJsonAsync<JsonDocument>(_json);
         var huaweiId = listDoc!.RootElement.GetProperty("data").GetProperty("rows")[0]
             .GetProperty("customerId").GetInt64();
@@ -150,11 +150,11 @@ public class CustomerFlowTests : IClassFixture<CrmTestFactory>
     [Fact]
     public async Task SearchByKeyword_FiltersResults()
     {
-        var resp = await _client.GetAsync("/api/customer?keyword=字节");
+        var resp = await _client.GetAsync("/api/customer?keyword=示例客户3");
         var doc = await resp.Content.ReadFromJsonAsync<JsonDocument>(_json);
         doc!.RootElement.GetProperty("code").GetInt32().Should().Be(200);
         var rows = doc.RootElement.GetProperty("data").GetProperty("rows");
         rows.GetArrayLength().Should().BeGreaterThanOrEqualTo(1);
-        rows[0].GetProperty("customerName").GetString().Should().Contain("字节");
+        rows[0].GetProperty("customerName").GetString().Should().Contain("示例客户3");
     }
 }

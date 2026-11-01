@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using OctopusOA.Api.DTOs;
+using OctopusOA.Api.Filters;
 using OctopusOA.Api.Persistence;
 using OctopusOA.Api.Services;
 using System.Security.Claims;
@@ -42,6 +43,7 @@ public class ApprovalController : ControllerBase
 
     /// <summary>提交审批申请</summary>
     [HttpPost("submit")]
+    [OperationLog("提交审批申请")]
     public IActionResult Submit([FromBody] SubmitApprovalRequest req)
     {
         var (userId, userName) = GetCurrentUser();
@@ -87,6 +89,7 @@ public class ApprovalController : ControllerBase
 
     /// <summary>审批通过</summary>
     [HttpPut("{id:long}/approve")]
+    [OperationLog("审批通过")]
     public IActionResult Approve(long id, [FromBody] ApproveRequest req)
     {
         var (userId, userName) = GetCurrentUser();
@@ -101,6 +104,7 @@ public class ApprovalController : ControllerBase
 
     /// <summary>驳回</summary>
     [HttpPut("{id:long}/reject")]
+    [OperationLog("驳回审批")]
     public IActionResult Reject(long id, [FromBody] RejectRequest req)
     {
         var (userId, userName) = GetCurrentUser();
@@ -125,6 +129,17 @@ public class ApprovalController : ControllerBase
             return Ok(new { code, msg = error });
         }
         return Ok(new { code = 200, msg = "已撤回" });
+    }
+
+    /// <summary>P17：转交给他人审批</summary>
+    [HttpPut("{id:long}/delegate")]
+    [OperationLog("转交审批")]
+    public IActionResult Delegate(long id, [FromBody] DelegateRequest req)
+    {
+        var (userId, userName) = GetCurrentUser();
+        var error = _service.Delegate(id, userId, userName, req.ToUserId, req.ToUserName ?? req.ToUserId.ToString(), req.Reason);
+        if (error != null) return Ok(new { code = 400, msg = error });
+        return Ok(new { code = 200, msg = "已转交" });
     }
 
     /// <summary>全部审批（oa_admin）</summary>
@@ -179,7 +194,12 @@ public class ApprovalController : ControllerBase
             FormData = a.FormData,
             CreateTime = a.CreateTime,
             UpdateTime = a.UpdateTime,
+            CurrentNodeDeadline = a.CurrentNodeDeadline,
+            IsOverdue = a.IsOverdue,
+            IsSlaWarned = a.IsSlaWarned,
             Records = records,
         };
     }
 }
+
+public record DelegateRequest(long ToUserId, string? ToUserName, string? Reason);

@@ -12,7 +12,7 @@ public record ScanStatus(
     int Fail,
     string? Error);
 
-public class VectorScanService
+public class VectorScanService(IServiceProvider rootSp)
 {
     private volatile ScanState _state = ScanState.Idle;
     private int _total;
@@ -24,29 +24,23 @@ public class VectorScanService
     public ScanStatus GetStatus() =>
         new(_state, _total, _processed, _success, _fail, _error);
 
-    public bool TryStart(IServiceProvider sp)
+    public bool TryStart()
     {
         if (_state == ScanState.Scanning) return false;
         _state = ScanState.Scanning;
         _total = _processed = _success = _fail = 0;
         _error = null;
-        
-        // 修复：创建scope而不是直接使用sp
-        _ = Task.Run(async () =>
-        {
-            await using var scope = sp.CreateAsyncScope();
-            await RunAsync(scope.ServiceProvider);
-        });
-        
+        _ = Task.Run(() => RunAsync());
         return true;
     }
 
-    private async Task RunAsync(IServiceProvider sp)
+    private async Task RunAsync()
     {
         try
         {
-            var db = sp.GetRequiredService<PlmDbContext>();
-            var vector = sp.GetRequiredService<VectorService>();
+            await using var scope = rootSp.CreateAsyncScope();
+            var db = scope.ServiceProvider.GetRequiredService<PlmDbContext>();
+            var vector = scope.ServiceProvider.GetRequiredService<VectorService>();
 
             var products = db.Products
                 .Where(p => !string.IsNullOrEmpty(p.MainImage))

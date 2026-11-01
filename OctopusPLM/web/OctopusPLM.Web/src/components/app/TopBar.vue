@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import { Search, Bell, LogOut } from 'lucide-vue-next'
+import { Search, Bell, LogOut } from '@lucide/vue'
 import AvatarVue from '@/components/ui/avatar.vue'
 import { usePlmUserStore } from '@/store/modules/plmUser'
 import { oidcService } from '@/services/oidcService'
