@@ -24,4 +24,9 @@
     <EmbeddedResource Include="Persistence\Migrations\*.sql" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- 共享：数据迁移执行器 / 内部接口密钥策略 -->
+    <ProjectReference Include="../../../OctopusCommon/OctopusCommon.csproj" />
+  </ItemGroup>
+
 </Project>

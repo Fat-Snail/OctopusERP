@@ -81,6 +81,16 @@ public class InternalUserApiTests : IClassFixture<InternalUserApiFactory>
     }
 
     [Fact]
+    public async Task WithWrongSecret_IsRejected()
+    {
+        var r = await PostRetailAsync(NewUser("wrongsecret01"), secret: "not-the-right-secret");
+
+        r.Code.Should().Be(403);
+        var exists = await WithDbAsync(db => db.Users.AnyAsync(u => u.UserName == "wrongsecret01"));
+        exists.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task WithSecret_CreatesCustomerUser()
     {
         var r = await PostRetailAsync(NewUser("retailcust01"));

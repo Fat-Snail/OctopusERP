@@ -44,6 +44,17 @@ public class InternalMemberProfileTests(RetailTestFactory factory) : IClassFixtu
             .SingleAsync(m => m.KcSub == kcSub && m.TenantId == tenant));
 
     [Fact]
+    public async Task WithWrongSecret_IsRejected()
+    {
+        var before = await MemberAsync("kc-lisi", "t_shanghai_001");
+
+        var r = await PostAsync(new { kcSub = "kc-lisi", phone = "13000000001" }, secret: "not-the-right-secret");
+
+        r.GetProperty("code").GetInt32().Should().Be(403);
+        (await MemberAsync("kc-lisi", "t_shanghai_001")).Phone.Should().Be(before.Phone);
+    }
+
+    [Fact]
     public async Task WithoutSecret_IsRejected()
     {
         var before = await MemberAsync("kc-lisi", "t_shanghai_001");

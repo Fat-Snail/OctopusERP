@@ -1,4 +1,5 @@
 using System.Net.Http.Json;
+using OctopusCommon.Security;
 
 namespace OctopusUMC.Api.Services;
 
@@ -15,14 +16,14 @@ namespace OctopusUMC.Api.Services;
 public class RetailProfileSyncService(
     IHttpClientFactory httpFactory,
     IConfiguration config,
+    IHostEnvironment env,
     ILogger<RetailProfileSyncService> logger)
 {
     private string? BaseUrl =>
         config["services:retail-api:http:0"]
         ?? config["Retail:BaseUrl"];      // Aspire 用显式环境变量，避免与 retail→umc 形成环
 
-    private string SharedSecret =>
-        config["InternalApi:SharedSecret"] ?? "retail-internal-secret-dev";
+    private string? SharedSecret => InternalApiSecret.Resolve(config, env);
 
     public async Task NotifyProfileChangedAsync(
         string? kcSub, string? userName, string? displayName, string? phone,
@@ -31,6 +32,14 @@ public class RetailProfileSyncService(
         var baseUrl = BaseUrl?.TrimEnd('/');
         if (string.IsNullOrEmpty(baseUrl)) return;          // 未配置零售域：跳过
         if (string.IsNullOrEmpty(kcSub)) return;            // 不是零售域用户
+
+        var secret = SharedSecret;
+        if (secret is null)
+        {
+            // fail-closed：宁可不同步，也不能用开发密钥去调生产接口
+            logger.LogWarning("未配置 {Key}，跳过零售资料回推", InternalApiSecret.ConfigKey);
+            return;
+        }
 
         try
         {
@@ -47,7 +56,7 @@ public class RetailProfileSyncService(
                     phone,
                 }),
             };
-            req.Headers.Add("X-Internal-Secret", SharedSecret);
+            req.Headers.Add("X-Internal-Secret", secret);
 
             var resp = await http.SendAsync(req, ct);
             if (!resp.IsSuccessStatusCode)

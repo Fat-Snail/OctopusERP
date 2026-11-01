@@ -5,6 +5,7 @@ using OctopusUMC.Api.DTOs;
 using OctopusUMC.Api.Services;
 using OctopusUMC.Core.Domain.Entities;
 using OctopusUMC.Infrastructure.Persistence;
+using OctopusCommon.Security;
 
 namespace OctopusUMC.Api.Controllers;
 
@@ -26,24 +27,26 @@ public class InternalUserController(
     ApplicationDbContext db,
     KeycloakSyncService keycloak,
     IConfiguration config,
+    IHostEnvironment env,
     ILogger<InternalUserController> logger) : ControllerBase
 {
-    private string SharedSecret => config["InternalApi:SharedSecret"] ?? "retail-internal-secret-dev";
+    /// <summary>
+    /// 解析内部密钥。**fail-closed**：非 Development/Test 且未配置时返回 null，
+    /// 此时一律拒绝请求，绝不回退到仓库里公开的开发密钥。
+    /// </summary>
+    private string? SharedSecret => InternalApiSecret.Resolve(config, env);
 
-    private bool Authorized()
-    {
-        var provided = Request.Headers["X-Internal-Secret"].FirstOrDefault();
-        return !string.IsNullOrEmpty(provided)
-               && System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
-                   System.Text.Encoding.UTF8.GetBytes(provided),
-                   System.Text.Encoding.UTF8.GetBytes(SharedSecret));
-    }
+    private bool Authorized() =>
+        InternalApiSecret.Matches(Request.Headers["X-Internal-Secret"].FirstOrDefault(), SharedSecret);
+
+    private const string NotConfigured = "服务端未配置内部接口密钥（InternalApi:SharedSecret），已拒绝请求";
 
     /// <summary>零售域邀请注册：在 UMC 建号并同步到 Keycloak</summary>
     [HttpPost("retail")]
     public async Task<ApiResponse<object?>> CreateForRetail(
         [FromBody] InternalCreateUserRequest req, CancellationToken ct)
     {
+        if (SharedSecret is null) return ApiResponse<object?>.Fail(NotConfigured, 403);
         if (!Authorized()) return ApiResponse<object?>.Fail("无权访问", 403);
 
         var userName = (req.UserName ?? string.Empty).Trim();
@@ -104,6 +107,7 @@ public class InternalUserController(
     public async Task<ApiResponse<object?>> AdoptExisting(
         [FromBody] InternalAdoptUserRequest req, CancellationToken ct)
     {
+        if (SharedSecret is null) return ApiResponse<object?>.Fail(NotConfigured, 403);
         if (!Authorized()) return ApiResponse<object?>.Fail("无权访问", 403);
 
         var userName = (req.UserName ?? string.Empty).Trim();

@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using OctopusCommon.Security;
 
 namespace OctopusRetail.Api.Services;
 
@@ -17,6 +18,7 @@ namespace OctopusRetail.Api.Services;
 public class UmcUserClient(
     IHttpClientFactory httpFactory,
     IConfiguration config,
+    IHostEnvironment env,
     ILogger<UmcUserClient> logger)
 {
     /// <summary>Aspire 注入的服务发现地址优先</summary>
@@ -26,8 +28,7 @@ public class UmcUserClient(
          ?? config["Umc:BaseUrl"]
          ?? "http://localhost:5001").TrimEnd('/');
 
-    private string SharedSecret =>
-        config["InternalApi:SharedSecret"] ?? "retail-internal-secret-dev";
+    private string? SharedSecret => InternalApiSecret.Resolve(config, env);
 
     public record CreateResult(bool Success, string? KcSub, long UserId, string? Error);
 
@@ -40,6 +41,14 @@ public class UmcUserClient(
         string password,
         CancellationToken ct = default)
     {
+        var secret = SharedSecret;
+        if (secret is null)
+        {
+            // fail-closed：没有可信密钥就不要去调 UMC，避免把开发密钥带上生产
+            logger.LogError("未配置 {Key}，拒绝调用 UMC 建号接口", InternalApiSecret.ConfigKey);
+            return new CreateResult(false, null, 0, "账号服务未配置内部密钥，请联系管理员");
+        }
+
         try
         {
             var http = httpFactory.CreateClient();
@@ -57,7 +66,7 @@ public class UmcUserClient(
                     source = "retail",
                 }),
             };
-            req.Headers.Add("X-Internal-Secret", SharedSecret);
+            req.Headers.Add("X-Internal-Secret", secret);
 
             var resp = await http.SendAsync(req, ct);
             var body = await resp.Content.ReadAsStringAsync(ct);

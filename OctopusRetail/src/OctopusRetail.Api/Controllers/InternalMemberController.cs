@@ -4,6 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using OctopusRetail.Api.Dtos;
 using OctopusRetail.Api.Multitenancy;
 using OctopusRetail.Api.Persistence;
+using OctopusCommon.Security;
 
 namespace OctopusRetail.Api.Controllers;
 
@@ -23,18 +24,14 @@ namespace OctopusRetail.Api.Controllers;
 public class InternalMemberController(
     RetailDbContext db,
     IConfiguration config,
+    IHostEnvironment env,
     ILogger<InternalMemberController> logger) : ControllerBase
 {
-    private string SharedSecret => config["InternalApi:SharedSecret"] ?? "retail-internal-secret-dev";
+    /// <summary>非 Development/Test 且未配置时返回 null → 一律拒绝（fail-closed）</summary>
+    private string? SharedSecret => InternalApiSecret.Resolve(config, env);
 
-    private bool Authorized()
-    {
-        var provided = Request.Headers["X-Internal-Secret"].FirstOrDefault();
-        return !string.IsNullOrEmpty(provided)
-               && System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
-                   System.Text.Encoding.UTF8.GetBytes(provided),
-                   System.Text.Encoding.UTF8.GetBytes(SharedSecret));
-    }
+    private bool Authorized() =>
+        InternalApiSecret.Matches(Request.Headers["X-Internal-Secret"].FirstOrDefault(), SharedSecret);
 
     /// <summary>
     /// 按 Keycloak sub 更新该用户在所有组织里的资料快照。
@@ -44,6 +41,8 @@ public class InternalMemberController(
     public async Task<ApiResponse<object?>> SyncProfile(
         [FromBody] SyncMemberProfileRequest req, CancellationToken ct)
     {
+        if (SharedSecret is null)
+            return ApiResponse<object?>.Fail("服务端未配置内部接口密钥（InternalApi:SharedSecret），已拒绝请求", 403);
         if (!Authorized()) return ApiResponse<object?>.Fail("无权访问", 403);
         if (string.IsNullOrWhiteSpace(req.KcSub))
             return ApiResponse<object?>.Fail("kcSub 不能为空", 400);

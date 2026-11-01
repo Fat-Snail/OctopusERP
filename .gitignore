@@ -284,3 +284,6 @@ service-account*.json
 # 本地工具产物（不应入库）
 .claude/worktrees/
 .understand-anything/
+
+# SourceTree 偏好设置备份（非项目文件）
+backup-sourcetree-*/

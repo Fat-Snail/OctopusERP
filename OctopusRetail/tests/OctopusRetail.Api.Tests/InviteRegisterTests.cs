@@ -91,6 +91,7 @@ public class InviteRegisterTests
         var umc = new UmcUserClient(
             new RecordingHttpClientFactory(umcHandler),
             new ConfigurationBuilder().Build(),
+            new TestHostEnvironment(),
             NullLogger<UmcUserClient>.Instance);
 
         var svc = new InviteService(db2, auth, tenantCtx, kc, umc, clock);
