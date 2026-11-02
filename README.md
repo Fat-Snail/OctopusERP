@@ -9,7 +9,8 @@
 [![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D?logo=vuedotjs)](https://vuejs.org)
 [![OpenIddict](https://img.shields.io/badge/OpenIddict-7.x-blue)](https://github.com/openiddict/openiddict-core)
 [![Aspire](https://img.shields.io/badge/Aspire-13.2.4-512BD4?logo=dotnet)](https://learn.microsoft.com/aspire)
-[![Tests](https://img.shields.io/badge/Tests-184%20passing-brightgreen)](#测试覆盖)
+[![Tests](https://img.shields.io/badge/Tests-653%20passing-brightgreen)](#测试覆盖)
+[![CI](https://img.shields.io/badge/CI-10%20services%20%C3%97%207%20frontends-blue)](#持续集成)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
 [快速开始](#快速开始) · [系统架构](#系统架构) · [功能特性](#功能特性) · [截图预览](#截图预览) · [开发指南](#开发指南)
@@ -20,15 +21,23 @@
 
 ## 项目简介
 
-Octopus ERP 是一套面向中小企业的开源企业管理平台，采用**微服务 + SSO**架构，包含三个子系统：
+Octopus ERP 是一套面向中小企业的开源企业管理平台，采用**微服务 + SSO + 多租户**架构，目前包含 **10 个服务**：
 
-| 系统 | 定位 | 状态 |
-|------|------|------|
-| **OctopusUMC** | 统一用户中心（IdP） — 全平台身份认证、RBAC 权限、组织管理 | ✅ 生产就绪 |
-| **OctopusOA** | 办公自动化 — 审批流、考勤、会议室、公告、通讯录、职员管理 | ✅ 生产就绪 |
-| **OctopusPLM** | 商品生命周期管理 — 物料主数据、**以图搜商品**（CLIP 视觉向量搜索） | 🚧 开发中 |
+| 系统 | 定位 | 端口 | 状态 |
+|------|------|------|------|
+| **OctopusUMC** | 统一用户中心（IdP）— 全平台身份认证、RBAC、组织、**唯一用户主数据源** | 5001 / 5173 | ✅ |
+| **OctopusOA** | 办公自动化 — 审批流、考勤、会议室、公告、通讯录、职员 | 5002 / 5174 | ✅ |
+| **OctopusPLM** | 商品生命周期 — 物料主数据、BOM、**以图搜商品**（CLIP 向量） | 5003 / 5175 | ✅ |
+| **OctopusCRM** | 客户关系 — 客户、询盘、报价、合同、回款 | 5004 / 5176 | ✅ |
+| **OctopusWMS** | 仓储 — 仓库、库存、出入库、盘点 | 5005 / 5177 | ✅ |
+| **OctopusMES** | 生产执行 — 供应商、采购、工单、服装排产 | 5006 / 5178 | ✅ |
+| **OctopusFIN** | 财务 — 复式记账、AR/AP、期间、银行 | 5007 | ✅ |
+| **OctopusHRM** | 人力资源 — 员工、薪酬、绩效、假期 | 5008 | ✅ |
+| **OctopusOMS** | 订单中台 — 多渠道电商订单 | 5009 | ✅ |
+| **OctopusRetail** | **零售多租户** — 组织邀请、成员管理、workspace 切换 | 5010 / 5186 | ✅ |
 
-所有子系统通过 **OpenIddict OIDC** 实现单点登录，用户只需登录一次即可访问全部授权系统。
+平台内部统一走 **OpenIddict OIDC** 单点登录；**零售域例外**，它按设计使用 **Keycloak**
+作为身份源（`https://localhost:8088`，realm `octopus`），见 [ADR-008](DECISIONS.md)。
 
 ---
 
@@ -61,7 +70,7 @@ CLAUDE.md           ← 项目系统提示词（架构、规范、已知坑点�
 | 多步操作容易出错 | `commands/` 提供精确的操作步骤和成功标准 |
 | PR 质量难以保证 | `agents/code-reviewer` 自动输出结构化审查报告 |
 
-**184 个集成测试、3 个子系统、OIDC SSO、自定义审批引擎** — 全部在 Harness 约束下，由 Claude Code 辅助完成，无架构漂移。
+**653 个集成测试、10 个服务、OIDC SSO + 多租户、自定义审批引擎** — 全部在 Harness 约束下，由 Claude Code 辅助完成，无架构漂移。
 
 > 📁 可复用的 Harness 模板在 [`harness-template/`](./harness-template) 目录，附完整使用说明。
 
@@ -120,88 +129,101 @@ CLAUDE.md           ← 项目系统提示词（架构、规范、已知坑点�
 |------|------|------|
 | .NET | 10.0 | 运行时 |
 | ASP.NET Core | 10.0 | Web 框架 |
-| OpenIddict | 7.x | OIDC/OAuth2 服务端（IdP） |
+| OpenIddict | 7.7 | OIDC/OAuth2 服务端（IdP） |
 | EF Core | 10.0 | ORM |
 | SQLite | — | 开发环境持久化 |
 | MySQL | 8.0 | 生产环境数据库 |
 | SignalR | — | 实时通信（公告推送、在线用户） |
-| Serilog | — | 结构化日志 |
-| xUnit | 2.9 | 集成测试框架 |
+| Serilog | 10.0 | 结构化日志 |
+| xUnit | 2.x | 集成测试框架 |
 | ONNX Runtime | 1.20.1 | CLIP 视觉模型推理（PLM 以图搜商品） |
 | SixLabors.ImageSharp | 3.1.6 | 图像预处理（PLM 以图搜商品） |
+| **Keycloak** | 26.x | **零售域身份源**（realm `octopus`，HTTPS :8088） |
+| BCrypt.Net-Next | 4.2.1 | 密码哈希 |
+| ASP.NET RateLimiter | 内置 | 登录 10 次/分钟、其余 100 次/分钟 |
 
 ### 前端
 
 | 技术 | 版本 | 用途 |
 |------|------|------|
 | Vue | 3.5 | UI 框架（Composition API） |
-| TypeScript | 5.x | 强类型（strict 模式） |
-| Vite | 6.x | 构建工具 |
-| Tailwind CSS | v4 | 原子化 CSS |
+| TypeScript | 5.9 | 强类型（strict 模式） |
+| Vite | 8.x | 构建工具 |
+| Tailwind CSS | 4.3 | 原子化 CSS |
 | shadcn-vue | latest | Headless 组件库 |
-| Pinia | latest | 状态管理 |
+| Pinia | 4.x | 状态管理 |
 | oidc-client-ts | latest | OIDC 客户端（SSO） |
-| lucide-vue-next | latest | 图标 |
-| TanStack Table | latest | 高性能表格 |
+| @lucide/vue | 1.55 | 图标（已从 `lucide-vue-next` 迁移） |
+| @tanstack/vue-table | 9.x | 高性能表格（v9 API） |
 
 ### 基础设施
 
 | 技术 | 用途 |
 |------|------|
-| .NET Aspire 13.x | 一键启动编排 + 可观测性 Dashboard |
-| Docker Compose | 容器化部署 |
+| .NET Aspire 13.x | 一键启动编排 + 可观测性 Dashboard（:15256） |
+| Docker Compose | 容器化部署（Keycloak + PostgreSQL） |
 | Qdrant | 向量数据库（PLM 以图搜商品，gRPC :6334） |
+| PostgreSQL 17 | Keycloak 的持久化存储（容器内） |
 
 ---
 
 ## 系统架构
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                   浏览器 / 客户端                     │
-│         OA.Web :5174      PLM.Web :5175              │
-└──────────────┬──────────────────┬───────────────────┘
-               │  OIDC 授权码流    │  OIDC 授权码流
-               ▼                  ▼
-┌──────────────────────────────────────────────────────┐
-│              OctopusUMC（身份提供商 IdP）              │
-│   UMC.Api :5001  ←→  UMC.Web :5173                  │
-│   OpenIddict · RBAC · 组织管理 · 用户同步 Webhook     │
-│   SQLite（开发）/ MySQL（生产）                        │
-└────────────────────┬─────────────────────────────────┘
-                     │  JWT Bearer Token
-          ┌──────────┴──────────┐
-          ▼                     ▼
-┌──────────────────┐  ┌──────────────────────────────┐
-│  OctopusOA.Api   │  │  OctopusPLM.Api              │
-│  :5002           │  │  :5003                       │
-│  审批·考勤·会议   │  │  商品·BOM·以图搜商品          │
-│  SQLite / MySQL  │  │  SQLite / MySQL              │
-└──────────────────┘  └──────────────┬───────────────┘
-                                     │  gRPC :6334
-                                     ▼
-                       ┌─────────────────────────┐
-                       │  Qdrant 向量数据库        │
-                       │  :6333 (REST)            │
-                       │  :6334 (gRPC)            │
-                       │  CLIP 512-dim 向量索引    │
-                       └─────────────────────────┘
-          │
-          └── Aspire Dashboard :15256（服务监控 + 日志聚合）
+                       ┌───────────────────────────────────────────┐
+                       │              浏览器（7 个前端）              │
+                       │ UMC 5173 │ OA 5174 │ PLM 5175 │ CRM 5176   │
+                       │ WMS 5177 │ MES 5178 │ Retail 5186           │
+                       └───────┬────────────────────┬──────────────┘
+                               │ OIDC 授权码 + PKCE  │ OIDC（Keycloak）
+                               ▼                    ▼
+        ┌──────────────────────────────┐   ┌──────────────────────────┐
+        │  OctopusUMC  :5001（IdP）      │   │  Keycloak :8088（HTTPS）  │
+        │  OpenIddict · RBAC · 组织      │   │  realm: octopus          │
+        │  ★ 全平台唯一用户主数据源        │   │  groups / depts / 租户组  │
+        └───────┬──────────────────────┘   └────────────┬─────────────┘
+                │ JWT Bearer                            │ JWT
+    ┌───────────┼───────────┬───────────┬───────────┐  │
+    ▼           ▼           ▼           ▼           ▼  ▼
+ ┌──────┐   ┌──────┐   ┌──────┐   ┌──────┐   ┌──────┐ ┌──────────┐
+ │  OA  │   │ PLM  │   │ CRM  │   │ WMS  │   │ MES  │ │  Retail  │
+ │ :5002│   │ :5003│   │ :5004│   │ :5005│   │ :5006│ │   :5010  │
+ └──────┘   └───┬──┘   └──────┘   └──────┘   └──────┘ └────┬─────┘
+                │ Qdrant :6333/6334                        │ tenant_id
+                ▼（CLIP 512 维向量）                  （租户隔离只在零售库）
+ ┌──────┐   ┌──────┐   ┌──────┐                  ┌──────────────┐
+ │ FIN  │   │ HRM  │   │ OMS  │                  │ retail_tenant│
+ │ :5007│   │ :5008│   │ :5009│                  │ retail_member│
+ └──────┘   └──────┘   └──────┘                  └──────────────┘
+
+              Aspire Dashboard :15256（编排 + 监控 + 日志聚合）
 ```
+
+**两条身份链路**（关键设计，见 [ADR-008](DECISIONS.md) / [ADR-010](DECISIONS.md)）：
+
+| 域 | 身份源 | 用户主数据 | 租户隔离 |
+|---|---|---|---|
+| 平台九个子系统 | UMC（OpenIddict） | `UMC.sys_user` | 无（单租户） |
+| 零售域 | Keycloak | **仍然登记进 UMC** | `retail_db` 内 `tenant_id` |
+
+> 零售用户虽然由 UMC 统一建号与管理，但**租户归属只存在于零售库**——
+> UMC 业务表不加 `tenant_id`，避免污染九个下游子系统。
 
 ### 单点登录流程
 
 ```
-用户访问 OA/PLM
-  → oidc-client-ts 发起授权请求
+用户访问 OA/PLM/CRM/WMS/MES
+  → oidc-client-ts 发起授权请求（PKCE）
   → 重定向到 UMC 登录页
   → 用户登录（Cookie 会话）
-  → OpenIddict 颁发授权码
-  → 换取 access_token
-  → 访问 OA/PLM API（Bearer Token）
+  → OpenIddict 颁发授权码 → 换取 access_token
+  → 访问各子系统 API（Bearer Token）
   → UMC Back-Channel Logout 同步注销
 ```
+
+零售域走独立的 Keycloak 链路，并在 token 的 `groups` 声明里携带
+`/tenants/{tenantId}`；前端切换 workspace 时通过 `X-Tenant-Id` 头传递
+当前租户，服务端用 token 校验（见 [ADR-009](DECISIONS.md)）。
 
 ---
 
@@ -260,6 +282,50 @@ CLAUDE.md           ← 项目系统提示词（架构、规范、已知坑点�
   - 支持拖拽上传，结果可直接跳转商品编辑页
   - 批量/单品向量化 API，索引增量可控
 
+### OctopusCRM · 客户关系管理
+
+- **客户管理**：客户档案 + 联系人、等级/状态、关键词检索
+- **销售链路**：询盘 → 报价 → 合同 → 回款，状态机驱动
+- **审批联动**：报价/合同/大额回款提交 OA 审批（HMAC 回调）
+- **Webhook**：合同激活触发 WMS 库存预占；WMS 发货回调更新合同状态
+
+### OctopusWMS · 仓储管理
+
+- **仓库与库位**、库存查询、低库存预警、手动调整
+- **出入库**：入库收货、出库发货自动增减库存；盘点任务与差异处理
+- **跨系统**：接收 CRM 合同预占、MES 完工入库；出库发货回调 CRM
+
+### OctopusMES · 生产执行与采购
+
+- **供应商 / 采购订单 / 工单**：审批、开工、完工、工序进度
+- **服装排产**：班组、排产看板、按日产能分配（含外协组）
+- **跨系统**：工单完工 → WMS 入库
+
+### OctopusFIN · 财务
+
+- 复式记账、会计科目、凭证、应收/应付、期间关账、银行账户与期初余额
+- HRM 薪酬单确认后自动生成薪资凭证
+
+### OctopusHRM · 人力资源
+
+- 员工档案、薪资项与薪资单计算、假期、KPI
+- 与 FIN 联动生成凭证
+
+### OctopusOMS · 订单中台
+
+- 多渠道接入（淘宝/京东/拼多多/抖音/Shopify/Amazon）、店铺、订单与明细
+- SKU 映射到 PLM 商品、售后单
+
+### OctopusRetail · 零售多租户（独立身份域）
+
+- **组织（租户）**：门店 / 连锁总部 / 加盟店 / 企业 / 子公司，支持上下级
+- **邀请入店**：短码链接 `/i/{code}` 或手动输码 `/join`；注册方式两种
+  （匿名自助注册建号，或已有账号直接加入）
+- **workspace 切换**：一个账号可属于多个组织，切换后所有请求带 `X-Tenant-Id`
+- **成员管理**：停用/启用（同步禁用 Keycloak 账号）、移出、重置密码；含
+  不可越级、不可移除最后一个所有者等约束
+- **租户隔离**：EF Core fail-closed 全局过滤器 + 启动期 `TenantFilterGuard` 校验
+
 ---
 
 ## 快速开始
@@ -301,41 +367,52 @@ docker run -d --name qdrant --restart unless-stopped \
 使用 **.NET Aspire** 一键启动所有服务：
 
 ```bash
-# 克隆仓库
-git clone https://github.com/your-org/octopus-erp.git
-cd octopus-erp
+git clone https://github.com/Fat-Snail/OctopusERP.git
+cd OctopusERP
 
-# 安装前端依赖
-cd OctopusUMC/web/OctopusUMC.Web && npm install && cd -
-cd OctopusOA/web/OctopusOA.Web && npm install && cd -
-cd OctopusPLM/web/OctopusPLM.Web && npm install && cd -
+# 一次性安装全部前端依赖（7 个）
+for d in Octopus*/web/Octopus*; do (cd "$d" && npm ci); done
 
-# 启动 Aspire（自动编排所有服务）
-cd aspire/OctopusAspire.AppHost
-dotnet run
+# 启动 Aspire（自动编排全部服务 + Keycloak 容器）
+cd aspire/OctopusAspire.AppHost && dotnet run
+```
+
+仓库根目录的 `restart.sh` 封装了"清理端口 → 启动 Aspire"的常用流程：
+
+```bash
+bash restart.sh              # 常规重启
+bash restart.sh --reset-kc   # 重建 Keycloak realm（改过 octopus-realm.json 时用）
 ```
 
 启动后访问：
 
-| 服务 | 地址 |
-|------|------|
-| Aspire Dashboard | http://localhost:15256 |
-| UMC 管理后台 | http://localhost:5173 |
-| OA 前端 | http://localhost:5174 |
-| PLM 前端 | http://localhost:5175 |
-| UMC API | http://localhost:5001 |
-| OA API | http://localhost:5002 |
-| PLM API | http://localhost:5003 |
+| 服务 | 地址 | 说明 |
+|------|------|------|
+| Aspire Dashboard | http://localhost:15256 | 编排、日志、指标（登录令牌每次重启都会变） |
+| UMC 管理后台 | http://localhost:5173 | 统一用户中心 |
+| OA / PLM / CRM | http://localhost:5174-5176 | |
+| WMS / MES | http://localhost:5177-5178 | |
+| **Retail** | http://localhost:5186 | 零售多租户 |
+| **Keycloak** | **https://localhost:8088** | 零售域身份源（HTTP 打不通，必须 HTTPS） |
+| 后端 API | http://localhost:5001-5010 | 每个系统一个端口 |
 
 ### 默认账号
 
-| 账号 | 密码 | 角色 |
-|------|------|------|
-| admin | Admin@123 | 超级管理员 |
-| zhangsan | Admin@123 | 普通员工（跨公司兼职） |
-| lisi | Admin@123 | 普通员工 |
+| 系统 | 账号 | 密码 | 角色 |
+|------|------|------|------|
+| UMC / OA / PLM 等 | `admin` | `Admin@123` | 超级管理员 |
+| UMC | `zhangsan` / `lisi` / `editor` | `Admin@123` | 普通员工（zhangsan 跨公司兼职） |
+| 零售域（Keycloak） | 同上任一账号 | `Admin@123` | 见各组织的成员角色 |
 
-> 首次启动自动创建 SQLite 数据库并植入种子数据。删除 `octopus_oa.db` / `octopus_umc.db` 后重启可重置数据。
+> **开发环境统一密码**：`Admin@123`。种子数据里 `wangwu` 为**禁用**状态（登录返回 403）。
+> 两套密码体系（UMC 的 BCrypt 与 Keycloak 凭据）不会自动同步，统一由脚本或
+> 「重置密码」接口维护，详见下方「安全与合规」。
+>
+> 数据库统一位于仓库根的 `data/` 目录（`*.db` 不入库）。删除对应 `.db` 后重启即可
+> 回到干净种子；**只有空库才会重新播种**。
+
+零售域演示组织：`上海南京路店`（store）、`成都春熙路店`（store）、
+`华东销售子公司`（subsidiary）、`连锁总部`（chain）。
 
 ### 独立启动（各服务分开运行）
 
@@ -357,75 +434,185 @@ cd OctopusOA/web/OctopusOA.Web && npm run dev
 
 ## 测试覆盖
 
-采用 **TDD 开发模式**，全量集成测试覆盖核心业务链路：
+采用 **TDD**，全部为**集成测试**（真实 SQLite 内存库，不 mock 数据库）：
+
+| 项目 | 测试数 | 覆盖重点 |
+|------|-------:|---------|
+| OctopusUMC.Api.Tests | 166 | 登录/OIDC/角色/菜单/数据权限/多公司/**用户主数据(ADR-010)**/密码安全 |
+| OctopusRetail.Api.Tests | 116 | 租户隔离/邀请注册/短码/成员管理/资料回传 |
+| OctopusMES.Api.Tests | 117 | 供应商/采购/工单/排产/**数据迁移与脱敏** |
+| OctopusOA.Api.Tests | 100 | 审批流/考勤/会议/公告/通讯录/职员 |
+| OctopusWMS.Api.Tests | 41 | 仓库/库存/出入库/盘点/Webhook |
+| OctopusCRM.Api.Tests | 38 | 客户/询盘/报价/合同/回款 |
+| OctopusPLM.Api.Tests | 35 | 商品/类目/BOM/审核流/向量检索 |
+| OctopusFIN.Api.Tests | 19 | 凭证/应收应付/期间/期初 |
+| OctopusHRM.Api.Tests | 11 | 薪资/假期/KPI |
+| OctopusOMS.Api.Tests | 10 | 渠道/订单/售后 |
+| **合计** | **653** | |
 
 ```bash
-# 运行 UMC 测试（79 个）
+# 单系统
 cd OctopusUMC && dotnet test
 
-# 运行 OA 测试（90 个）
-cd OctopusOA && dotnet test
+# 全部后端（约 2 分钟）
+for p in OctopusUMC OctopusRetail OctopusMES OctopusOA OctopusWMS \
+         OctopusCRM OctopusPLM OctopusFIN OctopusHRM OctopusOMS; do
+  ( cd $p && dotnet test --nologo ) || echo "❌ $p"
+done
 
-# 运行 PLM 测试（15 个）
-cd OctopusPLM && dotnet test
-
-# 查看完整业务流程日志（UMC 5 条端到端链路）
-cd OctopusUMC && dotnet test --filter "Flow" --logger "console;verbosity=detailed"
+# 前端类型检查（与 CI 完全一致）
+for d in Octopus*/web/Octopus*; do ( cd "$d" && npx tsc --noEmit && npm run build ); done
 ```
 
-| 项目 | 测试数 | 覆盖场景 |
-|------|--------|----------|
-| UMC.Api.Tests | 79 | 登录/OIDC/角色/菜单/数据权限/多公司 |
-| OA.Api.Tests | 90 | 审批流/考勤/会议/公告/通讯录/职员 |
-| PLM.Api.Tests | 15 | 商品CRUD/状态流转 |
-| **合计** | **184** | |
+---
+
+## 持续集成
+
+`.github/workflows/ci.yml` 三组任务，**推送到 `master`/`main` 或提 PR 时触发**：
+
+| 任务 | 覆盖 |
+|------|------|
+| `backend` | 10 个后端的 `dotnet test` |
+| `frontend` | 7 个前端的 `npx tsc --noEmit` + `npm run build` |
+| `docker-lint` | `docker compose config --quiet` |
+
+> ⚠️ 前端类型检查依赖根 `tsconfig.json` **真的包含源码**。历史上 UMC/OA/CRM/WMS/MES
+> 用的是 `{ "files": [], "references": [...] }`，裸 `tsc` 一个文件都不编译、
+> 永远通过——CI 类型检查是空转。现已改为继承 `tsconfig.app.json` 并显式声明
+> `include`，同时补了 `src/shims-vue.d.ts`（`vue-tsc` 认识 `.vue`，裸 `tsc` 不认识）。
 
 ---
 
 ## 项目结构
 
 ```
-octopus-erp/
-├── OctopusUMC/                  # 统一用户中心
-│   ├── src/OctopusUMC.Api/      # 后端 API（OpenIddict + EF Core）
-│   ├── tests/OctopusUMC.Api.Tests/
-│   └── web/OctopusUMC.Web/      # Vue 3 管理后台
-│
-├── OctopusOA/                   # 办公自动化
-│   ├── src/OctopusOA.Api/       # 后端 API（含 Persistence/SQLite）
-│   │   ├── Persistence/         # EF Core 实体 + DbContext + 种子数据
-│   │   ├── Services/            # 业务服务（Scoped）
-│   │   └── Controllers/
-│   ├── tests/OctopusOA.Api.Tests/
-│   └── web/OctopusOA.Web/       # Vue 3 OA 前端
-│
-├── OctopusPLM/                  # 商品生命周期管理
-│   ├── src/OctopusPLM.Api/
-│   ├── tests/OctopusPLM.Api.Tests/
-│   └── web/OctopusPLM.Web/
-│
-├── aspire/OctopusAspire.AppHost/ # .NET Aspire 编排
-├── assets/                       # README 截图
-├── docker-compose.yml
-├── DECISIONS.md                  # 架构决策记录
-└── ROADMAP.md                    # 功能路线图
+OctopusERP/
+├── OctopusUMC/          # 统一用户中心（IdP，唯一用户主数据源）
+├── OctopusOA/           # 办公自动化
+├── OctopusPLM/          # 商品生命周期（含 CLIP 向量检索）
+├── OctopusCRM/          # 客户关系
+├── OctopusWMS/          # 仓储
+├── OctopusMES/          # 生产执行 / 服装排产
+├── OctopusFIN/          # 财务
+├── OctopusHRM/          # 人力资源
+├── OctopusOMS/          # 订单中台
+├── OctopusRetail/       # 零售多租户（独立 Keycloak 身份域）
+├── OctopusCommon/       # 共享库：数据迁移执行器、内部接口密钥策略
+├── aspire/              # .NET Aspire 编排（AppHost + Keycloak realm）
+├── design/              # 设计文档（零售多租户、排产等）
+├── docs/
+│   ├── acceptance/      # 验收清单
+│   └── superpowers/     # 方案与规格
+├── scripts/             # 运维脚本（Keycloak 密码/脱敏）
+├── data/                # 本地 SQLite（git 忽略）
+├── DECISIONS.md         # 架构决策记录 ADR-001 ~ ADR-011
+├── CLAUDE.md            # AI 协作指南 + 已知坑点速查
+├── README.md            # 本文件
+└── restart.sh           # 一键重启（清理端口 + 启动 Aspire）
+```
+
+每个子系统的内部结构保持一致：
+
+```
+OctopusXXX/
+├── src/OctopusXXX.Api/
+│   ├── Controllers/          # HTTP 编排层
+│   ├── Services/             # 业务服务（Scoped）
+│   └── Persistence/          # EF Core 实体 / DbContext / Seeder
+│       └── Migrations/       # 数据订正脚本（*.sql，嵌入程序集）
+├── tests/OctopusXXX.Api.Tests/
+└── web/OctopusXXX.Web/       # Vue 3 + Vite + TS strict
 ```
 
 ---
 
 ## 数据库说明
 
-开发环境使用 SQLite 文件数据库，生产环境切换到 MySQL 只需修改连接字符串：
+开发环境使用 SQLite 文件数据库（统一放在仓库根的 `data/`，已 git 忽略），
+生产切换到 MySQL 只需替换 Provider：
 
 ```csharp
 // 开发（默认）
-builder.Services.AddDbContext<OaDbContext>(opt =>
-    opt.UseSqlite("Data Source=octopus_oa.db"));
+opt.UseSqlite(connectionString);
 
-// 生产（切换 MySQL）
-builder.Services.AddDbContext<OaDbContext>(opt =>
-    opt.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+// 生产
+opt.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString));
 ```
+
+### 三层保护：Schema 自愈 / 数据迁移 / 幂等种子
+
+这几个子系统都用 `EnsureCreated()` + 幂等 Seeder、**没有 EF Migrations**，
+`EnsureCreated` 只在库文件不存在时建表，因此老库不会自动补表/补列。为此有三层机制：
+
+| 机制 | 位置 | 作用 |
+|---|---|---|
+| **Schema 自愈** | `SchemaUpgrader`（UMC） | 补缺失的表/列，列带模型默认值并回填历史 NULL |
+| **数据迁移** | `OctopusCommon/Persistence/DataMigrationRunner` | 存量数据订正，执行一次并记录到 `*_data_migration` |
+| **幂等 Seeder** | 各 `*DbSeeder` | 仅空库播种 |
+
+数据迁移的约定（踩过的坑都写在代码注释里）：
+
+```csharp
+// 脚本放在 Persistence/Migrations/*.sql，作为 EmbeddedResource 编译进程序集
+// 文件名即迁移 Id，执行后写入 mes_data_migration / sys_data_migration / crm_… / wms_…
+MesDataMigrationRunner.Apply(db, logger, throwOnError: false);
+```
+
+> ⚠️ 迁移脚本必须**幂等**，且尽量**只按主键/自增列定位**——不要把待清除的敏感原值
+> 写进 SQL，否则清理工具本身就成了泄露源。
+>
+> ⚠️ 不要用 `ExecuteSqlRaw` 执行脚本：它会无条件把 SQL 交给 `string.Format`，
+> 注释里出现 `{Foo}` 就会抛 `FormatException` 且被吞掉，表现为"迁移什么都没做"。
+> 共享库已改用原始 ADO。
+
+---
+
+## 多租户与统一用户模型
+
+零售域与平台其它系统采用**不同的身份链路**，但用户主数据是统一的：
+
+```
+零售邀请注册 ──▶ UMC /api/internal/users/retail ──▶ sys_user(user_type=customer)
+                            │                               │
+                            └── 同步 ──▶ Keycloak ◀─────────┘（回写 kc_sub）
+
+零售域只写成员关系：retail_membership(kc_sub, tenant_id, role)
+```
+
+| 概念 | 存放位置 | 说明 |
+|---|---|---|
+| **用户** | `UMC.sys_user` | 唯一主数据源；`user_type` = employee / customer |
+| **租户** | `retail_tenant` | 门店 / 连锁总部 / 加盟店 / 企业 / 子公司 |
+| **成员关系** | `retail_membership` | 用户在某个租户中的角色 |
+| **当前租户** | 请求头 `X-Tenant-Id` | 由前端 workspace 切换，服务端用 token 校验 |
+
+**为什么零售用户也要进 UMC**：早期规划把零售用户挡在 UMC 之外，结果运营在
+`5173/system/users` 里查不到能登录的人、也无法停用或改密，只能去 Keycloak 控制台。
+现已改为"所有用户统一在 UMC 管理"，同时用 `user_type` 保证**客户不会进入 OA 通讯录**
+等下游系统（`UserSyncService` 只推 `employee`）。详见
+[ADR-010](DECISIONS.md)。
+
+---
+
+## 安全与合规
+
+| 主题 | 措施 |
+|---|---|
+| **内部接口密钥** | UMC ⇄ 零售的 `/api/internal/*` 用 `X-Internal-Secret` + 恒定时间比较；**配置缺失时 fail-closed**（仅 Development/Test 回退开发密钥，其它环境拒绝请求） |
+| **密码存储** | BCrypt；重置密码强制 ≥ 8 位（此前空字符串会被哈希入库并允许空密码登录，已修） |
+| **登录限流** | 登录接口 10 次/分钟/IP，其余 100 次/分钟 |
+| **种子数据脱敏** | 早期种子含真实员工姓名、一个**校验位合法**的身份证号、真实企业名/税号、真实客户与排产数据；现已全部替换为占位值，并通过数据迁移订正存量库 |
+| **租户隔离** | EF Core fail-closed 全局过滤器（未解析租户时匹配空集）+ `TenantFilterGuard` 启动期校验 |
+
+一键把开发库里 Keycloak 的密码统一（仅本地）：
+
+```bash
+bash scripts/dev-reset-keycloak-passwords.sh            # 默认 Admin@123
+bash scripts/dev-anonymize-keycloak-users.sh            # 把历史真实账号改名
+```
+
+> **注意**：仓库的**提交历史**中仍可能残留早期种子里的敏感数据。如需彻底清理，
+> 需重写历史（`git filter-repo`），当前 `main` 的文件树已是干净的。
 
 ---
 
@@ -467,9 +654,14 @@ Step 6 功能验收 ← Step 5 SSO打通 ← Step 4 前后端联调
 
 ### 本地开发注意事项
 
-- 修改种子数据后删除对应 `.db` 文件重启即可重建
-- 前端 TypeScript 检查：`npx tsc --noEmit`
-- 全量测试：`dotnet test`
+- 修改种子数据后删除对应 `.db` 文件重启即可重建（**只有空库才会重新播种**）
+- 前端类型检查务必与 CI 一致：`npx tsc --noEmit && npm run build`
+  - 若突然出现大量 `TS2307 Cannot find module './App.vue'`，先 `rm -rf node_modules/.tmp`
+    （陈旧的 `tsbuildinfo` 会报幽灵错误）
+- 全量测试：`dotnet test`（各子系统目录下执行）
+- **改动 `.gitignore` 时注意**：`build/`、`contract/` 这类通用规则会误伤
+  `OctopusPLM/web/**/build/`、`OctopusCRM/web/**/src/views/contract/`，
+  已锚定为 `/build/`、`/contract/`
 
 ---
 
@@ -487,10 +679,53 @@ Step 6 功能验收 ← Step 5 SSO打通 ← Step 4 前后端联调
 - [x] Aspire 一键编排
 - [x] PLM：商品管理（主数据 CRUD + 状态流转）
 - [x] PLM：以图搜商品（CLIP ONNX 视觉向量搜索）
+- [x] CRM / WMS / MES / FIN / HRM / OMS 六个子系统
+- [x] Retail：零售多租户（邀请注册、短码链接、成员管理、workspace 切换）
+- [x] UMC 成为全平台唯一用户主数据源（ADR-010）
+- [x] 数据迁移机制 + 种子数据脱敏（ADR-011）
+- [x] CI：10 个后端 + 7 个前端全量校验
+- [x] 内部接口 fail-closed 密钥策略
 - [ ] UMC：在线用户（SignalR）
 - [ ] UMC：操作日志 + 访问日志
 - [ ] UMC：文件管理（OSS 策略模式）
+- [ ] 零售：短信/企微触达邀请、邀请码限流
 - [ ] 移动端适配
+
+---
+
+## 架构决策记录（ADR）
+
+重要设计取舍都记录在 [DECISIONS.md](DECISIONS.md)，按时间编号：
+
+| ADR | 主题 |
+|---|---|
+| ADR-004 | H5 移动端独立 Vite 项目，不共享桌面端代码 |
+| ADR-005 | 跨系统 Webhook 用直接 HTTP，而非消息队列 |
+| ADR-006 | OA SLO 催办用 `BackgroundService` 轮询 |
+| ADR-007 | SQLite Schema 模型驱动自愈（替代 EF Migrations） |
+| **ADR-008** | 零售走「独立服务 + `tenant_id` 只落零售库」，不把多租户侵入 UMC |
+| **ADR-009** | 一人多租户的身份切换 = token 携带租户全集 + `X-Tenant-Id` 服务端校验 |
+| **ADR-010** | **UMC 是唯一用户主数据源**（修正 ADR-008 中"零售用户不进 UMC"的错误部分） |
+| **ADR-011** | 存量真实姓名匿名化 + 轻量数据迁移机制 |
+
+> ADR-010 是一次公开的自我纠错：ADR-008 为了"不污染 9 个下游子系统"而把零售用户
+> 挡在 UMC 之外，结果与 UMC「统一用户中心」的定位冲突——运营查不到能登录的人。
+> 现在改为"所有用户统一进 UMC + 下游只同步 `employee`"，两个目标同时满足。
+
+---
+
+## 文档索引
+
+| 文档 | 内容 |
+|---|---|
+| [README.md](README.md) | 本文件：快速开始、架构、测试、安全 |
+| [CLAUDE.md](CLAUDE.md) | AI 协作指南：架构约定、端口表、**已知坑点速查**（Aspire/Keycloak/EF 等） |
+| [DECISIONS.md](DECISIONS.md) | 架构决策记录 ADR-001 ~ ADR-011 |
+| [design/](design/) | 设计方案：零售多租户（含实现日志与缺陷记录）、离散制造排产 |
+| [docs/acceptance/](docs/acceptance/) | 验收清单（零售多租户邀请流程） |
+| [docs/superpowers/](docs/superpowers/) | 阶段性方案与规格 |
+| [ROADMAP.md](ROADMAP.md) · [TODO.md](TODO.md) | 路线图与待办 |
+| [MINIAPP-PLATFORM.md](MINIAPP-PLATFORM.md) | 小程序平台设计（多 realm 取舍等） |
 
 ---
 

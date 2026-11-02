@@ -13,6 +13,8 @@
 | **OctopusFIN** | 财务系统（P13） | 复式记账 / 凭证 / AR / AP，端口 5007 |
 | **OctopusHRM** | 人力资源系统（P14） | 薪酬 / KPI / 假期，端口 5008，→ FIN 自动生成薪资凭证 |
 | **OctopusOMS** | 订单中台（P15） | 多渠道电商订单（淘宝/京东/拼多多/抖音/Shopify/Amazon），端口 5009 |
+| **OctopusRetail** | 零售多租户 | 组织邀请 / 成员管理 / workspace 切换；**独立 Keycloak 身份域**，端口 5010 / 5186 |
+| **OctopusCommon** | 共享库 | 数据迁移执行器、内部接口密钥策略（被 UMC/MES/CRM/WMS/Retail 引用） |
 
 **核心约束**：
 - 开发全程采用 **TDD（测试驱动开发）**，先写测试再写实现
@@ -46,34 +48,48 @@
 │   ├── src/OctopusPLM.Api/
 │   │   ├── Persistence/                  # EF Core：PlmDbContext / PlmDbSeeder
 │   │   └── (db 统一存 repo_root/data/)
-│   ├── tests/OctopusPLM.Api.Tests/       # 22 个集成测试
+│   ├── tests/OctopusPLM.Api.Tests/       # 35 个集成测试
 │   └── web/OctopusPLM.Web/              # Vue 3 + Vite + shadcn-vue + Tailwind v4
 │
 ├── OctopusCRM/
 │   ├── src/OctopusCRM.Api/
 │   │   ├── Persistence/                  # EF Core：CrmDbContext / CrmDbSeeder (10张表)
 │   │   └── (db 统一存 repo_root/data/)
-│   ├── tests/OctopusCRM.Api.Tests/       # 31 个集成测试
+│   ├── tests/OctopusCRM.Api.Tests/       # 38 个集成测试
 │   └── web/OctopusCRM.Web/              # Vue 3 + Vite + shadcn-vue + Tailwind v4（三栏布局，与 OA/PLM 统一）
 │
 ├── OctopusWMS/
 │   ├── src/OctopusWMS.Api/
 │   │   ├── Persistence/                  # EF Core：WmsDbContext / WmsDbSeeder (10张表)
 │   │   └── (db 统一存 repo_root/data/)
-│   ├── tests/OctopusWMS.Api.Tests/       # 23 个集成测试
+│   ├── tests/OctopusWMS.Api.Tests/       # 41 个集成测试
 │   └── web/OctopusWMS.Web/              # Vue 3 + Vite + shadcn-vue + Tailwind v4
 │
 ├── OctopusMES/
 │   ├── src/OctopusMES.Api/
 │   │   ├── Persistence/                  # EF Core：MesDbContext / MesDbSeeder (6张表)
 │   │   └── (db 统一存 repo_root/data/)
-│   ├── tests/OctopusMES.Api.Tests/       # 20 个集成测试
+│   ├── tests/OctopusMES.Api.Tests/       # 117 个集成测试
 │   └── web/OctopusMES.Web/              # Vue 3 + Vite + shadcn-vue + Tailwind v4
+│
+├── OctopusRetail/                        # 零售多租户（独立 Keycloak 身份域）
+│   ├── src/OctopusRetail.Api/
+│   │   ├── Controllers/                  # Invite / Member / Tenant / Workspace
+│   │   ├── Services/                     # InviteService / MemberService / GroupSync*
+│   │   ├── Multitenancy/                 # ITenantContext / TenantResolutionMiddleware
+│   │   └── Persistence/                  # RetailDbContext（fail-closed 租户过滤器）
+│   ├── tests/OctopusRetail.Api.Tests/    # 116 个集成测试
+│   └── web/OctopusRetail.Web/
 │
 ├── OctopusFIN/src/OctopusFIN.Api/        # P13 财务：12 表（科目/凭证/AR/AP/期间/银行/期初）
 ├── OctopusHRM/src/OctopusHRM.Api/        # P14 人力资源：7 表（员工/薪资项/薪资单/明细/假期/KPI/同步用户）
 ├── OctopusOMS/src/OctopusOMS.Api/        # P15 订单中台：7 表（渠道/店铺/订单/明细/SKU 映射/售后/同步用户）
-├── aspire/OctopusAspire.AppHost/         # .NET Aspire 一键启动编排（15+ 个服务，9 个后端 + N 个前端）
+├── OctopusCommon/                        # 共享库：DataMigrationRunner / InternalApiSecret
+├── aspire/OctopusAspire.AppHost/         # .NET Aspire 编排（10 个后端 + 7 个前端 + Keycloak/Postgres 容器）
+├── design/                               # 设计方案（零售多租户、离散制造排产）
+├── docs/acceptance/                      # 验收清单
+├── scripts/                              # 运维脚本（Keycloak 密码/脱敏）
+├── data/                                 # 本地 SQLite（git 忽略）
 ├── CLAUDE.md
 ├── TODO.md
 └── DECISIONS.md
@@ -85,15 +101,15 @@
 
 | 层次 | 技术 | 说明 |
 |---|---|---|
-| 后端运行时 | .NET 8 / .NET 10 | UMC/OA 用 .NET 8；PLM 用 .NET 10 |
+| 后端运行时 | .NET 10 | 全部 10 个子系统 + OctopusCommon 统一 net10.0 |
 | 认证框架 | OpenIddict | OIDC/OAuth2 服务端，MIT 协议 |
-| ORM | EF Core 8 + SQLite | 开发用 SQLite 文件；生产切换 MySQL |
+| ORM | EF Core 10 + SQLite | 开发用 SQLite 文件；生产切换 MySQL |
 | 实时通信 | SignalR | 在线用户、公告推送 |
 | API 文档 | Swagger | XML 注释 + GenerateDocumentationFile |
 | 日志 | Serilog | 控制台 + 文件 + 结构化 |
 | 后端测试 | xUnit + WebApplicationFactory | SQLite 内存模式集成测试 |
 | UMC/OA 前端 | Vue 3 + Vite + pure-admin-thin | Element Plus + UnoCSS |
-| PLM 前端 | Vue 3 + Vite + shadcn-vue | Tailwind CSS v4 + TanStack Table + lucide-vue-next |
+| PLM 前端 | Vue 3 + Vite + shadcn-vue | Tailwind CSS v4 + TanStack Table v9 + **@lucide/vue**（已从 lucide-vue-next 迁移） |
 | OIDC 客户端 | oidc-client-ts | OA.Web / PLM.Web 使用 |
 | 包管理器 | npm | |
 
@@ -144,7 +160,7 @@ dotnet run
 ```
 
 **关键配置要点（AppHost.csproj）**：
-- `TargetFramework`：必须 `net8.0`（net10.0 有 DCP TLS 兼容问题）
+- `TargetFramework`：`net10.0`（历史备注：早期 net10.0 有过 DCP TLS 兼容问题，现已可用）
 - ProjectReference 上加 `<IsAspireProjectResource>true</IsAspireProjectResource>`
 - `AddProject<T>` 后用 `.WithEndpoint("http", e => e.Port = N)` 覆盖端口（不能再调 `WithHttpEndpoint`）
 - `AddViteApp(name, path)`（Aspire 13.x，不是 `AddNpmApp`）
@@ -212,7 +228,7 @@ dotnet run
 | **用户认证** | 注册、登录（Cookie 会话）、登出 |
 | **SSO** | 为 OA 等外部系统提供 SSO，支持 Back-Channel Logout |
 
-### 阶段二：权限体系（已完成，79 个测试）
+### 阶段二：权限体系（已完成；UMC 现有 166 个测试，含用户主数据与密码安全）
 
 | 模块 | 功能描述 |
 |---|---|
@@ -321,7 +337,7 @@ OctopusOA.Api/Persistence/
 
 ## OctopusPLM 功能清单
 
-### 后端（已完成，22 个测试）
+### 后端（已完成，35 个测试）
 
 - **商品状态机**：`draft → pending_review → approved → active → discontinued`（+ `rejected`）
 - **类目树**：多级树形，含属性模板（SPU属性 / SKU维度）
@@ -332,7 +348,7 @@ OctopusOA.Api/Persistence/
 
 ### 前端（已完成）
 
-- **UI 栈**：shadcn-vue + Tailwind CSS v4 + TanStack Table + lucide-vue-next
+- **UI 栈**：shadcn-vue + Tailwind CSS v4 + TanStack Table v9 + @lucide/vue
 - **商品列表**：状态栏筛选 + 关键词搜索 + 列设置 + 分页 + 点击行跳转详情
 - **商品详情**：基本信息 + 类目模版版本信息（版本号/创建人/发布人/生效时间）+ 属性 + SKU + 审核历史时间线
 - **商品新增/编辑**：原生 `<select>` 类目选择（扁平化缩进）+ 动态属性 + SKU 矩阵 + 审核历史时间线
@@ -342,7 +358,7 @@ OctopusOA.Api/Persistence/
 
 ## OctopusCRM 功能清单
 
-### 后端（已完成，31 个集成测试）
+### 后端（已完成，38 个集成测试）
 
 - **客户管理**：客户 CRUD + 联系人管理 + 关键词搜索
 - **询盘管理**：询盘创建/分配/关闭，关联客户
@@ -408,7 +424,7 @@ src/lib/
 
 ## OctopusWMS 功能清单
 
-### 后端（已完成，23 个集成测试）
+### 后端（已完成，41 个集成测试）
 
 - **仓库管理**：仓库 CRUD + 自动生成 WH-XXXXXX 编码 + 启/停用
 - **库存管理**：库存查询（按仓库/关键词分页）+ 摘要统计 + 低库存预警 + 手动调整
@@ -448,7 +464,7 @@ src/lib/
 
 ## OctopusMES 功能清单
 
-### 后端（已完成，20 个集成测试）
+### 后端（已完成，117 个集成测试）
 
 - **供应商管理**：供应商 CRUD + 自动生成 SUP-XXXXXX 编码 + A/B/C 等级
 - **采购订单**：采购单 CRUD（PO-yyyyMMdd-XXXX 编码）+ 提交审批 + 批准/驳回 + 金额自动汇总
@@ -489,7 +505,24 @@ Step 1 前端样板  →  Step 2 后端骨架  →  Step 3 接口确认
 Step 6 功能验收  ←  Step 5 SSO打通  ←  Step 4 前后端联调
 ```
 
-**当前状态**：UMC 已完成（102 个测试），OA 已完成（90 个测试），PLM 独立完成（22 个测试），CRM 独立完成（35 个测试），WMS 独立完成（28 个测试），MES 独立完成（20 个测试）。**全平台 297 个测试全部通过**。
+**当前状态（按实际运行统计）**：
+
+| 子系统 | 测试数 |
+|---|---:|
+| UMC | 166 |
+| Retail | 116 |
+| MES | 117 |
+| OA | 100 |
+| WMS | 41 |
+| CRM | 38 |
+| PLM | 35 |
+| FIN | 19 |
+| HRM | 11 |
+| OMS | 10 |
+| **合计** | **653** |
+
+前端 7 个（UMC / OA / PLM / CRM / WMS / MES / Retail），全部通过
+`npx tsc --noEmit` + `npm run build`；CI 覆盖 10 个后端 + 7 个前端。
 
 P6–P9 功能已全部实装：跨系统 Webhook 链路、审批 SLA + 超期检测、限流 + 操作日志（P8）、SignalR 统一通知中心（P9）。
 
@@ -569,6 +602,12 @@ public async Task Login_WithCorrectCredentials_SetsCookieAndReturns200() { }
 | Webhook 接收方 Body 为空 | 中间件在 controller 读前已消费 Body | WMS/CRM 已在 `Program.cs` 中用 `EnableBuffering()` 中间件；OA 新增了同样的中间件 |
 | 启动崩溃 `no such column` / `has no column named` | 实体新增字段后 `EnsureCreated` 不会增量补列 | DbSeeder 第一行调用 `EnsureSchemaUpToDate(db)`：模型驱动遍历 `db.Model.GetEntityTypes()`，缺列就 `ALTER TABLE ADD COLUMN`。已在 OA/PLM/MES 实装，新表用 `GenerateCreateScript + IF NOT EXISTS` 兜底 |
 | 启动崩溃 `no such table` | 新增表后旧 db 不会自动建 | 同上，`GenerateCreateScript()` 重放 CREATE TABLE 时注入 `IF NOT EXISTS` |
+| **`git add` 报 "paths are ignored" 但 `git check-ignore` 说没忽略** | 全局 `~/.gitignore_global` 里有规则（本机是裸 `data`），会匹配任意层级同名目录 | `git add -f`，并建议把全局规则改锚定形式（`/data/`） |
+| **CI 报 `TS2307 Cannot find module './build/plugins'` / `'@/views/contract/…'` 但本地正常** | `.gitignore` 里裸 `build/`、`contract/` 会命中前端**源码目录**，导致文件从未被提交（或同步时被 `git add -A` 跳过） | 规则锚定成 `/build/`、`/contract/`；已跟踪但被忽略的文件要 `git add -f` |
+| **CI 前端 `npx tsc --noEmit` 永远通过（假绿）** | 根 `tsconfig.json` 是 `{ "files": [], "references": [...] }`，裸 `tsc` 一个文件都不编译 | 根配置改为 `extends: ./tsconfig.app.json` **并显式写 `include`**（extends 不继承 include），另需 `src/shims-vue.d.ts` |
+| **本地改完 tsconfig 突然大量 `TS2307 ./App.vue`** | `node_modules/.tmp/*.tsbuildinfo` 陈旧 | `rm -rf node_modules/.tmp` 后重跑；CI 是干净环境不受影响 |
+| **数据迁移"跑了但什么都没改"** | 用 `ExecuteSqlRaw` 执行脚本：EF 会无条件 `string.Format`，注释里的 `{Foo}` 抛 `FormatException` 且被 catch 吞掉 | 共享库 `OctopusCommon.Persistence.DataMigrationRunner` 已改用原始 ADO；测试传 `throwOnError: true` |
+| **内部接口 403，提示"服务端未配置内部接口密钥"** | 密钥策略 fail-closed：非 Development/Test 且未配置 `InternalApi:SharedSecret` 时拒绝 | 编排里注入该配置；本地/测试环境自动回退开发密钥 |
 
 ---
 
