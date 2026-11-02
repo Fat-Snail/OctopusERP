@@ -1,9 +1,8 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
-  ],
+  // 根配置直接继承 app 配置，使 `npx tsc --noEmit`（CI 的第一步）真正检查 src。
+  // 原先是 { "files": [], "references": [...] }：裸 tsc 一个文件都不编译，
+  // 永远返回 0 —— CI 的类型检查对本站是空转。
+  "extends": "./tsconfig.app.json",
   "compilerOptions": {
     "baseUrl": ".",
     "paths": { "@/*": ["src/*"] }

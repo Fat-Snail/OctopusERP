@@ -1,11 +1,13 @@
 {
-  "files": [],
-  "references": [
-    { "path": "./tsconfig.app.json" },
-    { "path": "./tsconfig.node.json" }
-  ],
+  // 根配置继承 app 配置，并**显式**声明 include：
+  // extends 不会可靠地继承 include/files/exclude，缺了它裸 tsc 会把
+  // src 下的文件（含 *.vue 垫片）全部漏掉。
+  "extends": "./tsconfig.app.json",
   "compilerOptions": {
     "baseUrl": ".",
-    "paths": { "@/*": ["src/*"] }
-  }
+    "paths": { "@/*": ["src/*"] },
+    // @vue/tsconfig 默认 types: []；显式声明后 *.vue 垫片与 import.meta.env 才能正常解析
+    "types": ["vite/client"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"]
 }
