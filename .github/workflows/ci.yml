@@ -27,6 +27,14 @@ jobs:
             sln: OctopusWMS/tests/OctopusWMS.Api.Tests/OctopusWMS.Api.Tests.csproj
           - system: OctopusMES
             sln: OctopusMES/tests/OctopusMES.Api.Tests/OctopusMES.Api.Tests.csproj
+          - system: OctopusRetail
+            sln: OctopusRetail/OctopusRetail.sln
+          - system: OctopusFIN
+            sln: OctopusFIN/tests/OctopusFIN.Api.Tests/OctopusFIN.Api.Tests.csproj
+          - system: OctopusHRM
+            sln: OctopusHRM/tests/OctopusHRM.Api.Tests/OctopusHRM.Api.Tests.csproj
+          - system: OctopusOMS
+            sln: OctopusOMS/tests/OctopusOMS.Api.Tests/OctopusOMS.Api.Tests.csproj
     steps:
       - uses: actions/checkout@v4
 
@@ -60,6 +68,8 @@ jobs:
             path: OctopusWMS/web/OctopusWMS.Web
           - name: OctopusMES.Web
             path: OctopusMES/web/OctopusMES.Web
+          - name: OctopusRetail.Web
+            path: OctopusRetail/web/OctopusRetail.Web
     steps:
       - uses: actions/checkout@v4
 

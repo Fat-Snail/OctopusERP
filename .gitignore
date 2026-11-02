@@ -148,8 +148,9 @@ _ReSharper*/
 # StyleCop
 StyleCopReport.xml
 
-# 代码契约
-contract/
+# 代码契约（仅仓库根目录；不要写 contract/ —— 它会误伤
+# OctopusCRM/web/.../src/views/contract/ 这类前端源码目录）
+/contract/
 
 # VS Code 调试配置（如果项目不使用则忽略）
 # .vscode/
@@ -169,7 +170,9 @@ node_modules/
 # 构建输出
 dist/
 dist-ssr/
-build/
+# 仅根目录 build/；不要写 build/ —— 它会误伤 OctopusPLM/web/.../build/
+# 这个 Vite 构建配置源码目录，导致这些文件无法被跟踪、CI checkout 后缺失
+/build/
 .vite/
 
 # 环境变量（本地覆盖）
