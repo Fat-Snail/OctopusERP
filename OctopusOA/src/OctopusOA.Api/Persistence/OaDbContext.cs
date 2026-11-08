@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using OctopusOA.Api.Workflow;
 using System.Text.Json;
 
 namespace OctopusOA.Api.Persistence;
@@ -41,6 +42,13 @@ public class OaDbContext : DbContext
     // ── 会议室 ──
     public DbSet<OaMeetingRoom> MeetingRooms => Set<OaMeetingRoom>();
     public DbSet<OaMeetingBooking> MeetingBookings => Set<OaMeetingBooking>();
+
+    // ── 审批中心（图流程引擎）──
+    public DbSet<FlowDefinition> FlowDefinitions => Set<FlowDefinition>();
+    public DbSet<FlowInstance> FlowInstances => Set<FlowInstance>();
+    public DbSet<FlowTask> FlowTasks => Set<FlowTask>();
+    public DbSet<FlowExecution> FlowExecutions => Set<FlowExecution>();
+    public DbSet<FlowHistory> FlowHistories => Set<FlowHistory>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -180,6 +188,48 @@ public class OaDbContext : DbContext
             e.ToTable("oa_meeting_booking");
             e.HasKey(x => x.Id);
             e.Property(x => x.Id).ValueGeneratedOnAdd();
+        });
+
+        // ── 审批中心（wf_ 前缀，流程库与业务库逻辑分离）──
+        b.Entity<FlowDefinition>(e =>
+        {
+            e.ToTable("wf_definition");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedOnAdd();
+            e.HasIndex(x => x.Code);
+        });
+
+        b.Entity<FlowInstance>(e =>
+        {
+            e.ToTable("wf_instance");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedOnAdd();
+            e.HasIndex(x => new { x.DefinitionId, x.Status });
+        });
+
+        b.Entity<FlowTask>(e =>
+        {
+            e.ToTable("wf_task");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedOnAdd();
+            e.HasIndex(x => new { x.InstanceId, x.Status });
+            e.HasIndex(x => new { x.AssigneeId, x.Status });
+        });
+
+        b.Entity<FlowExecution>(e =>
+        {
+            e.ToTable("wf_execution");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedOnAdd();
+            e.HasIndex(x => x.InstanceId);
+        });
+
+        b.Entity<FlowHistory>(e =>
+        {
+            e.ToTable("wf_history");
+            e.HasKey(x => x.Id);
+            e.Property(x => x.Id).ValueGeneratedOnAdd();
+            e.HasIndex(x => x.InstanceId);
         });
     }
 }

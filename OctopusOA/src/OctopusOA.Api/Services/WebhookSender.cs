@@ -23,6 +23,15 @@ public class WebhookSender(IHttpClientFactory factory, IConfiguration config, IL
         FireAndForget(baseUrl + path, payload, "X-Mes-Signature", secret);
     }
 
+    /// <summary>推送到 WMS（采购审批通过 → 自动入库）</summary>
+    public void PostToWms(string path, object payload)
+    {
+        var baseUrl = config["Webhooks:WmsBaseUrl"];
+        if (string.IsNullOrEmpty(baseUrl)) return;
+        var secret = config["Webhooks:WmsSecret"] ?? "";
+        FireAndForget(baseUrl + path, payload, "X-Wms-Signature", secret);
+    }
+
     /// <summary>P9 — 推送到 UMC 统一通知中心（铃铛 + SignalR 实时推送给目标用户）</summary>
     public void PostToUmcNotify(long userId, string source, string type, string title,
         string? message = null, string? linkUrl = null, string? payloadJson = null)

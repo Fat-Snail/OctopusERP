@@ -58,6 +58,42 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '全部审批' }
       },
       {
+        path: 'flow/pending',
+        name: 'FlowPending',
+        component: () => import('@/views/flow/pending/index.vue'),
+        meta: { title: '待我处理' }
+      },
+      {
+        path: 'flow/apply',
+        name: 'FlowApply',
+        component: () => import('@/views/flow/apply/index.vue'),
+        meta: { title: '发起流程' }
+      },
+      {
+        path: 'flow/mine',
+        name: 'FlowMine',
+        component: () => import('@/views/flow/mine/index.vue'),
+        meta: { title: '我的申请' }
+      },
+      {
+        path: 'flow/definitions',
+        name: 'FlowDefinitions',
+        component: () => import('@/views/flow/definitions/index.vue'),
+        meta: { title: '流程定义' }
+      },
+      {
+        path: 'flow/detail/:id',
+        name: 'FlowDetail',
+        component: () => import('@/views/flow/detail/index.vue'),
+        meta: { title: '流程详情' }
+      },
+      {
+        path: 'flow/designer/:id',
+        name: 'FlowDesigner',
+        component: () => import('@/views/flow/designer/index.vue'),
+        meta: { title: '流程设计' }
+      },
+      {
         path: 'attendance/mine',
         name: 'AttendanceMine',
         component: () => import('@/views/attendance/mine/index.vue'),

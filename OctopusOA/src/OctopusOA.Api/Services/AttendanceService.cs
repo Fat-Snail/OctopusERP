@@ -314,12 +314,16 @@ public class AttendanceService
         }).ToList();
     }
 
-    /// <summary>由 ApprovalService 在 attendance_fix 审批通过时调用</summary>
+    /// <summary>由 ApprovalService 在 attendance_fix 审批通过时调用（旧引擎）</summary>
     public void HandleApprovalFix(Approval approval)
+        => HandleApprovalFix(approval.ApplicantId, approval.FormData, approval.ApprovalId);
+
+    /// <summary>审批中心（图引擎）attendance_fix 通过时调用；approvalId 用于补卡记录关联</summary>
+    public void HandleApprovalFix(long applicantId, string formData, long approvalId = 0)
     {
         try
         {
-            var form = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(approval.FormData);
+            var form = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(formData);
             if (form == null) return;
 
             var fixDate = form.TryGetValue("fixDate", out var d) ? d.GetString() : null;
@@ -332,12 +336,12 @@ public class AttendanceService
             var beijingDt = DateTime.Parse($"{fixDate} {fixTimeStr}");
             var utcDt = beijingDt.AddHours(-8);
 
-            var record = _db.Attendances.FirstOrDefault(a => a.UmcUserId == approval.ApplicantId && a.Date == fixDate);
+            var record = _db.Attendances.FirstOrDefault(a => a.UmcUserId == applicantId && a.Date == fixDate);
             if (record == null)
             {
                 record = new OaAttendance
                 {
-                    UmcUserId = approval.ApplicantId,
+                    UmcUserId = applicantId,
                     Date = fixDate,
                 };
                 _db.Attendances.Add(record);
@@ -361,7 +365,7 @@ public class AttendanceService
             _db.AttendanceFixes.Add(new OaAttendanceFix
             {
                 AttendanceId = record.Id,
-                ApprovalId = approval.ApprovalId,
+                ApprovalId = approvalId,
                 Type = fixType,
                 FixTime = utcDt,
                 Reason = reason,

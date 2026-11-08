@@ -116,17 +116,31 @@ public class WebhookController(MesDbContext db, IConfiguration config, GarmentSc
             return Unauthorized(new { code = 401, msg = err });
 
         var (schedule, wo, error) = await garmentSvc.HandleApprovalCallbackAsync(req.OaApprovalId, req.Approved);
-        if (schedule == null)
-            return Ok(new { code = 404, msg = error, data = (object?)null });
-        if (error != null)
-            return Ok(new { code = 400, msg = error, data = (object?)null });
-        return Ok(new { code = 200, msg = "ok", data = new
+        if (schedule != null)
         {
-            schedule.ScheduleId,
-            schedule.ScheduleStatus,
-            workOrderId = wo?.WorkOrderId,
-            workOrderCode = wo?.WorkOrderCode,
-        }});
+            if (error != null)
+                return Ok(new { code = 400, msg = error, data = (object?)null });
+            return Ok(new { code = 200, msg = "ok", data = new
+            {
+                schedule.ScheduleId,
+                schedule.ScheduleStatus,
+                workOrderId = wo?.WorkOrderId,
+                workOrderCode = wo?.WorkOrderCode,
+            }});
+        }
+
+        // 审批中心回推：服装排程未命中时，尝试采购单（按 OaApprovalId 匹配）
+        var po = await db.PurchaseOrders
+            .FirstOrDefaultAsync(x => x.OaApprovalId == req.OaApprovalId && x.Status == "submitted");
+        if (po != null)
+        {
+            po.Status = req.Approved ? "approved" : "rejected";
+            po.UpdatedAt = DateTime.UtcNow;
+            await db.SaveChangesAsync();
+            return Ok(new { code = 200, msg = "purchase updated", data = new { po.PurchaseId, po.Status } });
+        }
+
+        return Ok(new { code = 404, msg = error, data = (object?)null });
     }
 
     private bool VerifySignature(string secret, out string error)

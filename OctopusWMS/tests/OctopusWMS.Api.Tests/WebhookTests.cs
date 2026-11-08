@@ -138,6 +138,25 @@ public class WebhookTests : IClassFixture<WmsTestFactory>
     }
 
     [Fact]
+    public async Task ReceiveGoods_WithPurchaseInboundType_CreatesPurchaseInbound()
+    {
+        var resp = await PostWithSignature("/api/webhook/receive-goods", new
+        {
+            MesWorkOrderId = 0L,
+            ProductName = $"PUR-{Guid.NewGuid().ToString("N")[..6]}",
+            Quantity = 10m,
+            InboundType = "purchase",
+        });
+        resp.StatusCode.Should().Be(System.Net.HttpStatusCode.OK);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<WmsDbContext>();
+        var purchaseInbound = db.InboundOrders.OrderByDescending(x => x.InboundId)
+            .FirstOrDefault(x => x.InboundType == "purchase");
+        purchaseInbound.Should().NotBeNull();
+    }
+
+    [Fact]
     public async Task ReceiveGoods_WithInvalidSignature_Returns401()
     {
         var resp = await PostWithSignature("/api/webhook/receive-goods",

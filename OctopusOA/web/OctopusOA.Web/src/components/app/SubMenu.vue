@@ -36,6 +36,14 @@ const groups = computed<NavGroup[]>(() => [
     ],
   },
   {
+    group: '审批中心',
+    items: [
+      { label: '待我处理', path: '/flow/pending' },
+      { label: '发起流程', path: '/flow/apply' },
+      { label: '我的申请', path: '/flow/mine' },
+    ],
+  },
+  {
     group: '应用',
     items: [
       { label: '公告中心', path: '/notice/list', badge: props.unreadNoticeCount },
@@ -49,6 +57,7 @@ const groups = computed<NavGroup[]>(() => [
     group: '管理',
     items: [
       { label: '流程模板', path: '/approval/template' },
+      { label: '流程定义', path: '/flow/definitions' },
       { label: '全部审批', path: '/approval/all' },
       { label: '考勤统计', path: '/attendance/stats' },
       { label: '班次管理', path: '/attendance/shift' },

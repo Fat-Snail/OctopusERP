@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Storage;
+using OctopusOA.Api.Workflow;
 
 namespace OctopusOA.Api.Persistence;
 
@@ -20,6 +21,14 @@ public static class OaDbSeeder
         // 服装行业审批模板：幂等(以 TemplateCode = "garment_production" 为 marker)
         try { SeedGarmentTemplates(db); }
         catch (Exception ex) { Console.WriteLine($"[OaDbSeeder] SeedGarmentTemplates 失败(已跳过): {ex.Message}"); }
+
+        // 审批中心：采购订单审批流程定义（图引擎，幂等）
+        try { SeedFlowDefinitions(db); }
+        catch (Exception ex) { Console.WriteLine($"[OaDbSeeder] SeedFlowDefinitions 失败(已跳过): {ex.Message}"); }
+
+        // 审批中心：示例审批数据（待办/已通过/已驳回，幂等）
+        try { SeedFlowDemoData(db); }
+        catch (Exception ex) { Console.WriteLine($"[OaDbSeeder] SeedFlowDemoData 失败(已跳过): {ex.Message}"); }
     }
 
     // ── Schema 自愈：补齐缺失的表与列 ─────────────────────────────
@@ -32,8 +41,8 @@ public static class OaDbSeeder
         if (!wasOpen) conn.Open();
         try
         {
-            // 1) 表级自愈：oa_approval_delegate(P17 新增) 等
-            if (!TableExists(conn, "oa_approval_delegate"))
+            // 1) 表级自愈：无条件重放 CREATE TABLE/INDEX IF NOT EXISTS，
+            //    补齐任何缺失的表/索引（含 wf_* 等新增表），幂等安全
             {
                 var creator = (IRelationalDatabaseCreator)db.GetService<IDatabaseCreator>();
                 var script = creator.GenerateCreateScript();
@@ -54,7 +63,6 @@ public static class OaDbSeeder
                     try { cmd.ExecuteNonQuery(); }
                     catch (Exception ex) { Console.WriteLine($"[OaDbSeeder] 自愈建表跳过: {ex.Message}"); }
                 }
-                Console.WriteLine("[OaDbSeeder] Schema 自愈完成（已补齐缺失的表/索引）");
             }
 
             // 2) 列级自愈：枚举 EF Core 模型，对比每张表的实际列与模型预期列，
@@ -372,6 +380,223 @@ public static class OaDbSeeder
             new WorkflowNode { NodeId = 56, TemplateId = 52, NodeName = "采购主管", NodeOrder = 1, ApproverType = "role", ApproverValue = "oa_admin", SlaHours = 24 },
             new WorkflowNode { NodeId = 57, TemplateId = 52, NodeName = "财务审批", NodeOrder = 2, ApproverType = "role", ApproverValue = "oa_admin", SlaHours = 48 }
         );
+
+        db.SaveChanges();
+    }
+
+    // 审批中心：通用流程定义（图引擎，幂等）
+    private static void SeedFlowDefinitions(OaDbContext db)
+    {
+        string SchemaOf(string templateCode) =>
+            db.Templates.FirstOrDefault(t => t.TemplateCode == templateCode)?.FormSchema ?? "{}";
+
+        if (!db.FlowDefinitions.Any(d => d.Code == "leave"))
+            AddFlowDefinition(db, "leave", "请假审批", "leave", "leave",
+                Chain(
+                    new FlowNode { Id = "start", Type = FlowNodeTypes.Start, Name = "开始" },
+                    new FlowNode { Id = "n1", Type = FlowNodeTypes.Approval, Name = "直属主管审批",
+                        Config = new FlowNodeConfig { ApproverType = "dept_leader", SlaHours = 24 } },
+                    new FlowNode { Id = "n2", Type = FlowNodeTypes.Approval, Name = "HR 确认",
+                        Config = new FlowNodeConfig { ApproverType = "role", ApproverValue = "oa_admin", SlaHours = 48 } },
+                    new FlowNode { Id = "end", Type = FlowNodeTypes.End, Name = "结束" }),
+                SchemaOf("leave"));
+
+        if (!db.FlowDefinitions.Any(d => d.Code == "expense"))
+            AddFlowDefinition(db, "expense", "报销审批", "expense", "expense", ExpenseGraph(), SchemaOf("expense"));
+
+        if (!db.FlowDefinitions.Any(d => d.Code == "attendance_fix"))
+            AddFlowDefinition(db, "attendance_fix", "补卡审批", "attendance_fix", "attendance_fix",
+                Chain(
+                    new FlowNode { Id = "start", Type = FlowNodeTypes.Start, Name = "开始" },
+                    new FlowNode { Id = "n1", Type = FlowNodeTypes.Approval, Name = "直属主管审批",
+                        Config = new FlowNodeConfig { ApproverType = "dept_leader", SlaHours = 8 } },
+                    new FlowNode { Id = "n2", Type = FlowNodeTypes.Approval, Name = "HR 确认",
+                        Config = new FlowNodeConfig { ApproverType = "role", ApproverValue = "oa_admin", SlaHours = 24 } },
+                    new FlowNode { Id = "end", Type = FlowNodeTypes.End, Name = "结束" }),
+                SchemaOf("attendance_fix"));
+
+        if (!db.FlowDefinitions.Any(d => d.Code == "purchase_order"))
+            AddFlowDefinition(db, "purchase_order", "采购订单审批", "purchase", "purchase_order", PurchaseGraph(),
+                """{"fields":[{"key":"supplierName","label":"供应商","type":"text","required":true},{"key":"productName","label":"商品名称","type":"text","required":true},{"key":"productPicker","label":"商品选择（自定义组件）","type":"text","componentId":"demo:product-picker"},{"key":"plmProductId","label":"PLM商品ID","type":"number"},{"key":"spec","label":"规格","type":"text"},{"key":"unit","label":"单位","type":"text"},{"key":"quantity","label":"数量","type":"number","required":true},{"key":"amount","label":"金额(元)","type":"number","required":true},{"key":"reason","label":"采购说明","type":"textarea"}],"extensions":[{"type":"iframe","slot":"after_form","title":"采购单明细（来自 MES）","url":"/subsystem-demo.html","height":220}]}""");
+    }
+
+    private static void AddFlowDefinition(OaDbContext db, string code, string name, string category, string businessKey, FlowGraph graph, string formSchema)
+    {
+        db.FlowDefinitions.Add(new FlowDefinition
+        {
+            Code = code,
+            Name = name,
+            Category = category,
+            BusinessKey = businessKey,
+            Version = 1,
+            Status = 1,
+            GraphJson = graph.ToJson(),
+            FormSchema = formSchema,
+        });
+        db.SaveChanges();
+    }
+
+    private static FlowGraph Chain(params FlowNode[] nodes)
+    {
+        var graph = new FlowGraph();
+        graph.Nodes.AddRange(nodes);
+        for (int i = 0; i < nodes.Length - 1; i++)
+            graph.Edges.Add(new FlowEdge { From = nodes[i].Id, To = nodes[i + 1].Id });
+        return graph;
+    }
+
+    private static FlowGraph ExpenseGraph() => new()
+    {
+        Nodes =
+        {
+            new FlowNode { Id = "start", Type = FlowNodeTypes.Start, Name = "开始" },
+            new FlowNode { Id = "n1", Type = FlowNodeTypes.Approval, Name = "直属主管审批",
+                Config = new FlowNodeConfig { ApproverType = "dept_leader", SlaHours = 24 } },
+            new FlowNode { Id = "n2", Type = FlowNodeTypes.Approval, Name = "财务审核",
+                Config = new FlowNodeConfig { ApproverType = "role", ApproverValue = "oa_admin", SlaHours = 48 } },
+            new FlowNode { Id = "gw", Type = FlowNodeTypes.ExclusiveGateway, Name = "金额分支" },
+            new FlowNode { Id = "n3", Type = FlowNodeTypes.Approval, Name = "总经理审批",
+                Config = new FlowNodeConfig { ApproverType = "user", ApproverValue = "1", SlaHours = 72 } },
+            new FlowNode { Id = "end", Type = FlowNodeTypes.End, Name = "结束" },
+        },
+        Edges =
+        {
+            new FlowEdge { From = "start", To = "n1" },
+            new FlowEdge { From = "n1", To = "n2" },
+            new FlowEdge { From = "n2", To = "gw" },
+            new FlowEdge { From = "gw", To = "n3", Condition = "amount >= 100000" },
+            new FlowEdge { From = "gw", To = "end" },
+            new FlowEdge { From = "n3", To = "end" },
+        },
+    };
+
+    private static FlowGraph PurchaseGraph() => new()
+    {
+        Nodes =
+        {
+            new FlowNode { Id = "start", Type = FlowNodeTypes.Start, Name = "开始" },
+            new FlowNode { Id = "n1", Type = FlowNodeTypes.Approval, Name = "采购主管审批",
+                Config = new FlowNodeConfig { ApproverType = "dept_leader", SlaHours = 24 } },
+            new FlowNode { Id = "n2", Type = FlowNodeTypes.Approval, Name = "财务审核",
+                Config = new FlowNodeConfig { ApproverType = "role", ApproverValue = "oa_admin", SlaHours = 48 } },
+            new FlowNode { Id = "gw", Type = FlowNodeTypes.ExclusiveGateway, Name = "金额分支" },
+            new FlowNode { Id = "n3", Type = FlowNodeTypes.Approval, Name = "总经理审批",
+                Config = new FlowNodeConfig { ApproverType = "user", ApproverValue = "1", SlaHours = 72 } },
+            new FlowNode { Id = "svc", Type = FlowNodeTypes.ServiceTask, Name = "创建WMS入库单",
+                Config = new FlowNodeConfig { ServiceKind = "create_wms_inbound" } },
+            new FlowNode { Id = "end", Type = FlowNodeTypes.End, Name = "结束" },
+        },
+        Edges =
+        {
+            new FlowEdge { From = "start", To = "n1" },
+            new FlowEdge { From = "n1", To = "n2" },
+            new FlowEdge { From = "n2", To = "gw" },
+            new FlowEdge { From = "gw", To = "n3", Condition = "amount >= 100000" },
+            new FlowEdge { From = "gw", To = "svc" },
+            new FlowEdge { From = "n3", To = "svc" },
+            new FlowEdge { From = "svc", To = "end" },
+        },
+    };
+
+    // 审批中心：示例审批数据（待办/已通过/已驳回，幂等）
+    private static void SeedFlowDemoData(OaDbContext db)
+    {
+        if (db.FlowInstances.Any()) return;
+
+        long DefId(string code) => db.FlowDefinitions.First(d => d.Code == code).Id;
+        var now = DateTime.UtcNow;
+
+        FlowInstance AddInstance(string defCode, string title, long applicantId, string applicantName,
+            string formData, string status, DateTime createTime, string? businessKey = null)
+        {
+            var inst = new FlowInstance
+            {
+                DefinitionId = DefId(defCode),
+                DefinitionVersion = 1,
+                BusinessKey = businessKey,
+                Title = title,
+                ApplicantId = applicantId,
+                ApplicantName = applicantName,
+                Status = status,
+                FormData = formData,
+                CreateTime = createTime,
+                UpdateTime = createTime,
+            };
+            db.FlowInstances.Add(inst);
+            db.SaveChanges();
+            return inst;
+        }
+
+        // 1) 待办：张三请假（主管节点待审）
+        var leave = AddInstance("leave", "张三的请假申请（示例）", 2, "张三",
+            """{"leaveType":"annual","startDate":"2026-03-10","endDate":"2026-03-11","days":2,"reason":"家中有事"}""",
+            "pending", now.AddDays(-1));
+        var leaveExec = new FlowExecution { InstanceId = leave.Id, NodeId = "n1", Status = "active" };
+        db.FlowExecutions.Add(leaveExec);
+        db.SaveChanges();
+        db.FlowTasks.Add(new FlowTask { InstanceId = leave.Id, NodeId = "n1", ExecutionId = leaveExec.Id, AssigneeId = 1, AssigneeName = "超级管理员", Status = "pending", CreateTime = now.AddDays(-1) });
+
+        // 2) 待办：李四报销 5000（主管节点待审）
+        var expense = AddInstance("expense", "李四的报销申请（示例）", 3, "李四",
+            """{"expenseType":"travel","amount":5000,"description":"上海出差"}""",
+            "pending", now.AddDays(-1));
+        var expenseExec = new FlowExecution { InstanceId = expense.Id, NodeId = "n1", Status = "active" };
+        db.FlowExecutions.Add(expenseExec);
+        db.SaveChanges();
+        db.FlowTasks.Add(new FlowTask { InstanceId = expense.Id, NodeId = "n1", ExecutionId = expenseExec.Id, AssigneeId = 1, AssigneeName = "超级管理员", Status = "pending", CreateTime = now.AddDays(-1) });
+
+        // 3) 待办：张三补卡（主管节点待审）
+        var fix = AddInstance("attendance_fix", "张三的补卡申请（示例）", 2, "张三",
+            """{"fixDate":"2026-03-05","fixType":"checkIn","fixTime":"09:20","reason":"忘记打卡"}""",
+            "pending", now.AddHours(-6));
+        var fixExec = new FlowExecution { InstanceId = fix.Id, NodeId = "n1", Status = "active" };
+        db.FlowExecutions.Add(fixExec);
+        db.SaveChanges();
+        db.FlowTasks.Add(new FlowTask { InstanceId = fix.Id, NodeId = "n1", ExecutionId = fixExec.Id, AssigneeId = 1, AssigneeName = "超级管理员", Status = "pending", CreateTime = now.AddHours(-6) });
+
+        // 4) 待办：采购面料 8 万（采购主管节点待审）
+        var purchase = AddInstance("purchase_order", "采购面料 8 万（示例）", 2, "张三",
+            """{"supplierName":"供应商A","productName":"面料X","quantity":100,"amount":80000}""",
+            "pending", now.AddHours(-3), "purchase_order:9001");
+        var purchaseExec = new FlowExecution { InstanceId = purchase.Id, NodeId = "n1", Status = "active" };
+        db.FlowExecutions.Add(purchaseExec);
+        db.SaveChanges();
+        db.FlowTasks.Add(new FlowTask { InstanceId = purchase.Id, NodeId = "n1", ExecutionId = purchaseExec.Id, AssigneeId = 1, AssigneeName = "超级管理员", Status = "pending", CreateTime = now.AddHours(-3) });
+
+        // 5) 已通过：李四报销 3000（三节点）
+        var approved = AddInstance("expense", "李四的报销申请-已通过（示例）", 3, "李四",
+            """{"expenseType":"travel","amount":3000,"description":"北京出差"}""",
+            "approved", now.AddDays(-3));
+        db.FlowExecutions.Add(new FlowExecution { InstanceId = approved.Id, NodeId = "end", Status = "completed" });
+        foreach (var (nodeId, nodeName) in new[] { ("n1", "直属主管审批"), ("n2", "财务审核"), ("n3", "总经理审批") })
+        {
+            db.FlowTasks.Add(new FlowTask
+            {
+                InstanceId = approved.Id, NodeId = nodeId, AssigneeId = 1, AssigneeName = "超级管理员",
+                Status = "approved", Action = "approve", Comment = "同意", ActionTime = now.AddDays(-2),
+            });
+            db.FlowHistories.Add(new FlowHistory
+            {
+                InstanceId = approved.Id, NodeId = nodeId, NodeName = nodeName, Action = "approve",
+                ActorId = 1, ActorName = "超级管理员", Comment = "同意", CreateTime = now.AddDays(-2),
+            });
+        }
+
+        // 6) 已驳回：张三请假（主管驳回）
+        var rejected = AddInstance("leave", "张三的请假申请-已驳回（示例）", 2, "张三",
+            """{"leaveType":"personal","startDate":"2026-03-20","endDate":"2026-03-25","days":5,"reason":"事假"}""",
+            "rejected", now.AddDays(-2));
+        db.FlowExecutions.Add(new FlowExecution { InstanceId = rejected.Id, NodeId = "n1", Status = "cancelled" });
+        db.FlowTasks.Add(new FlowTask
+        {
+            InstanceId = rejected.Id, NodeId = "n1", AssigneeId = 1, AssigneeName = "超级管理员",
+            Status = "rejected", Action = "reject", Comment = "请假天数过多", ActionTime = now.AddDays(-1),
+        });
+        db.FlowHistories.Add(new FlowHistory
+        {
+            InstanceId = rejected.Id, NodeId = "n1", NodeName = "直属主管审批", Action = "reject",
+            ActorId = 1, ActorName = "超级管理员", Comment = "请假天数过多", CreateTime = now.AddDays(-1),
+        });
 
         db.SaveChanges();
     }

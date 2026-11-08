@@ -80,10 +80,23 @@ export interface FormField {
   type: 'select' | 'date' | 'number' | 'textarea' | 'text' | 'file'
   options?: { label: string; value: string }[]
   required?: boolean
+  /// <summary>L3：自定义组件 id（设置后优先用组件渲染，忽略 type）</summary>
+  componentId?: string
+}
+
+/// <summary>表单扩展视图：L2 远程视图（iframe）/ L3 自定义组件（componentId）</summary>
+export interface FormExtension {
+  slot?: 'before_form' | 'after_form'
+  type: 'iframe' | 'component'
+  title?: string
+  url?: string
+  componentId?: string
+  height?: number
 }
 
 export interface FormSchema {
   fields: FormField[]
+  extensions?: FormExtension[]
 }
 
 export type ApprovalStatus = 'draft' | 'pending' | 'approved' | 'rejected' | 'cancelled'

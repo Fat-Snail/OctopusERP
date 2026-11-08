@@ -107,6 +107,16 @@ builder.Services.AddRateLimiter(o =>
     });
 });
 
+// 审批中心：图流程引擎（Scoped，跟随 DbContext）
+builder.Services.AddScoped<OctopusOA.Api.Workflow.ApproverStrategyRegistry>();
+builder.Services.AddScoped<OctopusOA.Api.Workflow.IFlowEngine, OctopusOA.Api.Workflow.FlowEngine>();
+// 审批中心扩展点：服务任务处理器 + 事件监听器（二次开发注册在此）
+builder.Services.AddScoped<OctopusOA.Api.Workflow.IServiceTaskHandler, OctopusOA.Api.Services.CreateWmsInboundHandler>();
+builder.Services.AddScoped<OctopusOA.Api.Workflow.IProcessEventListener, OctopusOA.Api.Services.PurchaseApprovedListener>();
+builder.Services.AddScoped<OctopusOA.Api.Workflow.IProcessEventListener, OctopusOA.Api.Services.AttendanceFixListener>();
+builder.Services.AddScoped<OctopusOA.Api.Workflow.ServiceTaskHandlerRegistry>();
+builder.Services.AddScoped<OctopusOA.Api.Workflow.ProcessEventDispatcher>();
+
 // Services（Scoped，跟随 DbContext）
 builder.Services.AddScoped<OctopusOA.Api.Services.ApprovalService>();
 builder.Services.AddScoped<OctopusOA.Api.Services.EmployeeService>();
@@ -125,6 +135,10 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<OaDbContext>();
     db.Database.EnsureCreated();
     OaDbSeeder.Seed(db);
+
+    // 存量/示例数据迁移（只执行一次；Seeder 只负责空库）
+    var migLogger = scope.ServiceProvider.GetRequiredService<ILoggerFactory>().CreateLogger("OaDataMigration");
+    DataMigrationRunner.Apply(db, msg => migLogger.LogWarning("{Msg}", msg));
 }
 
 app.UseMiddleware<OctopusOA.Api.Middleware.GlobalExceptionMiddleware>();

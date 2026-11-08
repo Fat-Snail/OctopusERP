@@ -1,13 +1,22 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import type { FormField } from '@/api/approval/types'
+import type { FormExtension, FormField } from '@/api/approval/types'
+import { getFormComponent } from '@/lib/formComponentRegistry'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
 
 const props = defineProps<{
   fields: FormField[]
   modelValue: Record<string, unknown>
   readonly?: boolean
+  extensions?: FormExtension[]
 }>()
+
+const beforeExtensions = computed(() =>
+  (props.extensions ?? []).filter(e => (e.slot ?? 'after_form') === 'before_form')
+)
+const afterExtensions = computed(() =>
+  (props.extensions ?? []).filter(e => (e.slot ?? 'after_form') !== 'before_form')
+)
 
 const emit = defineEmits<{
   (e: 'update:modelValue', val: Record<string, unknown>): void
@@ -30,6 +39,10 @@ function selectLabel(field: FormField, value: unknown): string {
   return field.options?.find(o => o.value === str)?.label ?? str
 }
 
+function resolveFieldComponent(field: FormField) {
+  return field.componentId ? getFormComponent(field.componentId) : undefined
+}
+
 async function validate(): Promise<boolean> {
   errors.value = {}
   let valid = true
@@ -47,6 +60,18 @@ defineExpose({ validate })
 
 <template>
   <div class="space-y-4">
+    <!-- 扩展视图：表单之前 -->
+    <template v-for="(ext, i) in beforeExtensions" :key="'ext-b-' + i">
+      <div class="border border-border rounded-[var(--radius-lg)] overflow-hidden">
+        <div v-if="ext.title" class="px-3 py-2 text-[12px] font-medium bg-subtle border-b border-border">{{ ext.title }}</div>
+        <iframe v-if="ext.type === 'iframe' && ext.url" :src="ext.url" :title="ext.title ?? '子系统视图'"
+          class="w-full bg-card" :style="{ height: (Number(ext.height) || 240) + 'px' }" />
+        <div v-else class="p-3 text-[11px] text-muted-foreground">
+          {{ ext.type === 'component' ? `自定义组件 ${ext.componentId ?? ''}（未注册）` : '未配置视图 URL' }}
+        </div>
+      </div>
+    </template>
+
     <div v-for="field in fields" :key="field.key" class="flex gap-3">
       <label class="w-24 shrink-0 text-[12px] text-right text-foreground pt-1.5">
         <span v-if="field.required && !readonly" class="text-danger mr-0.5">*</span>
@@ -56,8 +81,11 @@ defineExpose({ validate })
 
         <!-- ── Readonly display ── -->
         <template v-if="readonly">
+          <!-- L3 自定义组件（只读） -->
+          <component v-if="resolveFieldComponent(field)" :is="resolveFieldComponent(field)"
+            :model-value="formData[field.key]" :readonly="true" />
           <!-- Select: look up label directly from options -->
-          <span v-if="field.type === 'select'" class="flex items-center h-[var(--row-h)] text-[12px] text-foreground">
+          <span v-else-if="field.type === 'select'" class="flex items-center h-[var(--row-h)] text-[12px] text-foreground">
             {{ selectLabel(field, formData[field.key]) }}
           </span>
           <!-- All other types: plain text -->
@@ -68,9 +96,13 @@ defineExpose({ validate })
 
         <!-- ── Editable controls ── -->
         <template v-else>
+          <!-- L3 自定义组件优先 -->
+          <component v-if="resolveFieldComponent(field)" :is="resolveFieldComponent(field)"
+            :model-value="formData[field.key]"
+            @update:model-value="updateField(field.key, $event)" />
           <!-- Select -->
           <Select
-            v-if="field.type === 'select'"
+            v-else-if="field.type === 'select'"
             :model-value="(formData[field.key] ?? '') as string"
             @update:model-value="updateField(field.key, $event)"
           >
@@ -124,5 +156,17 @@ defineExpose({ validate })
 
       </div>
     </div>
+
+    <!-- 扩展视图：表单之后 -->
+    <template v-for="(ext, i) in afterExtensions" :key="'ext-a-' + i">
+      <div class="border border-border rounded-[var(--radius-lg)] overflow-hidden">
+        <div v-if="ext.title" class="px-3 py-2 text-[12px] font-medium bg-subtle border-b border-border">{{ ext.title }}</div>
+        <iframe v-if="ext.type === 'iframe' && ext.url" :src="ext.url" :title="ext.title ?? '子系统视图'"
+          class="w-full bg-card" :style="{ height: (Number(ext.height) || 240) + 'px' }" />
+        <div v-else class="p-3 text-[11px] text-muted-foreground">
+          {{ ext.type === 'component' ? `自定义组件 ${ext.componentId ?? ''}（未注册）` : '未配置视图 URL' }}
+        </div>
+      </div>
+    </template>
   </div>
 </template>

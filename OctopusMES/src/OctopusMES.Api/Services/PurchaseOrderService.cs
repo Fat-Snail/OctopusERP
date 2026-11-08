@@ -3,7 +3,7 @@ using OctopusMES.Api.Persistence;
 
 namespace OctopusMES.Api.Services;
 
-public class PurchaseOrderService(MesDbContext db)
+public class PurchaseOrderService(MesDbContext db, IOaFlowClient oaFlow)
 {
     public async Task<object> GetListAsync(string? status, long? supplierId, int pageNum, int pageSize)
     {
@@ -34,11 +34,21 @@ public class PurchaseOrderService(MesDbContext db)
 
     public async Task<MesPurchaseOrder?> SubmitAsync(long id)
     {
-        var po = await db.PurchaseOrders.FindAsync(id);
+        var po = await db.PurchaseOrders
+            .Include(x => x.Items).Include(x => x.Supplier)
+            .FirstOrDefaultAsync(x => x.PurchaseId == id);
         if (po is null || po.Status != "draft") return null;
         po.Status = "submitted";
         po.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
+
+        // 接入审批中心：发起采购流程并回填流程实例 id（未配置 OA 时为空操作）
+        var instanceId = await oaFlow.SubmitPurchaseAsync(po);
+        if (instanceId.HasValue)
+        {
+            po.OaApprovalId = instanceId.Value;
+            await db.SaveChangesAsync();
+        }
         return po;
     }
 

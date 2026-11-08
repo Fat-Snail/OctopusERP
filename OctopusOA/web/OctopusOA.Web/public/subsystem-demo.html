@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>子系统只读视图（示例）</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; padding: 14px; background: #f8fafc; color: #0f172a; }
+    .card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px; }
+    h3 { margin: 0 0 10px; font-size: 14px; display: flex; align-items: center; gap: 8px; }
+    .tag { display: inline-block; background: #e0f2fe; color: #0369a1; border-radius: 999px; padding: 1px 8px; font-size: 11px; font-weight: 400; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    td { padding: 6px 4px; border-bottom: 1px solid #f1f5f9; }
+    td:first-child { color: #64748b; width: 110px; }
+    .hint { font-size: 11px; color: #94a3b8; margin: 10px 0 0; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h3>采购单明细 <span class="tag">来自 MES（只读）</span></h3>
+    <table>
+      <tr><td>供应商</td><td>供应商A</td></tr>
+      <tr><td>商品</td><td>面料X</td></tr>
+      <tr><td>数量</td><td>100 米</td></tr>
+      <tr><td>金额</td><td>¥80,000.00</td></tr>
+      <tr><td>期望到货</td><td>2026-03-20</td></tr>
+    </table>
+    <p class="hint">
+      这是 L2「远程视图」示例：审批中心通过 iframe 嵌入子系统只读页，不复制业务数据。
+    </p>
+  </div>
+</body>
+</html>

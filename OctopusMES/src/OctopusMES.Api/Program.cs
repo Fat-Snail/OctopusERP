@@ -67,6 +67,7 @@ builder.Services.AddAuthorization(options =>
 
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<WebhookSender>();
+builder.Services.AddScoped<IOaFlowClient, HttpOaFlowClient>();
 builder.Services.AddScoped<IPlmSyncAlertSink, PlmSyncAlertSink>();
 
 // 限流：固定窗口 100次/分钟/IP

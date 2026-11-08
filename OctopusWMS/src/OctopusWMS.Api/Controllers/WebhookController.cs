@@ -50,7 +50,7 @@ public class WebhookController(WmsDbContext db, IConfiguration config) : Control
         var inbound = new WmsInboundOrder
         {
             InboundCode = $"IN-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString("N")[..4].ToUpper()}",
-            InboundType = "production",
+            InboundType = req.InboundType ?? "production",
             WarehouseId = warehouse.WarehouseId,
             MesWorkOrderId = req.MesWorkOrderId,
             Status = "completed",
@@ -137,4 +137,5 @@ public record ReceiveGoodsRequest(
     string ProductName,
     string? Spec,
     string? Unit,
-    decimal Quantity);
+    decimal Quantity,
+    string? InboundType = "production");
