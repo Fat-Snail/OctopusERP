@@ -15,8 +15,8 @@
 
   <ItemGroup>
     <!-- 数据迁移执行器需要 DbContext / DbConnection（GetDbConnection 在 Relational 包里） -->
-    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.12" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="10.0.12" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="11.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Relational" Version="11.0.0" />
   </ItemGroup>
 
 </Project>

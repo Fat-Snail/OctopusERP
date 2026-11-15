@@ -133,9 +133,10 @@ public class VectorService : IDisposable
             var vector = GetImageVector(imageBytes);
             if (vector is null) return ([], "");
 
-            var hits = await _qdrant.SearchAsync(
+            // Qdrant.Client 1.20 起 SearchAsync 已过时，改用 QueryAsync + Query.Nearest
+            var hits = await _qdrant.QueryAsync(
                 collectionName: Collection,
-                vector: vector,
+                query: new Query { Nearest = vector },
                 limit: (ulong)limit,
                 payloadSelector: new WithPayloadSelector { Enable = true },
                 scoreThreshold: 0.20f); // CLIP 余弦相似度阈值

@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <!--
-      .NET 10 + Aspire 13.x：不再需要 IsAspireHost（workload 已弃用）。
+      .NET 11 + Aspire 13.x：不再需要 IsAspireHost（workload 已弃用）。
       Aspire.Hosting.AppHost NuGet 包内置源码生成器，
       自动将 ProjectReference 转换为 Projects.OctopusUMC_Api / Projects.OctopusOA_Api 类型。
     -->
@@ -24,7 +24,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Aspire 13.x（与 .NET 10 SDK 对齐，无需 workload） -->
+    <!-- Aspire 13.x（与 .NET 11 SDK 对齐，无需 workload） -->
     <!-- 所有 Aspire 包必须使用相同版本！否则会触发 MissingMethodException
          （13.3 引入了 ExecutableResource 构造函数新参数，旧 JavaScript 包调用会崩） -->
     <PackageReference Include="Aspire.Hosting.AppHost"    Version="13.6.1" />

@@ -438,7 +438,7 @@ dotnet test --filter "Flow" --logger "console;verbosity=detailed"
 - [ ] 短信发送（需短信服务商账号，如阿里云 SMS / 腾讯 SMS）
 
 ## ✅ Phase 6：DevOps（2026-05-04）
-- [x] 六个项目各自编写 Dockerfile（.NET 10 多阶段构建：SDK → aspnet runtime）
+- [x] 六个项目各自编写 Dockerfile（.NET 11 多阶段构建：SDK → aspnet runtime）
 - [x] 六个前端 Dockerfile（Node 22 构建 + nginx:stable-alpine 托管）+ nginx.conf（SPA fallback + /api 反向代理）
 - [x] docker-compose.yml（12 个服务，端口 5001-5006 / 5173-5178，healthcheck + 依赖链）
 - [x] GitHub Actions CI 流水线（.github/workflows/ci.yml）：后端 dotnet test × 6 + 前端 tsc + build × 6 + compose 语法校验

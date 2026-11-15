@@ -101,9 +101,9 @@
 
 | 层次 | 技术 | 说明 |
 |---|---|---|
-| 后端运行时 | .NET 10 | 全部 10 个子系统 + OctopusCommon 统一 net10.0 |
-| 认证框架 | OpenIddict | OIDC/OAuth2 服务端，MIT 协议 |
-| ORM | EF Core 10 + SQLite | 开发用 SQLite 文件；生产切换 MySQL |
+| 后端运行时 | .NET 11 | 全部 10 个子系统 + OctopusCommon 统一 net11.0（SDK 11.0.100） |
+| 认证框架 | OpenIddict 7.8 | OIDC/OAuth2 服务端，MIT 协议 |
+| ORM | EF Core 11 + SQLite | 开发用 SQLite 文件；生产切换 MySQL（`MySql.EntityFrameworkCore` 仍为 10.0.12，见 README「版本基线与上游阻塞项」） |
 | 实时通信 | SignalR | 在线用户、公告推送 |
 | API 文档 | Swagger | XML 注释 + GenerateDocumentationFile |
 | 日志 | Serilog | 控制台 + 文件 + 结构化 |
@@ -160,7 +160,7 @@ dotnet run
 ```
 
 **关键配置要点（AppHost.csproj）**：
-- `TargetFramework`：`net10.0`（历史备注：早期 net10.0 有过 DCP TLS 兼容问题，现已可用）
+- `TargetFramework`：`net11.0`（历史备注：早期 net10.0 有过 DCP TLS 兼容问题，现已可用）
 - ProjectReference 上加 `<IsAspireProjectResource>true</IsAspireProjectResource>`
 - `AddProject<T>` 后用 `.WithEndpoint("http", e => e.Port = N)` 覆盖端口（不能再调 `WithHttpEndpoint`）
 - `AddViteApp(name, path)`（Aspire 13.x，不是 `AddNpmApp`）
@@ -511,15 +511,15 @@ Step 6 功能验收  ←  Step 5 SSO打通  ←  Step 4 前后端联调
 |---|---:|
 | UMC | 166 |
 | Retail | 116 |
-| MES | 117 |
-| OA | 100 |
-| WMS | 41 |
+| MES | 120 |
+| OA | 131 |
+| WMS | 42 |
 | CRM | 38 |
 | PLM | 35 |
 | FIN | 19 |
 | HRM | 11 |
 | OMS | 10 |
-| **合计** | **653** |
+| **合计** | **688** |
 
 前端 7 个（UMC / OA / PLM / CRM / WMS / MES / Retail），全部通过
 `npx tsc --noEmit` + `npm run build`；CI 覆盖 10 个后端 + 7 个前端。

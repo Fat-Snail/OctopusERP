@@ -35,7 +35,9 @@ public class SmtpEmailService : IEmailService
         await client.ConnectAsync(_cfg.Host, _cfg.Port, socketOption);
         if (!string.IsNullOrEmpty(_cfg.UserName))
             await client.AuthenticateAsync(_cfg.UserName, _cfg.Password);
-        await client.SendAsync(message);
+        // MailKit 5.0 起 SendAsync 的实例重载改为接收 ISendRequest；
+        // 直接传 MimeMessage 的用法迁到 MailKit.IMailTransportExtensions.SendAsync 扩展方法。
+        await MailKit.IMailTransportExtensions.SendAsync(client, message);
         await client.DisconnectAsync(true);
     }
 }

@@ -5,11 +5,11 @@
 **企业级多系统一体化平台 · 统一身份认证 · 办公自动化 · 商品生命周期管理**
 
 [![Built with Claude Code](https://img.shields.io/badge/Built%20with-Claude%20Code-6B46C1?logo=anthropic&logoColor=white)](https://claude.ai/code)
-[![.NET](https://img.shields.io/badge/.NET-10.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com)
+[![.NET](https://img.shields.io/badge/.NET-11.0-512BD4?logo=dotnet)](https://dotnet.microsoft.com)
 [![Vue](https://img.shields.io/badge/Vue-3.5-4FC08D?logo=vuedotjs)](https://vuejs.org)
 [![OpenIddict](https://img.shields.io/badge/OpenIddict-7.x-blue)](https://github.com/openiddict/openiddict-core)
-[![Aspire](https://img.shields.io/badge/Aspire-13.2.4-512BD4?logo=dotnet)](https://learn.microsoft.com/aspire)
-[![Tests](https://img.shields.io/badge/Tests-653%20passing-brightgreen)](#测试覆盖)
+[![Aspire](https://img.shields.io/badge/Aspire-13.6.1-512BD4?logo=dotnet)](https://learn.microsoft.com/aspire)
+[![Tests](https://img.shields.io/badge/Tests-688%20passing-brightgreen)](#测试覆盖)
 [![CI](https://img.shields.io/badge/CI-10%20services%20%C3%97%207%20frontends-blue)](#持续集成)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
@@ -70,7 +70,7 @@ CLAUDE.md           ← 项目系统提示词（架构、规范、已知坑点�
 | 多步操作容易出错 | `commands/` 提供精确的操作步骤和成功标准 |
 | PR 质量难以保证 | `agents/code-reviewer` 自动输出结构化审查报告 |
 
-**653 个集成测试、10 个服务、OIDC SSO + 多租户、自定义审批引擎** — 全部在 Harness 约束下，由 Claude Code 辅助完成，无架构漂移。
+**688 个集成测试、10 个服务、OIDC SSO + 多租户、自定义审批引擎** — 全部在 Harness 约束下，由 Claude Code 辅助完成，无架构漂移。
 
 > 📁 可复用的 Harness 模板在 [`harness-template/`](./harness-template) 目录，附完整使用说明。
 
@@ -127,17 +127,17 @@ CLAUDE.md           ← 项目系统提示词（架构、规范、已知坑点�
 
 | 技术 | 版本 | 用途 |
 |------|------|------|
-| .NET | 10.0 | 运行时 |
-| ASP.NET Core | 10.0 | Web 框架 |
-| OpenIddict | 7.7 | OIDC/OAuth2 服务端（IdP） |
-| EF Core | 10.0 | ORM |
+| .NET | 11.0 | 运行时 |
+| ASP.NET Core | 11.0 | Web 框架 |
+| OpenIddict | 7.8 | OIDC/OAuth2 服务端（IdP） |
+| EF Core | 11.0 | ORM |
 | SQLite | — | 开发环境持久化 |
 | MySQL | 8.0 | 生产环境数据库 |
 | SignalR | — | 实时通信（公告推送、在线用户） |
 | Serilog | 10.0 | 结构化日志 |
-| xUnit | 2.x | 集成测试框架 |
-| ONNX Runtime | 1.20.1 | CLIP 视觉模型推理（PLM 以图搜商品） |
-| SixLabors.ImageSharp | 3.1.6 | 图像预处理（PLM 以图搜商品） |
+| xUnit | 2.9 | 集成测试框架 |
+| ONNX Runtime | 1.32.0 | CLIP 视觉模型推理（PLM 以图搜商品） |
+| SixLabors.ImageSharp | 4.1.3 | 图像预处理（PLM 以图搜商品） |
 | **Keycloak** | 26.x | **零售域身份源**（realm `octopus`，HTTPS :8088） |
 | BCrypt.Net-Next | 4.2.1 | 密码哈希 |
 | ASP.NET RateLimiter | 内置 | 登录 10 次/分钟、其余 100 次/分钟 |
@@ -155,6 +155,30 @@ CLAUDE.md           ← 项目系统提示词（架构、规范、已知坑点�
 | oidc-client-ts | latest | OIDC 客户端（SSO） |
 | @lucide/vue | 1.55 | 图标（已从 `lucide-vue-next` 迁移） |
 | @tanstack/vue-table | 9.x | 高性能表格（v9 API） |
+
+### 版本基线与上游阻塞项
+
+当前依赖基线（全部子系统统一 `net11.0`，SDK 11.0.100）：
+
+| 依赖 | 当前 | 说明 |
+|------|------|------|
+| Microsoft.*（ASP.NET Core / EF Core 等） | 11.0.0 | 与 `net11.0` 对齐；EF Core 11 **仅**提供 `net11.0` 目标 |
+| Swashbuckle.AspNetCore | 11.0.1 | — |
+| OpenIddict | 7.8.0 | 目标框架最高 `net10.0`，在 net11 下以兼容模式引用 |
+| Aspire.Hosting.* | 13.6.1 | ⚠️ Aspire 13.6.x 官方只到 `net10.0`；AppHost 虽已在 net11 编译通过，运行时编排建议单独回归 |
+| TypeScript（前端） | 5.9.3 | ⏸ 受 `vue-tsc` 阻塞，见下 |
+
+**上游阻塞项**（本轮实测确认，未强行绕过）：
+
+| 项 | 状态 | 证据 / 原因 |
+|---|---|---|
+| `MySql.EntityFrameworkCore` 无稳定 11.x | ⏸ 保持 10.0.12 | 上游最新稳定版仅到 `10.0.12`（配 EF Core 10）；11.x 只有 `11.0.0-preview`，按"零预发布"策略保留稳定版，编译可通过、运行时待验证 |
+| `Aspire.Hosting.Keycloak` 只有 preview | ⏸ 保持 `13.6.1-preview` | 该包从未发布稳定版；且 Aspire 全家族要求同版本，故本轮 Aspire 家族整体不升 |
+| Aspire 13.6.1 安全公告 | ⚠️ 已知 | `Aspire.Dashboard.Sdk`（严重）/`Aspire.Hosting`（高）存在 NU1903/NU1904 公告。它们是**本地编排工具**、非部署产物；根治需升到 13.6.5，会连带 Keycloak 包到 preview，待策略确认 |
+| TypeScript 7 | ⏸ 保持 5.9.3 | `latest` 已是 7.0.2，但 `vue-tsc` 3.3.x 通过 `typescript/lib/tsc` 子路径加载编译器，TS 7 已移除该导出 → `vue-tsc` 直接崩溃（`ERR_PACKAGE_PATH_NOT_EXPORTED`）。待 `vue-tsc` 兼容 TS 7 后再升；TS 6.0.3 可运行但需迁移 `baseUrl` |
+| SixLabors.ImageSharp 商业授权 | ⚠️ 待处理 | 4.x 构建提示 `Release builds require a valid license`。**Debug 可继续，Release 生产构建需要商业授权**（既有问题） |
+
+> 前端 `vite build` 依赖原生 rolldown 绑定；在部分受限宿主（如 macOS 库校验拒绝第三方签名 `.node` 的 Electron 环境）中无法执行，此时请在本机普通终端验证：`npx vue-tsc --noEmit && npm run build`。
 
 ### 基础设施
 
@@ -332,7 +356,7 @@ CLAUDE.md           ← 项目系统提示词（架构、规范、已知坑点�
 
 ### 环境要求
 
-- [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0)
+- [.NET 11 SDK](https://dotnet.microsoft.com/download/dotnet/11.0)
 - [Node.js 20+](https://nodejs.org)
 - [npm 10+](https://www.npmjs.com)
 - [Docker](https://www.docker.com)（PLM 以图搜商品需要，用于运行 Qdrant 向量数据库）
@@ -440,15 +464,15 @@ cd OctopusOA/web/OctopusOA.Web && npm run dev
 |------|-------:|---------|
 | OctopusUMC.Api.Tests | 166 | 登录/OIDC/角色/菜单/数据权限/多公司/**用户主数据(ADR-010)**/密码安全 |
 | OctopusRetail.Api.Tests | 116 | 租户隔离/邀请注册/短码/成员管理/资料回传 |
-| OctopusMES.Api.Tests | 117 | 供应商/采购/工单/排产/**数据迁移与脱敏** |
-| OctopusOA.Api.Tests | 100 | 审批流/考勤/会议/公告/通讯录/职员 |
-| OctopusWMS.Api.Tests | 41 | 仓库/库存/出入库/盘点/Webhook |
+| OctopusMES.Api.Tests | 120 | 供应商/采购/工单/排产/**数据迁移与脱敏** |
+| OctopusOA.Api.Tests | 131 | 审批流/考勤/会议/公告/通讯录/职员 |
+| OctopusWMS.Api.Tests | 42 | 仓库/库存/出入库/盘点/Webhook |
 | OctopusCRM.Api.Tests | 38 | 客户/询盘/报价/合同/回款 |
 | OctopusPLM.Api.Tests | 35 | 商品/类目/BOM/审核流/向量检索 |
 | OctopusFIN.Api.Tests | 19 | 凭证/应收应付/期间/期初 |
 | OctopusHRM.Api.Tests | 11 | 薪资/假期/KPI |
 | OctopusOMS.Api.Tests | 10 | 渠道/订单/售后 |
-| **合计** | **653** | |
+| **合计** | **688** | |
 
 ```bash
 # 单系统
@@ -749,7 +773,7 @@ Step 6 功能验收 ← Step 5 SSO打通 ← Step 4 前后端联调
 <div align="center">
   <sub>
     Built with <a href="https://claude.ai/code">Claude Code</a> · 
-    Powered by .NET 10 + Vue 3 + OpenIddict · 
+    Powered by .NET 11 + Vue 3 + OpenIddict · 
     AI-assisted development guided by <a href="./harness-template">Claude Code Harness</a>
   </sub>
 </div>
