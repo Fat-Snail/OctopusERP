@@ -254,3 +254,16 @@ vue 3.5.43   vue-router 5.4.0   pinia 4.0.3   vite 8.3.4   vue-tsc 3.3.13
 typescript 5.9.3   @tanstack/vue-table 9.2.8   @lucide/vue 1.55.0
 tailwindcss 4.3.3   element-plus 2.14.7   msw 3.0.3   axios 1.20.0
 ```
+
+---
+
+## 7. 2026-11 后续迁移记录（.NET 11 收尾）
+
+本报告（2026-10）落定 net10.0 后，`net11.0` 稳定版发布，仓库已完成后续迁移（commit `7c07308` 等），2026-11-17 完成收尾验证：
+
+- ✅ 全部 29 个 csproj 统一 `net11.0`，无 net8/net10 遗留
+- ✅ 全平台测试 **698 个用例全绿**：UMC 166 / OA 131 / MES 120 / Retail 116 / WMS 42 / CRM 38 / PLM 35 / FIN 19 / HRM 11 / OMS 10 / MiniappTodo 10
+- ✅ 第 1 节提到的 11 个失败用例确认为沙箱环境问题（`~/.aspnet/DataProtection-Keys` 不可写），正常环境全部通过
+- ✅ 修复测试基建隔离缺陷：12 处固定名 `Data Source=:memory:;Cache=Shared` SQLite 测试库改为 `Guid.NewGuid()` 唯一库名（与 OctopusRetail 既有做法统一），消除跨测试类并行执行时的共享内存库污染——该缺陷在 UMC 后续新增用例中暴露为 `PostControllerTests` 偶发 500，与 .NET 11 迁移无关
+
+**遗留提示**：本报告第 5 节第 5 条"未做浏览器端运行时验证"仍待 Aspire 全量启动冒烟覆盖。

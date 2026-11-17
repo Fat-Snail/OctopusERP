@@ -36,7 +36,7 @@ public class KeycloakSyncServiceTests
     private static ApplicationDbContext NewDb(out SqliteContext kept)
     {
         // 用内存 SQLite，保持连接生命周期跟测试一致
-        var conn = new Microsoft.Data.Sqlite.SqliteConnection("Data Source=:memory:;Cache=Shared");
+        var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source=umc_test_{Guid.NewGuid():N};Mode=Memory;Cache=Shared");
         conn.Open();
         var opt = new DbContextOptionsBuilder<ApplicationDbContext>()
             .UseSqlite(conn).Options;

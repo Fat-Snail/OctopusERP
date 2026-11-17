@@ -18,7 +18,7 @@ public class OmsTestFactory : WebApplicationFactory<Program>
 
     public OmsTestFactory()
     {
-        _connection = new SqliteConnection("Data Source=:memory:;Cache=Shared");
+        _connection = new SqliteConnection($"Data Source=oms_test_{Guid.NewGuid():N};Mode=Memory;Cache=Shared");
         _connection.Open();
     }
 

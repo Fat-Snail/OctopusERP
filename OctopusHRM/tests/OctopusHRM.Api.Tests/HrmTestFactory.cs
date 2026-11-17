@@ -18,7 +18,7 @@ public class HrmTestFactory : WebApplicationFactory<Program>
 
     public HrmTestFactory()
     {
-        _connection = new SqliteConnection("Data Source=:memory:;Cache=Shared");
+        _connection = new SqliteConnection($"Data Source=hrm_test_{Guid.NewGuid():N};Mode=Memory;Cache=Shared");
         _connection.Open();
     }
 

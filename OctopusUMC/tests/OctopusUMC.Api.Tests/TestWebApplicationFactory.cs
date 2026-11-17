@@ -19,7 +19,7 @@ public class TestWebApplicationFactory : WebApplicationFactory<Program>
 
     public TestWebApplicationFactory()
     {
-        _connection = new SqliteConnection("Data Source=:memory:;Cache=Shared");
+        _connection = new SqliteConnection($"Data Source=umc_test_{Guid.NewGuid():N};Mode=Memory;Cache=Shared");
         _connection.Open();
     }
 

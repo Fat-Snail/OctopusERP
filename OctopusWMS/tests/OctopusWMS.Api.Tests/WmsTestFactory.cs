@@ -18,7 +18,7 @@ public class WmsTestFactory : WebApplicationFactory<Program>
 
     public WmsTestFactory()
     {
-        _connection = new SqliteConnection("Data Source=:memory:;Cache=Shared");
+        _connection = new SqliteConnection($"Data Source=wms_test_{Guid.NewGuid():N};Mode=Memory;Cache=Shared");
         _connection.Open();
     }
 

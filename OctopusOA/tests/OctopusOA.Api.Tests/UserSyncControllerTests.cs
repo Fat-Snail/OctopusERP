@@ -20,7 +20,7 @@ public class OATestFactory : WebApplicationFactory<Program>
 
     public OATestFactory()
     {
-        _connection = new SqliteConnection("Data Source=:memory:;Cache=Shared");
+        _connection = new SqliteConnection($"Data Source=oa_test_{Guid.NewGuid():N};Mode=Memory;Cache=Shared");
         _connection.Open();
     }
 

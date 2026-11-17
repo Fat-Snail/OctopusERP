@@ -19,7 +19,7 @@ public class MesTestFactory : WebApplicationFactory<Program>
 
     public MesTestFactory()
     {
-        _connection = new SqliteConnection("Data Source=:memory:;Cache=Shared");
+        _connection = new SqliteConnection($"Data Source=mes_test_{Guid.NewGuid():N};Mode=Memory;Cache=Shared");
         _connection.Open();
         // 测试默认：归档截止设为远古（1900-01-01），让 2021/2022 seed 数据保持可写。
         // 归档专项测试可临时覆盖此值。
