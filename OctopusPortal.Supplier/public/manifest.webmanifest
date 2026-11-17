@@ -1,0 +1,18 @@
+{
+  "name": "Octopus 供应商门户",
+  "short_name": "供应商门户",
+  "description": "OctopusERP 供应商门户：询价响应、订单、发货登记、对账一站掌握",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#16a34a",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

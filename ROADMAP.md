@@ -983,6 +983,8 @@ oms_after_sale           售后单（退/换/补/退款）
 
 ## 二十、P16：客户/供应商门户
 
+> **状态：前端 Mock 版已落地（2026-11-17）** —— `OctopusPortal.Customer/`（端口 5184）与 `OctopusPortal.Supplier/`（端口 5185）两个 H5+PWA 项目已构建通过并接入 CI；OIDC 客户端（PKCE）已在 UMC 注册；待接入真实 API（OctopusGateway + 数据权限"仅本人"）。
+
 ### 20.1 OctopusPortal.Customer（客户门户）
 
 ```

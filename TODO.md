@@ -43,10 +43,25 @@
 - ✅ **SQLite Schema 模型驱动自愈**（DECISIONS ADR-007）— OA / PLM / MES 启动时自动 ALTER TABLE ADD COLUMN 补齐缺失的列，CREATE TABLE IF NOT EXISTS 补齐缺失的表；解决了"实体加字段后旧 db 启动崩溃 → 进而拖垮 Aspire 内其它子系统"的连锁故障。
 - ✅ **UMC 健康端点拆分**：`/health/live` vs `/health/ready`（Seeder 完成前 503，避免被认作"已就绪"导致下游误连）。
 
+### 2026-11-17 .NET 11 迁移收尾
+
+- ✅ 全部 29 个 csproj 统一 `net11.0`，无 net8/net10 遗留
+- ✅ 全平台测试基线更新：**698 个用例全绿**（UMC 166 / OA 131 / MES 120 / Retail 116 / WMS 42 / CRM 38 / PLM 35 / FIN 19 / HRM 11 / OMS 10 / MiniappTodo 10）
+- ✅ 修复测试隔离缺陷：12 处固定名 `:memory:;Cache=Shared` SQLite 测试库改为 Guid 唯一库名（与 Retail 先例统一），消除跨测试类并行污染导致的偶发 500；详见 `docs/dependency-upgrade-2026-10.md` 第 7 节
+- ⏳ Aspire 全量启动冒烟（升级报告建议的浏览器端运行时验证）待执行
+
+### 2026-11-17 P16 门户前端（Mock 版）
+
+- ✅ `OctopusPortal.Customer/`（端口 5184）：H5 + PWA，含我的询盘（提交 + 报价进度时间线）、我的合同（状态 + PDF 下载）、物流追踪、对账中心、在线客服、文档下载；UMC OIDC PKCE 登录（`octopus-customer-portal`）
+- ✅ `OctopusPortal.Supplier/`（端口 5185）：H5 + PWA，含询价响应（在线报价）、我的订单、发货登记、对账中心、资质上传；UMC OIDC PKCE 登录（`octopus-supplier-portal`）
+- ✅ 技术栈对齐仓库先例：Vue 3.5 + Vite 8 + TS 5.9 + Tailwind 4 + oidc-client-ts + Pinia + lucide；`vue-tsc -b && vite build` 双项目构建通过
+- ✅ CI frontend matrix 已接入两个门户（npm ci + TypeCheck + Build，node 22）
+- ⏳ 接入真实 API：门户 api 层签名已按未来契约设计，待网关 OctopusGateway 与数据权限（仅本人）就绪后替换 mock 实现
+
 ### 待落地（按优先级）
 
 - ✅ P5 H5 — OA H5 全功能（首页/审批/考勤/公告/通讯录/会议室/个人中心）+ UMC H5 完成
-- ⬜ P16 门户前端 — Customer / Supplier Portal Vite 项目
+- ✅ P16 门户前端 — Customer / Supplier Portal Vite 项目（Mock 版，2026-11-17）
 - ⬜ P18+ MySQL 迁移路径（EF Migrations 启用、自愈守卫加 `Sqlite` 判断）
 - ⬜ Redis 缓存 / 真实电商平台对接 / BPM 拖拽设计器
 

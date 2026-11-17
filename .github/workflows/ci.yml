@@ -70,6 +70,10 @@ jobs:
             path: OctopusMES/web/OctopusMES.Web
           - name: OctopusRetail.Web
             path: OctopusRetail/web/OctopusRetail.Web
+          - name: OctopusPortal.Customer
+            path: OctopusPortal.Customer
+          - name: OctopusPortal.Supplier
+            path: OctopusPortal.Supplier
     steps:
       - uses: actions/checkout@v4
 
