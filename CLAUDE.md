@@ -608,6 +608,9 @@ public async Task Login_WithCorrectCredentials_SetsCookieAndReturns200() { }
 | **本地改完 tsconfig 突然大量 `TS2307 ./App.vue`** | `node_modules/.tmp/*.tsbuildinfo` 陈旧 | `rm -rf node_modules/.tmp` 后重跑；CI 是干净环境不受影响 |
 | **数据迁移"跑了但什么都没改"** | 用 `ExecuteSqlRaw` 执行脚本：EF 会无条件 `string.Format`，注释里的 `{Foo}` 抛 `FormatException` 且被 catch 吞掉 | 共享库 `OctopusCommon.Persistence.DataMigrationRunner` 已改用原始 ADO；测试传 `throwOnError: true` |
 | **内部接口 403，提示"服务端未配置内部接口密钥"** | 密钥策略 fail-closed：非 Development/Test 且未配置 `InternalApi:SharedSecret` 时拒绝 | 编排里注入该配置；本地/测试环境自动回退开发密钥 |
+| **Aspire 里 keycloak/keycloak-db 显示「未知」，retail-web 报 `Failed to fetch`** | Docker Desktop 未运行，`docker.sock` 不存在，DCP 建不出容器 | `open -a Docker` 启动引擎，确认镜像 `keycloak:26.0`/`postgres:17.6` 在本地，再重启 Aspire；排查入口是 DCP 临时目录的 `*_starterr_*` |
+| **curl 能取到 discovery JSON，但浏览器仍 `Failed to fetch`** | 长期运行的 Chrome 进程缓存了陈旧的证书信任判定，`fetch()` 不重新校验（地址栏导航会） | 完全退出浏览器（Cmd+Q）后重开；自查命令用 `curl -sk`（自签证书需 `-k`） |
+| **Keycloak demo 证书过期导致 HTTPS 全挂** | `keycloak:26.0` 内置自签证书 `CN=localhost`，`notAfter` 固定（当前为 2026-11-20 08:40 UTC），每台机器相同 | 到期前更换正式证书或重新签发；`openssl s_client -connect localhost:8088 \| openssl x509 -noout -dates` 查有效期 |
 
 ---
 

@@ -37,13 +37,14 @@ async function retry() {
       </div>
 
       <p class="mt-4 text-sm text-gray-500">
-        常见原因：Keycloak 未启动、端口不对、或 realm 尚未导入。
-        可先在终端确认：
+        常见原因：Keycloak 未启动、端口不对、realm 尚未导入，或证书刚更新过需要重启浏览器。
+        可先在终端确认（-k 用于跳过开发环境的自签证书）：
       </p>
-      <pre class="mt-2 overflow-x-auto rounded-md bg-gray-900 p-3 text-xs text-gray-100">curl -s {{ AUTHORITY }}/.well-known/openid-configuration | head -c 200</pre>
+      <pre class="mt-2 overflow-x-auto rounded-md bg-gray-900 p-3 text-xs text-gray-100">curl -sk {{ AUTHORITY }}/.well-known/openid-configuration | head -c 200</pre>
 
       <p class="mt-3 text-xs text-gray-400">
-        该命令返回 JSON 说明身份服务正常，此时点「重试」即可；返回连接错误说明 Keycloak 没起来。
+        返回 JSON 说明身份服务正常。此时若页面仍报错，请完全退出浏览器（Cmd+Q）后重开，
+        让浏览器重新加载受信证书，再点「重试」；返回连接错误才说明 Keycloak 没起来。
       </p>
 
       <div class="mt-5 flex gap-3">
