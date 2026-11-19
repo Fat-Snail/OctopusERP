@@ -114,6 +114,7 @@ builder.Services.AddScoped<OctopusOA.Api.Workflow.IFlowEngine, OctopusOA.Api.Wor
 builder.Services.AddScoped<OctopusOA.Api.Workflow.IServiceTaskHandler, OctopusOA.Api.Services.CreateWmsInboundHandler>();
 builder.Services.AddScoped<OctopusOA.Api.Workflow.IProcessEventListener, OctopusOA.Api.Services.PurchaseApprovedListener>();
 builder.Services.AddScoped<OctopusOA.Api.Workflow.IProcessEventListener, OctopusOA.Api.Services.AttendanceFixListener>();
+builder.Services.AddScoped<OctopusOA.Api.Workflow.IProcessEventListener, OctopusOA.Api.Services.ExpenseApprovedListener>();
 builder.Services.AddScoped<OctopusOA.Api.Workflow.ServiceTaskHandlerRegistry>();
 builder.Services.AddScoped<OctopusOA.Api.Workflow.ProcessEventDispatcher>();
 

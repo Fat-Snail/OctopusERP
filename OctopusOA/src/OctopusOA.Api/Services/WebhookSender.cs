@@ -32,6 +32,15 @@ public class WebhookSender(IHttpClientFactory factory, IConfiguration config, IL
         FireAndForget(baseUrl + path, payload, "X-Wms-Signature", secret);
     }
 
+    /// <summary>Q3-② — 推送到 FIN（报销审批通过 → 费用凭证）</summary>
+    public void PostToFin(string path, object payload)
+    {
+        var baseUrl = config["Webhooks:FinBaseUrl"];
+        if (string.IsNullOrEmpty(baseUrl)) return;
+        var secret = config["Webhooks:FinSecret"] ?? "";
+        FireAndForget(baseUrl + path, payload, "X-Fin-Signature", secret);
+    }
+
     /// <summary>P9 — 推送到 UMC 统一通知中心（铃铛 + SignalR 实时推送给目标用户）</summary>
     public void PostToUmcNotify(long userId, string source, string type, string title,
         string? message = null, string? linkUrl = null, string? payloadJson = null)
