@@ -36,6 +36,7 @@ const groups: NavGroup[] = [
       { label: '通用生产排程', path: '/scheduling' },
       { label: 'PLM 同步管理', path: '/plm-sync' },
       { label: '车间组管理', path: '/garment-team' },
+      { label: '设备 OEE', path: '/oee' },
     ],
   },
 ]

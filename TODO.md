@@ -58,6 +58,15 @@
 - ✅ CI frontend matrix 已接入两个门户（npm ci + TypeCheck + Build，node 22）
 - ⏳ 接入真实 API：门户 api 层签名已按未来契约设计，待网关 OctopusGateway 与数据权限（仅本人）就绪后替换 mock 实现
 
+### 2026-11-18 Q3 主线：FIN 业务闭环（四项落地）
+
+- ✅ **Q3-① 发货→应收→回款→结清**：CRM `ShipConfirm` → FIN 自动生成 AR（借 1122/贷 6001）+ 收入凭证；CRM 回款确认 → FIN 自动核销 + 收款凭证（借 1002/贷 1122）；幂等键 `crm-pay-{paymentId}`，HMAC `X-Fin-Signature` 验签
+- ✅ **Q3-② OA 报销→FIN 费用凭证**：`ExpenseApprovedListener`（ProcessEventDispatcher 扩展点）→ FIN `oa/expense-approved`（借 6602/贷 1002），按 `oaApprovalId` 幂等
+- ✅ **Q3-③ 月结流程**：`ClosingService` 关账前自动结转损益（收入/费用 → 4103 本年利润，closing 凭证自动过账、按期间幂等）+ 期间锁定 + 月结报告 `GET /api/reports/month-end-closing/{id}`
+- ✅ **Q3-④ MES 设备 OEE 看板**：报工口径（可用率=1−停机/窗口、表现率=min(1,标准/实际节拍)、质量率=合格/总量），`GET /api/stats/oee` + MES.Web `/oee` 看板页
+- 📈 测试基线：698 → **717**（FIN 29 / OA 137 / CRM 38 / MES 123，四系统全绿）
+- ⏳ 变更待提交（FIN/OA/CRM/MES 四系统 + 门户无关，建议按任务拆 4 个 commit）
+
 ### 待落地（按优先级）
 
 - ✅ P5 H5 — OA H5 全功能（首页/审批/考勤/公告/通讯录/会议室/个人中心）+ UMC H5 完成

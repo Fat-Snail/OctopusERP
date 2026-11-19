@@ -68,6 +68,12 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/views/garment/GarmentTeamView.vue'),
         meta: { title: '车间组管理' }
       },
+      {
+        path: 'oee',
+        name: 'EquipmentOee',
+        component: () => import('@/views/stats/OeeView.vue'),
+        meta: { title: '设备 OEE 看板' }
+      },
     ]
   },
   {

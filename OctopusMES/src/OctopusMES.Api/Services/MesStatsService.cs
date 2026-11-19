@@ -214,6 +214,84 @@ public class MesStatsService(MesDbContext db)
         }
         return result;
     }
+
+    /// <summary>
+    /// Q3-④：设备 OEE（报工口径，聚合 P12 工序报工真实字段）。
+    /// 可用率 = 1 - 停机时长 / 报工窗口时长；表现率 = min(1, Σ产量×标准节拍 / Σ产量×实际节拍)（教科书口径封顶 100%）；
+    /// 质量率 = 合格数 / 总产量；OEE = 三者乘积。IoT 设备日志（mes_equipment_log）接入后可升级为标准口径。
+    /// </summary>
+    public async Task<OeeResponse> GetOeeAsync(string? workCenter, DateTime? from, DateTime? to)
+    {
+        var eqQuery = db.Equipments.AsQueryable();
+        if (!string.IsNullOrEmpty(workCenter))
+            eqQuery = eqQuery.Where(e => e.WorkCenter == workCenter);
+        var equipments = await eqQuery.ToListAsync();
+
+        var eqIds = equipments.Select(e => e.EquipmentId).ToList();
+        var processes = await db.WorkOrderProcesses
+            .Where(p => p.EquipmentId != null
+                && eqIds.Contains(p.EquipmentId.Value)
+                && p.StartedAt != null
+                && (p.Status == "completed" || p.Status == "in_progress"))
+            .ToListAsync();
+        if (from.HasValue) processes = processes.Where(p => p.StartedAt >= from.Value).ToList();
+        if (to.HasValue) processes = processes.Where(p => p.StartedAt <= to.Value).ToList();
+
+        var now = DateTime.UtcNow;
+        decimal gPlannedSec = 0, gRunSec = 0, gStdTime = 0, gActualTime = 0, gTotalQty = 0, gQualifiedQty = 0;
+
+        var rows = new List<OeeEquipmentRow>();
+        foreach (var eq in equipments)
+        {
+            var procs = processes.Where(p => p.EquipmentId == eq.EquipmentId).ToList();
+            decimal plannedSec = 0, runSec = 0, stdTime = 0, actualTime = 0, totalQty = 0, qualifiedQty = 0;
+            var reportedCount = 0;
+
+            foreach (var p in procs)
+            {
+                var end = p.FinishedAt ?? now;   // in_progress 持续计时到当前
+                if (end <= p.StartedAt!.Value) continue;
+
+                var windowSec = (decimal)(end - p.StartedAt.Value).TotalSeconds;
+                var downtimeSec = Math.Min((decimal)p.DowntimeMinutes * 60, windowSec);
+                plannedSec += windowSec;
+                runSec += windowSec - downtimeSec;
+
+                var qty = p.QualifiedQty + p.DefectQty;
+                if (p.StandardCycleSec is > 0) stdTime += qty * p.StandardCycleSec.Value;
+                if (p.ActualCycleSec is > 0) actualTime += qty * p.ActualCycleSec.Value;
+                if (qty > 0) reportedCount++;
+                totalQty += qty;
+                qualifiedQty += p.QualifiedQty;
+            }
+
+            var availability = plannedSec == 0 ? 0 : Math.Min(1.0, (double)(runSec / plannedSec));
+            var performance = actualTime == 0 ? 0 : Math.Min(1.0, (double)(stdTime / actualTime));
+            var quality = totalQty == 0 ? 0 : (double)(qualifiedQty / totalQty);
+            var oee = availability * performance * quality;
+
+            gPlannedSec += plannedSec; gRunSec += runSec;
+            gStdTime += stdTime; gActualTime += actualTime;
+            gTotalQty += totalQty; gQualifiedQty += qualifiedQty;
+
+            rows.Add(new OeeEquipmentRow(
+                eq.EquipmentId, eq.EquipmentCode, eq.EquipmentName, eq.WorkCenter, eq.Status,
+                Math.Round(availability, 4), Math.Round(performance, 4), Math.Round(quality, 4), Math.Round(oee, 4),
+                (int)Math.Round(runSec / 60), (int)Math.Round((plannedSec - runSec) / 60),
+                totalQty, qualifiedQty, reportedCount));
+        }
+
+        var gAvailability = gPlannedSec == 0 ? 0 : Math.Min(1.0, (double)(gRunSec / gPlannedSec));
+        var gPerformance = gActualTime == 0 ? 0 : Math.Min(1.0, (double)(gStdTime / gActualTime));
+        var gQuality = gTotalQty == 0 ? 0 : (double)(gQualifiedQty / gTotalQty);
+
+        return new OeeResponse(
+            new OeeOverall(
+                Math.Round(gAvailability, 4), Math.Round(gPerformance, 4),
+                Math.Round(gQuality, 4), Math.Round(gAvailability * gPerformance * gQuality, 4)),
+            rows.OrderByDescending(r => r.Oee).ToList(),
+            "报工口径：可用率=1-停机/报工窗口；表现率=min(1,Σ产量×标准节拍/Σ产量×实际节拍)；质量率=合格/总量；数据来源 P12 工序报工");
+    }
 }
 
 public record WoEfficiencyResponse(
@@ -263,3 +341,23 @@ public record DefectParetoRow(
 
 public sealed record PlmSyncMetrics(int Pending, int Syncing, int RetryWaiting, int ManualAction, int Synced,
     double FailureRate, double AverageDurationSeconds, DateTime? LastSuccessAt, int MaxConsecutiveFailures);
+
+public record OeeResponse(OeeOverall Overall, List<OeeEquipmentRow> Equipments, string Note);
+
+public record OeeOverall(double Availability, double Performance, double Quality, double Oee);
+
+public record OeeEquipmentRow(
+    long EquipmentId,
+    string EquipmentCode,
+    string EquipmentName,
+    string? WorkCenter,
+    string Status,
+    double Availability,
+    double Performance,
+    double Quality,
+    double Oee,
+    int RunMinutes,
+    int DowntimeMinutes,
+    decimal TotalQty,
+    decimal QualifiedQty,
+    int ProcessCount);

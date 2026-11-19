@@ -1,5 +1,5 @@
 import type { ApiResponse } from '../types'
-import type { StatsSummaryResponse } from './types'
+import type { StatsSummaryResponse, OeeResponse } from './types'
 import { createAuthedHttp } from '@/utils/http'
 
 const http = createAuthedHttp('/api/stats')
@@ -11,4 +11,8 @@ function unwrap<T>(res: { data: ApiResponse<T> }): T {
 
 export async function getSummary(): Promise<StatsSummaryResponse> {
   return unwrap(await http.get<ApiResponse<StatsSummaryResponse>>('/summary'))
+}
+
+export async function getOee(params?: { workCenter?: string; from?: string; to?: string }): Promise<OeeResponse> {
+  return unwrap(await http.get<ApiResponse<OeeResponse>>('/oee', { params }))
 }

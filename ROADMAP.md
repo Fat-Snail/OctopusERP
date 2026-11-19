@@ -797,6 +797,8 @@ Status               waiting/running/paused/completed
 
 ### 16.3 设备 OEE（设备综合效率）
 
+> **状态：报工口径 OEE 已落地（2026-11-18，Q3-④）**——不建 IoT 日志表，直接聚合工序报工真实字段：可用率=1−停机/报工窗口、表现率=min(1, Σ产量×标准节拍/Σ产量×实际节拍)、质量率=合格/总量。API `GET /api/stats/oee` + MES.Web `/oee` 看板页。`mes_equipment_log`（IoT 上报）后续接入时可用率可升级为标准口径。
+
 **新增表**：
 
 ```

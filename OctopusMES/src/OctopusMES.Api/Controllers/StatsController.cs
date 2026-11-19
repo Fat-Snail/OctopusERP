@@ -70,4 +70,12 @@ public class StatsController(MesStatsService svc) : ControllerBase
         var data = await svc.GetDefectParetoAsync();
         return Ok(new { code = 200, msg = "ok", data });
     }
+
+    /// <summary>Q3-④：设备 OEE 看板（报工口径，可用率 × 表现率 × 质量率）</summary>
+    [HttpGet("oee")]
+    public async Task<IActionResult> Oee([FromQuery] string? workCenter, [FromQuery] DateTime? from, [FromQuery] DateTime? to)
+    {
+        var data = await svc.GetOeeAsync(workCenter, from, to);
+        return Ok(new { code = 200, msg = "ok", data });
+    }
 }
