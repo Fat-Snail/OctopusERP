@@ -37,6 +37,7 @@ public class GatewayTestFactory : WebApplicationFactory<Program>
             msg = "echo from stub",
             data = new { path = req.Path.Value, downstream = "stub", forwarded = req.Headers["X-Forwarded-For"].ToString() },
         }));
+        stubApp.MapGet("/health", () => Results.Ok(new { status = "ok" }));
         stubApp.StartAsync().GetAwaiter().GetResult();
         StubUrl = stubApp.Urls.First(u => u.StartsWith("http"));
         _stub = stubApp;

@@ -35,6 +35,7 @@ Octopus ERP 是一套面向中小企业的开源企业管理平台，采用**微
 | **OctopusHRM** | 人力资源 — 员工、薪酬、绩效、假期 | 5008 | ✅ |
 | **OctopusOMS** | 订单中台 — 多渠道电商订单 | 5009 | ✅ |
 | **OctopusRetail** | **零售多租户** — 组织邀请、成员管理、workspace 切换 | 5010 / 5186 | ✅ |
+| **OctopusGateway** | API 网关 — YARP 反向代理、JWT 验签、限流、聚合健康与诊断 | 5100 | ✅ |
 
 平台内部统一走 **OpenIddict OIDC** 单点登录；**零售域例外**，它按设计使用 **Keycloak**
 作为身份源（`https://localhost:8088`，realm `octopus`），见 [ADR-008](DECISIONS.md)。

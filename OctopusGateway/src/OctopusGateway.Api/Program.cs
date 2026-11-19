@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using System.Diagnostics;
 using System.Threading.RateLimiting;
 using Yarp.ReverseProxy.Transforms;
+using OctopusGateway.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -56,6 +57,10 @@ builder.Services.AddCors(o => o.AddPolicy("GatewayPolicy", p =>
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 
+// v1.5.5 可观测性：健康聚合 + 诊断快照（具名 HttpClient 带超时）
+builder.Services.AddHttpClient("gateway-health", c => c.Timeout = TimeSpan.FromSeconds(5));
+builder.Services.AddSingleton<ObservabilityService>();
+
 var app = builder.Build();
 
 // ── 请求访问日志（P16：网关统一日志）─────────────────────────────
@@ -105,6 +110,19 @@ app.MapGet("/_self/echo", (HttpRequest req) => Results.Ok(new
         time = DateTime.UtcNow,
     },
 })).AllowAnonymous();
+
+// v1.5.5 /health/full：聚合探测所有下游。全绿 200，部分降级/全挂 503，便于告警。
+app.MapGet("/health/full", async (ObservabilityService svc, CancellationToken ct) =>
+{
+    var result = await svc.GetFullHealthAsync(ct);
+    var httpStatus = result.Overall == "healthy" ? 200 : 503;
+    return Results.Json(new { code = httpStatus, msg = result.Overall, data = result }, statusCode: httpStatus);
+}).AllowAnonymous();
+
+// v1.5.5 /octopus/diagnostics：运行时诊断快照（版本/环境/运行时长/路由拓扑，无密钥）
+app.MapGet("/octopus/diagnostics", (ObservabilityService svc) =>
+    Results.Ok(new { code = 200, msg = "ok", data = svc.GetDiagnostics() }))
+    .AllowAnonymous();
 
 // 门户 API 转发：所有 /gw/{system}/** 路由强制认证 + 统一限流
 app.MapReverseProxy()
