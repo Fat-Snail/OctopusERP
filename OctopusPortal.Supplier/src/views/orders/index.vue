@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Truck } from '@lucide/vue'
-import { portalApi } from '@/api/mock'
+import { portalApi } from '@/api/portal'
 import type { OrderStatus, PurchaseOrder } from '@/api/types'
 
 const router = useRouter()

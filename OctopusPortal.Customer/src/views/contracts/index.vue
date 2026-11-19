@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ChevronRight } from '@lucide/vue'
-import { portalApi } from '@/api/mock'
+import { portalApi } from '@/api/portal'
 import type { Contract } from '@/api/types'
 
 const router = useRouter()

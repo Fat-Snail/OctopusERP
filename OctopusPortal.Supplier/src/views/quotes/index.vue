@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
-import { portalApi } from '@/api/mock'
+import { portalApi } from '@/api/portal'
 import type { QuoteRequest, QuoteStatus } from '@/api/types'
 
 const router = useRouter()

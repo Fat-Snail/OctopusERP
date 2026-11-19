@@ -56,7 +56,10 @@
 - ✅ `OctopusPortal.Supplier/`（端口 5185）：H5 + PWA，含询价响应（在线报价）、我的订单、发货登记、对账中心、资质上传；UMC OIDC PKCE 登录（`octopus-supplier-portal`）
 - ✅ 技术栈对齐仓库先例：Vue 3.5 + Vite 8 + TS 5.9 + Tailwind 4 + oidc-client-ts + Pinia + lucide；`vue-tsc -b && vite build` 双项目构建通过
 - ✅ CI frontend matrix 已接入两个门户（npm ci + TypeCheck + Build，node 22）
-- ⏳ 接入真实 API：门户 api 层签名已按未来契约设计，待网关 OctopusGateway 与数据权限（仅本人）就绪后替换 mock 实现
+- 🔶 接入真实 API（骨架已就位，2026-11-20）：新增 `src/api/http.ts`（axios + Bearer token + `{code,msg,data}` 解包，LIVE 开关 `VITE_PORTAL_LIVE=1`）与 `src/api/portal.ts`（真实优先 + mock 降级）。视图 import 已从 `@/api/mock` 切到 `@/api/portal`，默认 LIVE=0 保持 mock 不崩页。
+  - 已接真实端点：客户 `getInquiries(GET /api/inquiry)` / `getContracts(GET /api/contract)` / `createInquiry(POST /api/inquiry)`；供应商 `getOrders(GET /api/purchase)`。经网关 `/gw/crm` `/gw/mes` 转发，含 DTO→门户类型映射。
+  - 仍 mock 降级（后端端点待建，运行时 console.warn 标注）：客户 汇总/物流/对账/客服/文档；供应商 汇总/询价响应/发货登记/对账/资质。
+  - ⬜ 待后端补：UMC sub → 客户/供应商身份绑定（"仅本人"行级过滤），以及上述门户专属端点；补齐后逐个把 LIVE 打开。
 
 ### 2026-11-18 Q3 主线：FIN 业务闭环（四项落地）
 

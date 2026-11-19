@@ -2,7 +2,7 @@
 import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, FileDown } from '@lucide/vue'
-import { portalApi } from '@/api/mock'
+import { portalApi } from '@/api/portal'
 import type { Contract } from '@/api/types'
 import { useUserStore } from '@/store/user'
 

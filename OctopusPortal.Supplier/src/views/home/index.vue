@@ -2,14 +2,14 @@
 import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Gavel, Package, Truck, Wallet, FileBadge, ChevronRight, Factory } from '@lucide/vue'
-import { portalApi, mockSummary } from '@/api/mock'
+import { portalApi } from '@/api/portal'
 import type { PortalSummary } from '@/api/types'
 import { useUserStore } from '@/store/user'
 
 const router = useRouter()
 const userStore = useUserStore()
 
-const summary = ref<PortalSummary>(mockSummary)
+const summary = ref<PortalSummary>({ pendingQuotes: 0, activeOrders: 0, readyToShip: 0, outstandingAmount: 0 })
 
 onMounted(async () => {
   if (!userStore.userName) userStore.loadFromOidc()
