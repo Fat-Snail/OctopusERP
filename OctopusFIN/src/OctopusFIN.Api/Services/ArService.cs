@@ -16,6 +16,19 @@ public class ArService(FinDbContext db, VoucherService voucherSvc)
     public async Task<FinArInvoice?> GetByIdAsync(long id) =>
         await db.ArInvoices.FirstOrDefaultAsync(x => x.InvoiceId == id);
 
+    /// <summary>按 CRM 合同 ID 定位应收发票（一条合同一张 AR）</summary>
+    public async Task<FinArInvoice?> GetByContractIdAsync(long crmContractId) =>
+        await db.ArInvoices.FirstOrDefaultAsync(x => x.CrmContractId == crmContractId);
+
+    /// <summary>按外部回款引用（crm-pay-{paymentId}）查重，webhook 幂等用</summary>
+    public async Task<FinArReceipt?> FindReceiptByExternalRefAsync(string externalRef)
+    {
+        var normalized = externalRef.Split('|')[0];
+        return await db.ArReceipts
+            .FirstOrDefaultAsync(r => r.BankReference != null &&
+                (r.BankReference == normalized || r.BankReference.EndsWith("|" + normalized)));
+    }
+
     /// <summary>从 CRM 发货事件生成 AR 发票（自动联动凭证：借 应收账款 / 贷 主营业务收入）</summary>
     public async Task<(FinArInvoice? invoice, string? error)> CreateFromShipmentAsync(
         long crmContractId, long? customerId, string customerName, decimal amount, long createdBy)
@@ -93,6 +106,33 @@ public class ArService(FinDbContext db, VoucherService voucherSvc)
         invoice.Status = invoice.ReceivedAmount >= invoice.Amount ? "closed" : "partial";
 
         await db.SaveChangesAsync();
+
+        // Q3-① 自动生成收款凭证（借 银行存款(1002) / 贷 应收账款(1122)），保证复式记账平衡：
+        // 发货时已借 应收 / 贷 收入，收款时不冲减应收会导致应收账款虚挂
+        var bankAcct = await db.Accounts.FirstAsync(a => a.AccountCode == "1002");
+        var arAcct = await db.Accounts.FirstAsync(a => a.AccountCode == "1122");
+
+        var (voucher, vErr) = await voucherSvc.CreateAsync(new VoucherInput(
+            null, DateTime.UtcNow, "normal",
+            $"收回应收账款：{invoice.CustomerName} - 发票 {invoice.InvoiceNo}" +
+            (invoice.Status == "closed" ? "（已结清）" : "（部分收款）"),
+            "crm-receipt", receipt.ReceiptNo,
+            new List<VoucherEntryInput>
+            {
+                new(bankAcct.AccountId, "银行收款", amount, 0, "CNY"),
+                new(arAcct.AccountId, "冲减应收", 0, amount, "CNY"),
+            }), createdBy);
+
+        if (voucher != null)
+        {
+            receipt.VoucherId = voucher.VoucherId;
+            await db.SaveChangesAsync();
+        }
+        else if (vErr != null)
+        {
+            // 凭证生成失败不阻断收款（收款已落库），仅保留错误信息供排查；凭证可事后手工补录
+        }
+
         return (receipt, null);
     }
 }

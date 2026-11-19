@@ -64,6 +64,41 @@ public class WebhookController(
         return Ok(new { code = 200, msg = "费用凭证已生成", data = voucher });
     }
 
+    /// <summary>CRM 回款确认 → 自动核销 AR（收款凭证由 RegisterReceiptAsync 内部生成）</summary>
+    [HttpPost("crm/payment-received")]
+    public async Task<IActionResult> CrmPaymentReceived()
+    {
+        var (body, ok) = await VerifyAndReadAsync("X-Fin-Signature", config["Webhooks:FinSecret"]);
+        if (!ok) return Unauthorized(new { code = 401, msg = "签名验证失败" });
+
+        var req = JsonSerializer.Deserialize<CrmPaymentRequest>(body, JsonOpts);
+        if (req == null) return BadRequest(new { code = 400, msg = "请求体格式错误" });
+
+        // 幂等：同一笔回款（CRM paymentId）重复推送只核销一次
+        var externalRef = $"crm-pay-{req.CrmPaymentId}";
+        var existingReceipt = await arSvc.FindReceiptByExternalRefAsync(externalRef);
+        if (existingReceipt != null)
+            return Ok(new { code = 200, msg = "该回款已核销（幂等跳过）", data = existingReceipt });
+
+        var invoice = await arSvc.GetByContractIdAsync(req.CrmContractId);
+        if (invoice == null)
+            return Ok(new { code = 400, msg = $"合同 {req.CrmContractId} 尚无应收发票（先经发货确认生成 AR）", data = (object?)null });
+        if (invoice.Status == "closed")
+            return Ok(new { code = 200, msg = "应收已结清", data = invoice });
+
+        var (receipt, err) = await arSvc.RegisterReceiptAsync(
+            invoice.InvoiceId, req.Amount, req.PaymentMethod ?? "bank",
+            string.IsNullOrEmpty(req.BankReference) ? externalRef : $"{req.BankReference}|{externalRef}", 1);
+        if (err != null) return Ok(new { code = 400, msg = err, data = (object?)null });
+
+        return Ok(new
+        {
+            code = 200,
+            msg = invoice.Status == "closed" ? "回款已核销，应收已结清" : "回款已核销（部分）",
+            data = receipt,
+        });
+    }
+
     private async Task<(string body, bool valid)> VerifyAndReadAsync(string sigHeader, string? secret)
     {
         Request.Body.Seek(0, SeekOrigin.Begin);
@@ -87,5 +122,6 @@ public class WebhookController(
 }
 
 public record CrmShipmentRequest(long CrmContractId, long? CustomerId, string? CustomerName, decimal Amount);
+public record CrmPaymentRequest(long CrmContractId, long CrmPaymentId, decimal Amount, string? PaymentMethod, string? BankReference);
 public record MesPurchaseRequest(long MesPurchaseOrderId, long? SupplierId, string? SupplierName, decimal Amount);
 public record OaExpenseRequest(long OaApprovalId, decimal Amount, string? Summary);

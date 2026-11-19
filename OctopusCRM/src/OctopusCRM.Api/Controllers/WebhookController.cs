@@ -15,7 +15,7 @@ public class WebhookController(CrmDbContext db, IConfiguration config) : Control
     private const string CrmSignatureHeader = "X-Crm-Signature";
 
     [HttpPost("ship-confirm")]
-    public async Task<IActionResult> ShipConfirm([FromBody] ShipConfirmRequest req)
+    public async Task<IActionResult> ShipConfirm([FromBody] ShipConfirmRequest req, [FromServices] Services.WebhookSender webhook)
     {
         if (!VerifySignature(config["CrmSync:SharedSecret"] ?? "crm-shared-secret-dev", out var err))
             return Unauthorized(new { code = 401, msg = err });
@@ -30,6 +30,16 @@ public class WebhookController(CrmDbContext db, IConfiguration config) : Control
             contract.ActualDeliveryDate = req.ShippedAt;
             contract.UpdatedAt = DateTime.UtcNow;
             await db.SaveChangesAsync();
+
+            // Q3-① 发货确认 → 通知 FIN 自动生成应收发票 + 收入凭证
+            var customer = await db.Customers.FindAsync(contract.CustomerId);
+            webhook.PostToFin("/api/webhook/crm/shipment", new
+            {
+                crmContractId = contract.ContractId,
+                customerId = contract.CustomerId,
+                customerName = customer?.CustomerName ?? "未知客户",
+                amount = contract.TotalAmount,
+            });
         }
 
         return Ok(new { code = 200, msg = "ok", data = (object?)null });

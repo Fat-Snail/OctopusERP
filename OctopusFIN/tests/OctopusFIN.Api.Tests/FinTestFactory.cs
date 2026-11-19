@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -24,6 +25,10 @@ public class FinTestFactory : WebApplicationFactory<Program>
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
+        // 测试环境清空 webhook 验签 secret，直接走"未配置即跳过"分支
+        builder.ConfigureAppConfiguration(cfg => cfg.AddInMemoryCollection(
+            new Dictionary<string, string?> { ["Webhooks:FinSecret"] = "" }));
+
         builder.ConfigureServices(services =>
         {
             var descriptor = services.SingleOrDefault(

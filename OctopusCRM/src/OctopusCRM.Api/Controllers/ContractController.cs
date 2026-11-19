@@ -123,7 +123,7 @@ public class ContractController(ContractService contractService, CrmDbContext db
 [ApiController]
 [Route("api/payment")]
 [Authorize]
-public class PaymentController(CrmDbContext db) : ControllerBase
+public class PaymentController(CrmDbContext db, Services.WebhookSender webhook) : ControllerBase
 {
     [HttpPut("{paymentId:long}/submit")]
     public async Task<IActionResult> Submit(long paymentId)
@@ -148,6 +148,17 @@ public class PaymentController(CrmDbContext db) : ControllerBase
 
         payment.Status = "confirmed";
         await db.SaveChangesAsync();
+
+        // Q3-① 回款确认 → 通知 FIN 自动核销应收（收款凭证由 FIN 侧生成，AR 收齐后自动结清）
+        webhook.PostToFin("/api/webhook/crm/payment-received", new
+        {
+            crmContractId = payment.ContractId,
+            crmPaymentId = payment.PaymentId,
+            amount = payment.Amount,
+            paymentMethod = payment.PaymentMethod,
+            bankReference = payment.BankReference,
+        });
+
         return Ok(new { code = 200, msg = "回款已确认", data = (object?)null });
     }
 }

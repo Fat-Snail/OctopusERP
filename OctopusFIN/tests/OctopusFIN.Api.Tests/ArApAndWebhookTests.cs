@@ -168,6 +168,24 @@ public class ArApAndWebhookTests : IClassFixture<FinTestFactory>
         voucher.Entries.Should().Contain(e => e.AccountCode == "1002"); // 银行存款
     }
 
+    [Fact]
+    public async Task OaExpenseWebhook_DuplicateApprovalId_IsIdempotent()
+    {
+        var payload = new { oaApprovalId = 7002L, amount = 888m, summary = "重复推送测试" };
+        var first = await _client.PostAsJsonAsync("/api/webhook/oa/expense-approved", payload);
+        var second = await _client.PostAsJsonAsync("/api/webhook/oa/expense-approved", payload);
+
+        (await first.Content.ReadFromJsonAsync<JsonDocument>(_json))!
+            .RootElement.GetProperty("code").GetInt32().Should().Be(200);
+        (await second.Content.ReadFromJsonAsync<JsonDocument>(_json))!
+            .RootElement.GetProperty("code").GetInt32().Should().Be(200);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<FinDbContext>();
+        var count = await db.Vouchers.CountAsync(v => v.Source == "oa-expense" && v.SourceRef == "7002");
+        count.Should().Be(1, "同一审批 ID 重复推送只应生成一张费用凭证");
+    }
+
     // ── 试算平衡表 ─────────────────────────────────────────────────────
 
     [Fact]
@@ -205,5 +223,109 @@ public class ArApAndWebhookTests : IClassFixture<FinTestFactory>
         var doc = await resp.Content.ReadFromJsonAsync<JsonDocument>(_json);
         doc!.RootElement.GetProperty("code").GetInt32().Should().Be(200);
         doc.RootElement.GetProperty("data").GetProperty("status").GetString().Should().Be("open");
+    }
+
+    // ── Q3-① CRM 回款 → 自动核销 AR + 收款凭证 ────────────────────────
+
+    [Fact]
+    public async Task PaymentReceivedWebhook_RegistersReceiptGeneratesVoucherAndCloses()
+    {
+        // 1. 发货确认 → 生成 AR（借 1122 应收 / 贷 6001 收入）
+        var shipResp = await _client.PostAsJsonAsync("/api/webhook/crm/shipment", new
+        {
+            crmContractId = 9101L, customerId = 1L, customerName = "链路客户", amount = 50000m,
+        });
+        shipResp.IsSuccessStatusCode.Should().BeTrue();
+
+        // 2. 回款确认（第一笔 30000）→ 核销 + 收款凭证（借 1002 银行 / 贷 1122 应收）
+        var pay1 = await _client.PostAsJsonAsync("/api/webhook/crm/payment-received", new
+        {
+            crmContractId = 9101L, crmPaymentId = 501L, amount = 30000m,
+            paymentMethod = "银行转账", bankReference = "TXN-A",
+        });
+        var p1 = await pay1.Content.ReadFromJsonAsync<JsonDocument>(_json);
+        p1!.RootElement.GetProperty("code").GetInt32().Should().Be(200);
+        p1.RootElement.GetProperty("msg").GetString().Should().Be("回款已核销（部分）");
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<FinDbContext>();
+            var invoice = await db.ArInvoices.FirstAsync(x => x.CrmContractId == 9101);
+            invoice.ReceivedAmount.Should().Be(30000m);
+            invoice.Status.Should().Be("partial");
+
+            var receipt = await db.ArReceipts.FirstAsync(x => x.InvoiceId == invoice.InvoiceId);
+            receipt.VoucherId.Should().NotBeNull();
+            var voucher = await db.Vouchers.Include(x => x.Entries)
+                .FirstAsync(v => v.VoucherId == receipt.VoucherId);
+            voucher.Source.Should().Be("crm-receipt");
+            voucher.Entries.Count.Should().Be(2);
+            voucher.Entries.Sum(e => e.DebitAmount).Should().Be(30000m);
+            voucher.Entries.Sum(e => e.CreditAmount).Should().Be(30000m);
+            voucher.Entries.Should().Contain(e => e.AccountCode == "1002"); // 银行存款
+            voucher.Entries.Should().Contain(e => e.AccountCode == "1122"); // 应收账款冲减
+        }
+
+        // 3. 回款确认（第二笔 20000）→ 收齐自动结清
+        var pay2 = await _client.PostAsJsonAsync("/api/webhook/crm/payment-received", new
+        {
+            crmContractId = 9101L, crmPaymentId = 502L, amount = 20000m,
+            paymentMethod = "银行转账", bankReference = "TXN-B",
+        });
+        var p2 = await pay2.Content.ReadFromJsonAsync<JsonDocument>(_json);
+        p2!.RootElement.GetProperty("code").GetInt32().Should().Be(200);
+        p2.RootElement.GetProperty("msg").GetString().Should().Be("回款已核销，应收已结清");
+
+        using (var scope = _factory.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<FinDbContext>();
+            var invoice = await db.ArInvoices.FirstAsync(x => x.CrmContractId == 9101);
+            invoice.Status.Should().Be("closed");
+            invoice.ReceivedAmount.Should().Be(invoice.Amount);
+
+            // 复式记账仍平衡
+            var vouchers = await db.Vouchers.Include(x => x.Entries)
+                .Where(v => v.Source == "crm-ar" || v.Source == "crm-receipt").ToListAsync();
+            vouchers.Sum(v => v.Entries.Sum(e => e.DebitAmount))
+                .Should().Be(vouchers.Sum(v => v.Entries.Sum(e => e.CreditAmount)));
+        }
+    }
+
+    [Fact]
+    public async Task PaymentReceivedWebhook_DuplicatePaymentId_IsIdempotent()
+    {
+        await _client.PostAsJsonAsync("/api/webhook/crm/shipment", new
+        {
+            crmContractId = 9102L, customerId = 1L, customerName = "幂等回款客户", amount = 10000m,
+        });
+
+        var payload = new { crmContractId = 9102L, crmPaymentId = 601L, amount = 4000m, paymentMethod = "银行转账" };
+        var first = await _client.PostAsJsonAsync("/api/webhook/crm/payment-received", payload);
+        var second = await _client.PostAsJsonAsync("/api/webhook/crm/payment-received", payload);
+
+        (await first.Content.ReadFromJsonAsync<JsonDocument>(_json))!
+            .RootElement.GetProperty("code").GetInt32().Should().Be(200);
+        var secondDoc = await second.Content.ReadFromJsonAsync<JsonDocument>(_json);
+        secondDoc!.RootElement.GetProperty("code").GetInt32().Should().Be(200);
+        secondDoc.RootElement.GetProperty("msg").GetString().Should().Contain("幂等");
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<FinDbContext>();
+        var invoice = await db.ArInvoices.FirstAsync(x => x.CrmContractId == 9102);
+        invoice.ReceivedAmount.Should().Be(4000m); // 只核销一次
+        var receipts = await db.ArReceipts.Where(x => x.InvoiceId == invoice.InvoiceId).CountAsync();
+        receipts.Should().Be(1);
+    }
+
+    [Fact]
+    public async Task PaymentReceivedWebhook_UnknownContract_ReturnsBusinessError()
+    {
+        var resp = await _client.PostAsJsonAsync("/api/webhook/crm/payment-received", new
+        {
+            crmContractId = 99999L, crmPaymentId = 701L, amount = 100m, paymentMethod = "银行转账",
+        });
+        var doc = await resp.Content.ReadFromJsonAsync<JsonDocument>(_json);
+        doc!.RootElement.GetProperty("code").GetInt32().Should().Be(400);
+        doc.RootElement.GetProperty("msg").GetString().Should().Contain("尚无应收发票");
     }
 }
