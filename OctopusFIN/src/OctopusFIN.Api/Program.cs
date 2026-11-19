@@ -76,6 +76,7 @@ builder.Services.AddRateLimiter(o =>
 builder.Services.AddScoped<AccountService>();
 builder.Services.AddScoped<VoucherService>();
 builder.Services.AddScoped<PeriodService>();
+builder.Services.AddScoped<ClosingService>();
 builder.Services.AddScoped<ArService>();
 builder.Services.AddScoped<ApService>();
 builder.Services.AddScoped<ReportsService>();

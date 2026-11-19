@@ -3,7 +3,7 @@ using OctopusFIN.Api.Persistence;
 
 namespace OctopusFIN.Api.Services;
 
-public class PeriodService(FinDbContext db)
+public class PeriodService(FinDbContext db, ClosingService closingSvc)
 {
     public async Task<List<FinPeriod>> GetListAsync() =>
         await db.Periods.OrderByDescending(x => x.PeriodCode).ToListAsync();
@@ -11,7 +11,9 @@ public class PeriodService(FinDbContext db)
     public async Task<FinPeriod?> GetCurrentAsync() =>
         await db.Periods.OrderByDescending(x => x.PeriodCode).FirstOrDefaultAsync(x => x.Status == "open");
 
-    /// <summary>月结：将期间状态改为 closed，禁止再录入凭证</summary>
+    /// <summary>
+    /// Q3-③ 月结：先自动结转损益（收入/费用 → 本年利润，幂等），再锁定期间禁止录入。
+    /// </summary>
     public async Task<(FinPeriod? period, string? error)> CloseAsync(long periodId, long userId)
     {
         var period = await db.Periods.FirstOrDefaultAsync(x => x.PeriodId == periodId);
@@ -22,6 +24,10 @@ public class PeriodService(FinDbContext db)
         var draftCount = await db.Vouchers.CountAsync(v => v.PeriodId == periodId && v.Status == "draft");
         if (draftCount > 0)
             return (null, $"期间内有 {draftCount} 张草稿凭证未过账，无法关账");
+
+        // 结转损益（无收入/费用发生时跳过；重复关账幂等）
+        var (_, closingErr) = await closingSvc.TransferProfitAsync(periodId, userId);
+        if (closingErr != null) return (null, $"结转损益失败：{closingErr}");
 
         period.Status = "closed";
         period.ClosedAt = DateTime.UtcNow;
