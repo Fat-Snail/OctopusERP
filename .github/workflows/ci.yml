@@ -17,6 +17,8 @@ jobs:
         include:
           - system: OctopusUMC
             sln: OctopusUMC/OctopusUMC.sln
+          - system: OctopusGateway
+            sln: OctopusGateway/OctopusGateway.sln
           - system: OctopusOA
             sln: OctopusOA/OctopusOA.sln
           - system: OctopusPLM

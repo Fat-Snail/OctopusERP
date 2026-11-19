@@ -190,7 +190,11 @@ _ = omsApi;
 var miniappTodo = builder.AddProject<Projects.MiniappTodo_Api>("miniapp-todo")
     .WithEndpoint("http", e => e.Port = 5201)
     .WithReference(keycloak)
-    .WaitFor(keycloak)
+    // 2026-11-19：改为等 keycloak-db。扩展 Aspire.Hosting.Keycloak 13.6.1-preview 的
+    // 健康检查用 http 探测 TLS management 端口（9000/https），永远 Unhealthy，
+    // WaitFor(keycloak) 会把下游卡死。KC 挂数据卷后 4s 启动、discovery 实测 200，
+    // 登录时早已就绪；discovery 刷新机制可容忍启动窗口的瞬时失败。
+    .WaitFor(keycloakDb)
     .WithReplicas(1);
 _ = miniappTodo;
 
@@ -213,12 +217,23 @@ var retailApi = builder.AddProject<Projects.OctopusRetail_Api>("retail-api")
     // 不 WaitFor(umcApi)：建号是运行期动作，不必让零售启动被 UMC 拖慢。
     .WithReference(umcApi)
     .WithEnvironment("InternalApi__SharedSecret", "retail-internal-secret-dev")
-    .WaitFor(keycloak)
+    // 同 miniapp-todo：扩展健康检查探测协议不匹配，等 keycloak-db 替代
+    .WaitFor(keycloakDb)
     .WithReplicas(1);
 
 builder.AddViteApp("retail-web", "../../OctopusRetail/web/OctopusRetail.Web")
     .WithEndpoint("http", e => e.Port = 5186)
     .WithEnvironment("PORT", "5186")
     .WaitFor(retailApi);
+
+// ── OctopusGateway 门户统一网关（P16）──────────────────────────────
+// 端口 5100；/gw/{system}/** → 各子系统（YARP 转发 + UMC JWT 验签 +
+// 按用户限流 + 请求日志）。路由配置见 OctopusGateway.Api/appsettings.json。
+// 不 WaitFor 下游业务系统：下游未就绪时网关转发返回 502/503，不影响网关启动。
+var gatewayApi = builder.AddProject<Projects.OctopusGateway_Api>("gateway-api")
+    .WithEndpoint("http", e => e.Port = 5100)
+    .WithReplicas(1)
+    .WaitFor(umcApi);
+_ = gatewayApi;
 
 builder.Build().Run();

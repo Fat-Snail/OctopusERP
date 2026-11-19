@@ -853,9 +853,10 @@ public class WebhookSender(IHttpClientFactory factory, IConfiguration config, IL
 - [ ] 资质上传
 
 **API 网关（OctopusGateway）**
-- [ ] 新建 .NET YARP 反向代理项目
-- [ ] 统一限流 / 鉴权 / 日志
-- [ ] 外网请求强制走网关
+- [x] 新建 .NET YARP 反向代理项目（`OctopusGateway/`，端口 5100，2026-11-19）
+- [x] 统一限流 / 鉴权 / 日志（按用户固定窗口限流、UMC JWT 验签 FallbackPolicy 全局强制认证、请求访问日志；`/gw/{system}/**` 路由 CRM/WMS/MES/FIN，前缀剥离转发）
+- [ ] 外网请求强制走网关（生产域名/证书就位后收口）
+- 网关测试 5/5：路由转发（前缀剥离）、无 token 401、限流 429、per-user 隔离、自身健康
 
 ---
 

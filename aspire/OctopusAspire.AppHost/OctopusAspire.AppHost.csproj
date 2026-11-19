@@ -53,6 +53,9 @@
     <ProjectReference Include="..\..\OctopusCRM\src\OctopusCRM.Api\OctopusCRM.Api.csproj">
       <IsAspireProjectResource>true</IsAspireProjectResource>
     </ProjectReference>
+    <ProjectReference Include="..\..\OctopusGateway\src\OctopusGateway.Api\OctopusGateway.Api.csproj">
+      <IsAspireProjectResource>true</IsAspireProjectResource>
+    </ProjectReference>
     <ProjectReference Include="..\..\OctopusWMS\src\OctopusWMS.Api\OctopusWMS.Api.csproj">
       <IsAspireProjectResource>true</IsAspireProjectResource>
     </ProjectReference>
