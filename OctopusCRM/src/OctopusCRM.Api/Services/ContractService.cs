@@ -197,6 +197,8 @@ public class ContractService(CrmDbContext db, WebhookSender webhook)
 
         contract.Status = "shipped";
         if (actualDeliveryDate.HasValue) contract.ActualDeliveryDate = actualDeliveryDate;
+        // P16 门户物流：持久化运单号/承运商（原来参数被丢弃，门户无真实轨迹可查）
+        if (!string.IsNullOrWhiteSpace(trackingNumber)) contract.TrackingNumber = trackingNumber;
         contract.UpdatedAt = DateTime.UtcNow;
         await db.SaveChangesAsync();
         return null;

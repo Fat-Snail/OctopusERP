@@ -142,6 +142,9 @@ public class CrmContract
     public DateTime? SignDate { get; set; }
     public DateTime? DeliveryDate { get; set; }
     public DateTime? ActualDeliveryDate { get; set; }
+    /// <summary>P16 门户物流：发货时登记的运单号/承运商（原 Ship 接口接收但未持久化）</summary>
+    public string? TrackingNumber { get; set; }
+    public string? Carrier { get; set; }
     public string Status { get; set; } = "draft";
     public long? OaApprovalId { get; set; }
     public string? FileUrl { get; set; }
@@ -216,4 +219,30 @@ public class CrmPayment
     public DateTime CreatedAt { get; set; }
 
     public CrmContract? Contract { get; set; }
+}
+
+// ── P16 客户门户轻量数据 ──────────────────────────────────────────
+
+/// <summary>客户门户在线客服消息。From='me' 客户发出 / 'agent' 客服回复。</summary>
+public class CrmPortalChatMessage
+{
+    public long Id { get; set; }
+    public long CustomerId { get; set; }
+    public string From { get; set; } = "agent";
+    public string Text { get; set; } = string.Empty;
+    public DateTime CreatedAt { get; set; }
+}
+
+/// <summary>客户门户文档下载清单。</summary>
+public class CrmPortalDocument
+{
+    public long Id { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
+    public string FileName { get; set; } = string.Empty;
+    public string FileSize { get; set; } = string.Empty;
+    public DateTime UpdatedAt { get; set; }
+    public int Downloads { get; set; }
+    public bool IsGlobal { get; set; } = true;  // true=所有客户可见；false=仅 CustomerId 客户
+    public long? CustomerId { get; set; }
 }

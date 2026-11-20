@@ -19,6 +19,35 @@ public static class CrmDbSeeder
 
         // P16：幂等绑定演示客户到 UMC 用户（sub 2/3），使门户"仅本人"可验证
         BindPortalCustomers(db);
+        // P16：客服消息/文档演示种子（幂等）
+        SeedPortalContent(db);
+    }
+
+    /// <summary>客户门户客服消息与文档种子（幂等，以 Count==0 为 gate）。</summary>
+    private static void SeedPortalContent(CrmDbContext db)
+    {
+        var now = DateTime.UtcNow;
+        if (!db.PortalDocuments.Any())
+        {
+            db.PortalDocuments.AddRange(
+                new CrmPortalDocument { Title = "2026 秋冬面料产品手册", Category = "产品手册", FileName = "catalog-aw26.pdf", FileSize = "8.2 MB", UpdatedAt = now.AddDays(-31), Downloads = 132 },
+                new CrmPortalDocument { Title = "面料洗护与工艺说明", Category = "技术文档", FileName = "fabric-care.pdf", FileSize = "1.4 MB", UpdatedAt = now.AddDays(-53), Downloads = 87 },
+                new CrmPortalDocument { Title = "ODM 合作流程指引", Category = "合作指南", FileName = "odm-guide.pdf", FileSize = "2.1 MB", UpdatedAt = now.AddDays(-97), Downloads = 56 });
+        }
+        if (!db.PortalChatMessages.Any())
+        {
+            // 给已绑定的两个客户各放一条欢迎消息
+            var bound = db.Customers.Where(c => c.UmcUserId.HasValue)
+                .Select(c => c.CustomerId).ToList();
+            foreach (var cid in bound)
+                db.PortalChatMessages.Add(new CrmPortalChatMessage
+                {
+                    CustomerId = cid, From = "agent",
+                    Text = "您好，我是您的专属客户经理，有什么可以帮您？",
+                    CreatedAt = now.AddMinutes(-10),
+                });
+        }
+        db.SaveChanges();
     }
 
     /// <summary>
@@ -41,6 +70,18 @@ public static class CrmDbSeeder
                 cmd.ExecuteNonQuery();
                 Console.WriteLine("[CrmDbSeeder] 列级自愈：crm_customer.UmcUserId 已补齐");
             }
+            // 合同物流字段（P16）：发货运单号/承运商
+            if (TableExists(conn, "crm_contract"))
+            {
+                foreach (var (col, def) in new[] { ("TrackingNumber", "TEXT NULL"), ("Carrier", "TEXT NULL") })
+                {
+                    if (ColumnExists(conn, "crm_contract", col)) continue;
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = $"ALTER TABLE crm_contract ADD COLUMN {col} {def}";
+                    cmd.ExecuteNonQuery();
+                    Console.WriteLine($"[CrmDbSeeder] 列级自愈：crm_contract.{col} 已补齐");
+                }
+            }
             // 唯一索引：重复历史数据时跳过，避免阻塞启动
             try
             {
@@ -51,6 +92,32 @@ public static class CrmDbSeeder
             catch (Exception ex)
             {
                 Console.WriteLine($"[CrmDbSeeder] 建 UmcUserId 唯一索引跳过：{ex.Message}");
+            }
+
+            // P16 新表（旧库 EnsureCreated 不会增量建表）
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = @"
+CREATE TABLE IF NOT EXISTS crm_portal_chat_message (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    CustomerId INTEGER NOT NULL,
+    ""From"" TEXT NOT NULL,
+    ""Text"" TEXT NOT NULL,
+    CreatedAt TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS IX_crm_portal_chat_customer ON crm_portal_chat_message(CustomerId);
+CREATE TABLE IF NOT EXISTS crm_portal_document (
+    Id INTEGER PRIMARY KEY AUTOINCREMENT,
+    Title TEXT NOT NULL,
+    Category TEXT NOT NULL,
+    FileName TEXT NOT NULL,
+    FileSize TEXT NOT NULL,
+    UpdatedAt TEXT NOT NULL,
+    Downloads INTEGER NOT NULL DEFAULT 0,
+    IsGlobal INTEGER NOT NULL DEFAULT 1,
+    CustomerId INTEGER NULL
+);";
+                cmd.ExecuteNonQuery();
             }
         }
         finally

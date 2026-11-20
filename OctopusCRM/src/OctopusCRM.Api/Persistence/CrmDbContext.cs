@@ -17,6 +17,8 @@ public class CrmDbContext : DbContext
     public DbSet<CrmContractItem> ContractItems => Set<CrmContractItem>();
     public DbSet<CrmPayment> Payments => Set<CrmPayment>();
     public DbSet<CrmCustomerStyle> CustomerStyles => Set<CrmCustomerStyle>();
+    public DbSet<CrmPortalChatMessage> PortalChatMessages => Set<CrmPortalChatMessage>();
+    public DbSet<CrmPortalDocument> PortalDocuments => Set<CrmPortalDocument>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -31,6 +33,8 @@ public class CrmDbContext : DbContext
         b.Entity<CrmContractItem>().ToTable("crm_contract_item");
         b.Entity<CrmPayment>().ToTable("crm_payment");
         b.Entity<CrmCustomerStyle>().ToTable("crm_customer_style");
+        b.Entity<CrmPortalChatMessage>().ToTable("crm_portal_chat_message");
+        b.Entity<CrmPortalDocument>().ToTable("crm_portal_document");
 
         // 显式主键 + 自增
         b.Entity<CrmSyncUser>().HasKey(x => x.Id);
@@ -53,6 +57,10 @@ public class CrmDbContext : DbContext
         b.Entity<CrmContractItem>().Property(x => x.ItemId).ValueGeneratedOnAdd();
         b.Entity<CrmPayment>().HasKey(x => x.PaymentId);
         b.Entity<CrmPayment>().Property(x => x.PaymentId).ValueGeneratedOnAdd();
+        b.Entity<CrmPortalChatMessage>().HasKey(x => x.Id);
+        b.Entity<CrmPortalChatMessage>().Property(x => x.Id).ValueGeneratedOnAdd();
+        b.Entity<CrmPortalDocument>().HasKey(x => x.Id);
+        b.Entity<CrmPortalDocument>().Property(x => x.Id).ValueGeneratedOnAdd();
 
         // Decimal 精度
         b.Entity<CrmInquiryItem>().Property(x => x.Quantity).HasColumnType("decimal(18,4)");
