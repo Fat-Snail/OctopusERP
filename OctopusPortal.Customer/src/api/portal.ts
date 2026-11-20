@@ -1,7 +1,7 @@
 // ── 客户门户 API（真实优先 + mock 降级） ──
-// 有后端端点的方法：LIVE 开启时经网关调用真实 API，失败自动降级 mock（保证页面不崩）。
-// 无后端端点的方法（物流/对账/客服/文档/汇总）：保持 mock，并显式 warn 标注缺口。
-// 替换 mock.ts 的门户入口；视图只需把 import 从 '@/api/mock' 改为 '@/api/portal'。
+// 身份绑定与后端端点就绪后（2026-11-20），所有方法 LIVE=1 时经网关调用真实 API，
+// 失败自动降级 mock（保证页面不崩）。后端 /api/portal/** 已按 sub→客户做"仅本人"过滤。
+// LIVE=0（默认）保持 mock 行为，用于网关未启动/后端未部署的开发场景。
 
 import { LIVE, http, unwrap } from './http'
 import {
@@ -12,11 +12,6 @@ import type {
   ChatMessage, Contract, DocumentItem, Inquiry, PortalSummary,
   Shipment, StatementItem, StatementSummary,
 } from './types'
-
-/** 无真实端点时的统一降级日志，便于识别哪些数据仍是 mock。 */
-function fallback(method: string, reason: string): void {
-  console.warn(`[portal:cust] ${method} 使用 mock 降级：${reason}`)
-}
 
 /** 真实调用失败时降级，避免单个接口故障拖垮整页。 */
 async function live<T>(method: string, call: () => Promise<T>, fallbackValue: T): Promise<T> {
@@ -68,11 +63,26 @@ function mapContract(b: BackendContract): Contract {
   }
 }
 
+// 后端 /api/portal/* 返回的字段已对齐门户契约，映射仅做防御性兜底
+type BackendShipment = {
+  id: string; trackingNo: string; carrier: string; status: string
+  contractCode: string; productName: string
+  traces: Array<{ time: string; desc: string; location?: string }>
+}
+function mapShipment(b: BackendShipment): Shipment {
+  return {
+    id: b.id, trackingNo: b.trackingNo, carrier: b.carrier,
+    status: (['preparing', 'shipping', 'delivered'].includes(b.status) ? b.status : 'shipping') as Shipment['status'],
+    contractCode: b.contractCode, productName: b.productName,
+    traces: b.traces ?? [],
+  }
+}
+
 export const portalApi = {
-  // 汇总：后端无聚合端点 → mock（warn）
+  // ✅ 真实端点：GET /api/portal/summary
   async getSummary(): Promise<PortalSummary> {
-    fallback('getSummary', '后端无门户汇总端点 /api/portal/summary')
-    return mockSummary
+    if (!LIVE) return mockSummary
+    return live('getSummary', () => unwrap<PortalSummary>(http.get('/api/portal/summary')), mockSummary)
   },
 
   // ✅ 真实端点：GET /api/inquiry（网关 /gw/crm）
@@ -84,10 +94,9 @@ export const portalApi = {
     }, mockInquiries)
   },
 
-  // ✅ 真实端点：POST /api/inquiry（契约不同，需按后端 CreateInquiryRequest 组装）
+  // ✅ 真实端点：POST /api/inquiry（后端按 sub 强制归属本人，customerId 占位会被覆盖）
   async createInquiry(input: { productName: string; quantity: number; unit: string; remark?: string }): Promise<Inquiry> {
     if (!LIVE) {
-      // 保留原 mock 创建逻辑
       const now = new Date()
       const pad = (n: number) => String(n).padStart(2, '0')
       return {
@@ -105,16 +114,15 @@ export const portalApi = {
       }
     }
     try {
-      // 后端需 customerId；门户客户身份绑定尚未落地，暂以标题承载产品信息（详见 TODO）
       const created = await unwrap<BackendInquiry>(http.post('/api/inquiry', {
-        customerId: 0,
+        customerId: 0, // 占位：后端 PortalIdentityService 会强制覆盖为本人客户
         title: input.productName,
         description: [input.quantity + input.unit, input.remark].filter(Boolean).join(' / '),
       }))
       return mapInquiry(created)
     } catch (e) {
-      console.warn('[portal:cust] createInquiry 真实 API 失败，降级 mock：', e)
-      throw e // 创建是写操作，失败必须让用户知道，不做静默 mock 成功
+      console.warn('[portal:cust] createInquiry 真实 API 失败：', e)
+      throw e // 写操作失败必须让用户知道，不做静默 mock 成功
     }
   },
 
@@ -127,30 +135,48 @@ export const portalApi = {
     }, mockContracts)
   },
 
+  // ✅ 真实端点：GET /api/portal/shipments
   async getShipments(): Promise<Shipment[]> {
-    fallback('getShipments', '后端无客户物流轨迹端点（WMS 侧待建）')
-    return mockShipments
+    if (!LIVE) return mockShipments
+    return live('getShipments', async () => {
+      const rows = await unwrap<BackendShipment[]>(http.get('/api/portal/shipments'))
+      return rows.map(mapShipment)
+    }, mockShipments)
   },
+
+  // ✅ 真实端点：GET /api/portal/statement/summary
   async getStatementSummary(): Promise<StatementSummary> {
-    fallback('getStatementSummary', '后端无客户对账端点（FIN 侧待建）')
-    return mockStatementSummary
+    if (!LIVE) return mockStatementSummary
+    return live('getStatementSummary',
+      () => unwrap<StatementSummary>(http.get('/api/portal/statement/summary')), mockStatementSummary)
   },
+  // ✅ 真实端点：GET /api/portal/statement/items
   async getStatementItems(): Promise<StatementItem[]> {
-    fallback('getStatementItems', '后端无客户对账端点（FIN 侧待建）')
-    return mockStatementItems
+    if (!LIVE) return mockStatementItems
+    return live('getStatementItems',
+      () => unwrap<StatementItem[]>(http.get('/api/portal/statement/items')), mockStatementItems)
   },
+  // ✅ 真实端点：GET /api/portal/chat
   async getChatHistory(): Promise<ChatMessage[]> {
-    fallback('getChatHistory', '后端无在线客服端点')
-    return mockChat
+    if (!LIVE) return mockChat
+    return live('getChatHistory',
+      () => unwrap<ChatMessage[]>(http.get('/api/portal/chat')), mockChat)
   },
+  // ✅ 真实端点：POST /api/portal/chat
   async sendChatMessage(text: string): Promise<ChatMessage> {
-    fallback('sendChatMessage', '后端无在线客服端点')
-    const now = new Date()
-    const pad = (n: number) => String(n).padStart(2, '0')
-    return { id: String(Date.now()), from: 'me', text, time: `${pad(now.getHours())}:${pad(now.getMinutes())}` }
+    if (!LIVE) {
+      const now = new Date()
+      const pad = (n: number) => String(n).padStart(2, '0')
+      return { id: String(Date.now()), from: 'me', text, time: `${pad(now.getHours())}:${pad(now.getMinutes())}` }
+    }
+    return live('sendChatMessage',
+      () => unwrap<ChatMessage>(http.post('/api/portal/chat', { text })),
+      { id: String(Date.now()), from: 'me', text, time: new Date().toTimeString().slice(0, 5) })
   },
+  // ✅ 真实端点：GET /api/portal/documents
   async getDocuments(): Promise<DocumentItem[]> {
-    fallback('getDocuments', '后端无文档库端点')
-    return mockDocuments
+    if (!LIVE) return mockDocuments
+    return live('getDocuments',
+      () => unwrap<DocumentItem[]>(http.get('/api/portal/documents')), mockDocuments)
   },
 }

@@ -56,10 +56,12 @@
 - ✅ `OctopusPortal.Supplier/`（端口 5185）：H5 + PWA，含询价响应（在线报价）、我的订单、发货登记、对账中心、资质上传；UMC OIDC PKCE 登录（`octopus-supplier-portal`）
 - ✅ 技术栈对齐仓库先例：Vue 3.5 + Vite 8 + TS 5.9 + Tailwind 4 + oidc-client-ts + Pinia + lucide；`vue-tsc -b && vite build` 双项目构建通过
 - ✅ CI frontend matrix 已接入两个门户（npm ci + TypeCheck + Build，node 22）
-- 🔶 接入真实 API（骨架已就位，2026-11-20）：新增 `src/api/http.ts`（axios + Bearer token + `{code,msg,data}` 解包，LIVE 开关 `VITE_PORTAL_LIVE=1`）与 `src/api/portal.ts`（真实优先 + mock 降级）。视图 import 已从 `@/api/mock` 切到 `@/api/portal`，默认 LIVE=0 保持 mock 不崩页。
-  - 已接真实端点：客户 `getInquiries(GET /api/inquiry)` / `getContracts(GET /api/contract)` / `createInquiry(POST /api/inquiry)`；供应商 `getOrders(GET /api/purchase)`。经网关 `/gw/crm` `/gw/mes` 转发，含 DTO→门户类型映射。
-  - 仍 mock 降级（后端端点待建，运行时 console.warn 标注）：客户 汇总/物流/对账/客服/文档；供应商 汇总/询价响应/发货登记/对账/资质。
-  - ⬜ 待后端补：UMC sub → 客户/供应商身份绑定（"仅本人"行级过滤），以及上述门户专属端点；补齐后逐个把 LIVE 打开。
+- ✅ 接入真实 API（全量打通，2026-11-20）：新增 `src/api/http.ts`（axios + Bearer token + `{code,msg,data}` 解包，LIVE 开关 `VITE_PORTAL_LIVE=1`）与 `src/api/portal.ts`（真实优先 + mock 降级）。视图 import 已从 `@/api/mock` 切到 `@/api/portal`，默认 LIVE=0 保持 mock 不崩页。
+  - 已接真实端点：客户 `getInquiries/getContracts/createInquiry`（CRM）+ `getSummary/getShipments/getStatementSummary/getStatementItems/getChatHistory/sendChatMessage/getDocuments`（CRM `/api/portal/*`）；供应商 `getOrders`（MES `/api/purchase`）+ 其余 8 个方法（MES `/api/portal/*`）。全部经网关 `/gw/crm` `/gw/mes` 转发，含 DTO→门户类型映射。
+  - ✅ 后端身份绑定落地（commit `9e388eb`）：`CrmCustomer.UmcUserId` / `MesSupplier.UmcUserId`（nullable + 唯一索引）+ ADR-007 列级自愈；`PortalIdentityService` 解析 sub→档案；询盘/合同/采购单列表与详情强制"仅本人"（覆盖前端传入 id 防越权），内部员工未绑定保持全量。`/api/portal/me` 供身份探测。
+  - ✅ 客户门户专属端点（commit `3a2f5bb`）：CRM 汇总/物流(合同运单号)/对账(真实回款)/客服消息/文档；供应商门户专属端点（commit `607123b`）：MES 汇总/询价响应/发货登记/对账/资质。全部按绑定身份隔离。
+  - 📈 测试：CRM 38→51（隔离 6 + 端点 7）、MES 123→135（隔离 5 + 端点 7）；两端门户 vue-tsc + vite build 通过。
+  - 上线切换：网关与后端就绪后，给两个门户设置 `VITE_PORTAL_LIVE=1` 即走真实 API；任一接口失败自动降级 mock。演示数据的身份绑定：UMC sub 2→客户1/供应商1，sub 3→客户2/供应商2（见 seeder）。
 
 ### 2026-11-18 Q3 主线：FIN 业务闭环（四项落地）
 

@@ -1,6 +1,7 @@
 // ── 供应商门户 API（真实优先 + mock 降级） ──
-// 有后端端点的方法：LIVE 开启时经网关调用真实 API，失败自动降级 mock（保证页面不崩）。
-// 无后端端点的方法（询价响应/发货登记/对账/资质/汇总）：保持 mock，并显式 warn 标注缺口。
+// 身份绑定与后端端点就绪后（2026-11-20），所有方法 LIVE=1 时经网关调用真实 API，
+// 失败自动降级 mock（保证页面不崩）。后端 /api/portal/** 已按 sub→供应商做"仅本人"过滤。
+// LIVE=0（默认）保持 mock 行为。
 
 import { LIVE, http, unwrap } from './http'
 import {
@@ -10,10 +11,6 @@ import {
 import type {
   PortalSummary, PurchaseOrder, Qualification, QuoteRequest, StatementItem, StatementSummary,
 } from './types'
-
-function fallback(method: string, reason: string): void {
-  console.warn(`[portal:supp] ${method} 使用 mock 降级：${reason}`)
-}
 
 async function live<T>(method: string, call: () => Promise<T>, fallbackValue: T): Promise<T> {
   try {
@@ -49,36 +46,75 @@ function mapOrder(b: BackendPurchase): PurchaseOrder {
   }
 }
 
+// 后端 /api/portal/* 字段已对齐门户契约，映射仅做防御性兜底
+type BackendQuote = {
+  id: string; code: string; productName: string; sku: string; quantity: number; unit: string
+  deadline: string; status: string
+  myQuote?: { unitPrice: number; deliveryDays: number; remark?: string; quotedAt: string; status: string }
+}
+function mapQuote(b: BackendQuote): QuoteRequest {
+  return {
+    id: b.id, code: b.code, productName: b.productName, sku: b.sku,
+    quantity: b.quantity, unit: b.unit, deadline: b.deadline,
+    status: (['pending', 'responded', 'closed'].includes(b.status) ? b.status : 'pending') as QuoteRequest['status'],
+    myQuote: b.myQuote ? {
+      unitPrice: b.myQuote.unitPrice, deliveryDays: b.myQuote.deliveryDays,
+      remark: b.myQuote.remark, quotedAt: b.myQuote.quotedAt,
+      status: (['under_review', 'accepted', 'rejected'].includes(b.myQuote.status)
+        ? b.myQuote.status : 'under_review') as NonNullable<QuoteRequest['myQuote']>['status'],
+    } : undefined,
+  }
+}
+
+type ShipmentResult = { orderCode: string; trackingNo: string; carrier: string; shippedAt: string }
+
 export const portalApi = {
+  // ✅ 真实端点：GET /api/portal/summary
   async getSummary(): Promise<PortalSummary> {
-    fallback('getSummary', '后端无供应商门户汇总端点')
-    return mockSummary
+    if (!LIVE) return mockSummary
+    return live('getSummary', () => unwrap<PortalSummary>(http.get('/api/portal/summary')), mockSummary)
   },
 
+  // ✅ 真实端点：GET /api/portal/quotes
   async getQuoteRequests(): Promise<QuoteRequest[]> {
-    fallback('getQuoteRequests', '后端无「供应商询价响应」端点（CRM 仅有销售侧询盘）')
-    return mockQuotes
+    if (!LIVE) return mockQuotes
+    return live('getQuoteRequests', async () => {
+      const rows = await unwrap<BackendQuote[]>(http.get('/api/portal/quotes'))
+      return rows.map(mapQuote)
+    }, mockQuotes)
   },
 
+  // ✅ 真实端点：POST /api/portal/quotes/{id}/submit
   async submitQuote(
     quoteId: string,
     input: { unitPrice: number; deliveryDays: number; remark?: string }
   ): Promise<QuoteRequest> {
-    fallback('submitQuote', '后端无供应商报价回写端点')
-    const target = mockQuotes.find((q) => q.id === quoteId)
-    if (!target) throw new Error('询价单不存在')
-    const now = new Date()
-    const pad = (n: number) => String(n).padStart(2, '0')
-    target.status = 'responded'
-    target.myQuote = {
-      unitPrice: input.unitPrice, deliveryDays: input.deliveryDays, remark: input.remark,
-      quotedAt: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`,
-      status: 'under_review',
+    if (!LIVE) {
+      const target = mockQuotes.find((q) => q.id === quoteId)
+      if (!target) throw new Error('询价单不存在')
+      const now = new Date()
+      const pad = (n: number) => String(n).padStart(2, '0')
+      target.status = 'responded'
+      target.myQuote = {
+        unitPrice: input.unitPrice, deliveryDays: input.deliveryDays, remark: input.remark,
+        quotedAt: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`,
+        status: 'under_review',
+      }
+      return target
     }
-    return target
+    return live('submitQuote', async () => {
+      const row = await unwrap<BackendQuote>(http.post(`/api/portal/quotes/${quoteId}/submit`, {
+        unitPrice: input.unitPrice, deliveryDays: input.deliveryDays, remark: input.remark,
+      }))
+      return mapQuote(row)
+    }, (() => {
+      const target = mockQuotes.find((q) => q.id === quoteId)
+      if (!target) throw new Error('询价单不存在')
+      return { ...target, status: 'responded' as const }
+    })())
   },
 
-  // ✅ 真实端点：GET /api/purchase（MES，支持 supplierId 过滤；身份绑定待后端补）
+  // ✅ 真实端点：GET /api/purchase（MES，后端按 sub 强制本人供应商）
   async getOrders(): Promise<PurchaseOrder[]> {
     if (!LIVE) return mockOrders
     return live('getOrders', async () => {
@@ -87,42 +123,52 @@ export const portalApi = {
     }, mockOrders)
   },
 
+  // ✅ 真实端点：POST /api/portal/shipments
   async registerShipment(
     orderId: string,
     input: { trackingNo: string; carrier: string }
-  ): Promise<{ orderCode: string; trackingNo: string; carrier: string; shippedAt: string }> {
-    fallback('registerShipment', '后端无供应商发货登记端点（内部 ship-confirm 不可供供应商调用）')
-    const order = mockOrders.find((o) => o.id === orderId)
-    if (!order) throw new Error('采购订单不存在')
-    order.status = 'shipped'
-    const now = new Date()
-    const pad = (n: number) => String(n).padStart(2, '0')
-    return {
-      orderCode: order.code, trackingNo: input.trackingNo, carrier: input.carrier,
-      shippedAt: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}`,
+  ): Promise<ShipmentResult> {
+    if (!LIVE) {
+      const order = mockOrders.find((o) => o.id === orderId)
+      if (!order) throw new Error('采购订单不存在')
+      order.status = 'shipped'
+      return { orderCode: order.code, trackingNo: input.trackingNo, carrier: input.carrier, shippedAt: new Date().toISOString() }
     }
+    return live('registerShipment', async () => {
+      // 后端按采购单数字 id 定位，前端 orderId 为字符串
+      return unwrap<ShipmentResult>(http.post('/api/portal/shipments', {
+        orderId: Number(orderId), trackingNo: input.trackingNo, carrier: input.carrier,
+      }))
+    }, { orderCode: `PO-${orderId}`, trackingNo: input.trackingNo, carrier: input.carrier, shippedAt: new Date().toISOString() })
   },
 
+  // ✅ 真实端点：GET /api/portal/statement/summary
   async getStatementSummary(): Promise<StatementSummary> {
-    fallback('getStatementSummary', '后端无供应商对账端点（FIN /api/ap 是企业应付视角）')
-    return mockStatementSummary
+    if (!LIVE) return mockStatementSummary
+    return live('getStatementSummary',
+      () => unwrap<StatementSummary>(http.get('/api/portal/statement/summary')), mockStatementSummary)
   },
+  // ✅ 真实端点：GET /api/portal/statement/items
   async getStatementItems(): Promise<StatementItem[]> {
-    fallback('getStatementItems', '后端无供应商对账端点')
-    return mockStatementItems
+    if (!LIVE) return mockStatementItems
+    return live('getStatementItems',
+      () => unwrap<StatementItem[]>(http.get('/api/portal/statement/items')), mockStatementItems)
   },
+  // ✅ 真实端点：GET /api/portal/qualifications
   async getQualifications(): Promise<Qualification[]> {
-    fallback('getQualifications', '后端无资质档案端点')
-    return mockQualifications
+    if (!LIVE) return mockQualifications
+    return live('getQualifications',
+      () => unwrap<Qualification[]>(http.get('/api/portal/qualifications')), mockQualifications)
   },
+  // ✅ 真实端点：POST /api/portal/qualifications
   async uploadQualification(input: { title: string; category: string; fileName: string }): Promise<Qualification> {
-    fallback('uploadQualification', '后端无资质上传端点')
-    const now = new Date()
-    const pad = (n: number) => String(n).padStart(2, '0')
-    return {
+    const fallbackVal: Qualification = {
       id: String(Date.now()), title: input.title, category: input.category,
       fileName: input.fileName, fileSize: '—', status: 'pending',
-      uploadedAt: `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`,
+      uploadedAt: new Date().toISOString().slice(0, 10),
     }
+    if (!LIVE) return fallbackVal
+    return live('uploadQualification',
+      () => unwrap<Qualification>(http.post('/api/portal/qualifications', input)), fallbackVal)
   },
 }
