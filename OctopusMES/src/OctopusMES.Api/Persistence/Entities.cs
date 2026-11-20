@@ -27,6 +27,8 @@ public class MesSupplier
     public string Status { get; set; } = "active";
     public int Level { get; set; } = 3;
     public string? Remark { get; set; }
+    /// <summary>P16 门户身份绑定：该供应商对应的 UMC 用户 sub。为 null 表示内部录入，不对外门户开放。</summary>
+    public long? UmcUserId { get; set; }
     public DateTime CreatedAt { get; set; }
 
     public List<MesPurchaseOrder> PurchaseOrders { get; set; } = new();

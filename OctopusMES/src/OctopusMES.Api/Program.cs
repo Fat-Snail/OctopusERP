@@ -86,6 +86,7 @@ builder.Services.AddRateLimiter(o =>
 // Services（Scoped）
 builder.Services.AddScoped<SupplierService>();
 builder.Services.AddScoped<PurchaseOrderService>();
+builder.Services.AddScoped<PortalIdentityService>();
 builder.Services.AddScoped<WorkOrderService>();
 builder.Services.AddScoped<MesStatsService>();
 builder.Services.AddScoped<GarmentScheduleService>();

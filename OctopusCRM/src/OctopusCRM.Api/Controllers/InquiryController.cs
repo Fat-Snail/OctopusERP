@@ -7,7 +7,7 @@ namespace OctopusCRM.Api.Controllers;
 [ApiController]
 [Route("api/inquiry")]
 [Authorize]
-public class InquiryController(InquiryService inquiryService) : ControllerBase
+public class InquiryController(InquiryService inquiryService, PortalIdentityService portalIdentity) : ControllerBase
 {
     private long GetCurrentUserId() =>
         long.TryParse(User.FindFirst("sub")?.Value, out var id) ? id : 0;
@@ -17,6 +17,11 @@ public class InquiryController(InquiryService inquiryService) : ControllerBase
         [FromQuery] long? customerId, [FromQuery] string? status,
         [FromQuery] string? keyword, [FromQuery] int page = 1, [FromQuery] int size = 20)
     {
+        // P16 行级过滤：门户客户强制只看本人，忽略前端传入的 customerId（防越权）；
+        // 内部员工（未绑定）保持原行为，可用 customerId 查询任意客户。
+        var boundId = await portalIdentity.GetCustomerIdAsync(GetCurrentUserId());
+        if (boundId.HasValue) customerId = boundId.Value;
+
         var (rows, total) = await inquiryService.GetListAsync(customerId, status, keyword, page, size);
         return Ok(new { code = 200, msg = "ok", data = new { rows, total } });
     }
@@ -26,14 +31,22 @@ public class InquiryController(InquiryService inquiryService) : ControllerBase
     {
         var inquiry = await inquiryService.GetByIdAsync(id);
         if (inquiry == null) return Ok(new { code = 404, msg = "询盘不存在", data = (object?)null });
+
+        var boundId = await portalIdentity.GetCustomerIdAsync(GetCurrentUserId());
+        if (boundId.HasValue && inquiry.CustomerId != boundId.Value)
+            return Ok(new { code = 404, msg = "询盘不存在", data = (object?)null });
+
         return Ok(new { code = 200, msg = "ok", data = inquiry });
     }
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateInquiryRequest req)
     {
+        // P16：门户客户创建询盘强制归属本人（覆盖前端可能传来的 customerId=0 占位）
+        var boundId = await portalIdentity.GetCustomerIdAsync(GetCurrentUserId());
+        var customerId = boundId ?? req.CustomerId;
         var inquiry = await inquiryService.CreateAsync(
-            req.CustomerId, req.Title, req.Description, req.ExpectedDelivery,
+            customerId, req.Title, req.Description, req.ExpectedDelivery,
             req.AssignedTo, req.AssignedToName, GetCurrentUserId());
         return Ok(new { code = 200, msg = "创建成功", data = inquiry });
     }

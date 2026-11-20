@@ -28,6 +28,8 @@ public class CrmCustomer
     public string? Address { get; set; }
     public string? Website { get; set; }
     public string? Remark { get; set; }
+    /// <summary>P16 门户身份绑定：该客户对应的 UMC 用户 sub。为 null 表示内部录入客户，不对外门户开放。</summary>
+    public long? UmcUserId { get; set; }
     public long CreatedBy { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }

@@ -63,6 +63,7 @@ builder.Services.AddScoped<InquiryService>();
 builder.Services.AddScoped<QuoteService>();
 builder.Services.AddScoped<ContractService>();
 builder.Services.AddScoped<StatsService>();
+builder.Services.AddScoped<PortalIdentityService>();
 
 builder.Services.AddHttpClient();
 builder.Services.AddScoped<WebhookSender>();

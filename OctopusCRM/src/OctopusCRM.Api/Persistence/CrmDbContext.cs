@@ -68,6 +68,8 @@ public class CrmDbContext : DbContext
 
         // 唯一索引
         b.Entity<CrmSyncUser>().HasIndex(x => x.UmcUserId).IsUnique();
+        // P16：一个 UMC 用户最多绑定一个客户档案（null 不受唯一约束限制）
+        b.Entity<CrmCustomer>().HasIndex(x => x.UmcUserId).IsUnique();
 
         // 关系配置
         b.Entity<CrmCustomer>()

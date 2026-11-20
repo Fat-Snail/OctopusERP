@@ -36,6 +36,31 @@ public static class MesDbSeeder
         // 通用离散制造主数据演示种子（幂等）
         EnsureDiscreteManufacturingCapabilities(db);
         TryExtendResourceCalendarsSafe(db);
+
+        // P16：幂等绑定演示供应商到 UMC 用户（sub 2/3），供供应商门户"仅本人"过滤
+        BindPortalSuppliers(db);
+    }
+
+    /// <summary>
+    /// 幂等绑定：将演示供应商绑定到已有 UMC 用户，供供应商门户以各自 sub 只看本人数据。
+    /// 已绑定的不覆盖。
+    /// </summary>
+    private static void BindPortalSuppliers(MesDbContext db)
+    {
+        var bindings = new (string Code, long UmcUserId)[]
+        {
+            ("SUP-001", 2),
+            ("SUP-002", 3),
+        };
+        var changed = false;
+        foreach (var (code, umcId) in bindings)
+        {
+            var supplier = db.Suppliers.FirstOrDefault(s => s.SupplierCode == code);
+            if (supplier == null || supplier.UmcUserId.HasValue) continue;
+            supplier.UmcUserId = umcId;
+            changed = true;
+        }
+        if (changed) db.SaveChanges();
     }
 
     public static int EnsureDiscreteManufacturingCapabilities(MesDbContext db)
@@ -412,6 +437,9 @@ public static class MesDbSeeder
             // (TableName, ColumnName, ColumnDef)
             var expectedColumns = new (string Table, string Col, string Def)[]
             {
+                // P16 门户身份绑定：供应商档案绑定 UMC 用户 sub
+                ("mes_supplier", "UmcUserId",                "INTEGER NULL"),
+
                 // mes_garment_team 新增列
                 ("mes_garment_team", "LeaderUmcUserId",      "INTEGER NULL"),
                 ("mes_garment_team", "UmcDeptId",            "INTEGER NULL"),

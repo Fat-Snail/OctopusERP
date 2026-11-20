@@ -8,13 +8,17 @@ namespace OctopusMES.Api.Controllers;
 [Authorize]
 [ApiController]
 [Route("api/purchase")]
-public class PurchaseOrderController(PurchaseOrderService svc) : ControllerBase
+public class PurchaseOrderController(PurchaseOrderService svc, PortalIdentityService portalIdentity) : ControllerBase
 {
     private long UserId => long.TryParse(User.FindFirst("sub")?.Value, out var id) ? id : 1;
 
     [HttpGet]
     public async Task<IActionResult> List([FromQuery] string? status, [FromQuery] long? supplierId, [FromQuery] int pageNum = 1, [FromQuery] int pageSize = 20)
     {
+        // P16 行级过滤：门户供应商强制只看本人采购单，忽略前端传入的 supplierId（防越权）
+        var boundId = await portalIdentity.GetSupplierIdAsync(UserId);
+        if (boundId.HasValue) supplierId = boundId.Value;
+
         var data = await svc.GetListAsync(status, supplierId, pageNum, pageSize);
         return Ok(new { code = 200, msg = "ok", data });
     }
@@ -24,6 +28,11 @@ public class PurchaseOrderController(PurchaseOrderService svc) : ControllerBase
     {
         var data = await svc.GetByIdAsync(id);
         if (data is null) return Ok(new { code = 404, msg = "采购单不存在", data = (object?)null });
+
+        var boundId = await portalIdentity.GetSupplierIdAsync(UserId);
+        if (boundId.HasValue && data.SupplierId != boundId.Value)
+            return Ok(new { code = 404, msg = "采购单不存在", data = (object?)null });
+
         return Ok(new { code = 200, msg = "ok", data });
     }
 

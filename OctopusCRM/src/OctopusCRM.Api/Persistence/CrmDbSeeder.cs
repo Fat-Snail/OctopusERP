@@ -1,15 +1,102 @@
+using Microsoft.EntityFrameworkCore;
+using System.Data;
+
 namespace OctopusCRM.Api.Persistence;
 
 public static class CrmDbSeeder
 {
     public static void Seed(CrmDbContext db)
     {
+        // P16 门户身份绑定：旧库补列（ADR-007 列级自愈），必须在任何查询 UmcUserId 之前
+        EnsurePortalSchema(db);
+
         if (!db.SyncUsers.Any())
         {
             SeedMainData(db);
         }
         // 服装客户与款号字典：幂等，每次启动都尝试补齐(以 CustomerCode "CUS-GARM-001" 为 marker)
         SeedGarmentCustomers(db);
+
+        // P16：幂等绑定演示客户到 UMC 用户（sub 2/3），使门户"仅本人"可验证
+        BindPortalCustomers(db);
+    }
+
+    /// <summary>
+    /// P16 列级自愈：旧库 crm_customer 表缺 UmcUserId 列时补列并建唯一索引。
+    /// EnsureCreated 只为新库建全列，存量库需手动补齐（ADR-007 约定）。
+    /// </summary>
+    public static void EnsurePortalSchema(CrmDbContext db)
+    {
+        if (!db.Database.IsRelational()) return;
+        var conn = db.Database.GetDbConnection();
+        var wasOpen = conn.State == ConnectionState.Open;
+        if (!wasOpen) conn.Open();
+        try
+        {
+            if (!TableExists(conn, "crm_customer")) return;
+            if (!ColumnExists(conn, "crm_customer", "UmcUserId"))
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "ALTER TABLE crm_customer ADD COLUMN UmcUserId INTEGER NULL";
+                cmd.ExecuteNonQuery();
+                Console.WriteLine("[CrmDbSeeder] 列级自愈：crm_customer.UmcUserId 已补齐");
+            }
+            // 唯一索引：重复历史数据时跳过，避免阻塞启动
+            try
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "CREATE UNIQUE INDEX IF NOT EXISTS IX_crm_customer_UmcUserId ON crm_customer(UmcUserId)";
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[CrmDbSeeder] 建 UmcUserId 唯一索引跳过：{ex.Message}");
+            }
+        }
+        finally
+        {
+            if (!wasOpen) conn.Close();
+        }
+    }
+
+    /// <summary>
+    /// 幂等绑定：将演示客户档案绑定到已有 UMC 用户（zhangsan=2 / lisi=3），
+    /// 供客户门户以各自 sub 登录后只能看到本人数据。已绑定的不覆盖。
+    /// </summary>
+    private static void BindPortalCustomers(CrmDbContext db)
+    {
+        var bindings = new (string Code, long UmcUserId)[]
+        {
+            ("CUS-20260101-001", 2),
+            ("CUS-20260101-002", 3),
+        };
+        var changed = false;
+        foreach (var (code, umcId) in bindings)
+        {
+            var customer = db.Customers.FirstOrDefault(c => c.CustomerCode == code);
+            if (customer == null || customer.UmcUserId.HasValue) continue;
+            customer.UmcUserId = umcId;
+            changed = true;
+        }
+        if (changed) db.SaveChanges();
+    }
+
+    private static bool TableExists(IDbConnection conn, string table)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name=$name";
+        var p = cmd.CreateParameter(); p.ParameterName = "$name"; p.Value = table; cmd.Parameters.Add(p);
+        return Convert.ToInt64(cmd.ExecuteScalar()) > 0;
+    }
+
+    private static bool ColumnExists(IDbConnection conn, string table, string column)
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = $"PRAGMA table_info({table})";
+        using var r = cmd.ExecuteReader();
+        while (r.Read())
+            if (string.Equals(r["name"]?.ToString(), column, StringComparison.OrdinalIgnoreCase)) return true;
+        return false;
     }
 
     private static void SeedMainData(CrmDbContext db)

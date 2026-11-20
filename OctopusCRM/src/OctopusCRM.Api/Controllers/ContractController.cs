@@ -10,7 +10,7 @@ namespace OctopusCRM.Api.Controllers;
 [ApiController]
 [Route("api/contract")]
 [Authorize]
-public class ContractController(ContractService contractService, CrmDbContext db) : ControllerBase
+public class ContractController(ContractService contractService, CrmDbContext db, PortalIdentityService portalIdentity) : ControllerBase
 {
     private long GetCurrentUserId() =>
         long.TryParse(User.FindFirst("sub")?.Value, out var id) ? id : 0;
@@ -20,6 +20,10 @@ public class ContractController(ContractService contractService, CrmDbContext db
         [FromQuery] long? customerId, [FromQuery] string? status,
         [FromQuery] int page = 1, [FromQuery] int size = 20)
     {
+        // P16 行级过滤：门户客户强制只看本人，忽略前端传入的 customerId（防越权）
+        var boundId = await portalIdentity.GetCustomerIdAsync(GetCurrentUserId());
+        if (boundId.HasValue) customerId = boundId.Value;
+
         var (rows, total) = await contractService.GetListAsync(customerId, status, page, size);
         return Ok(new { code = 200, msg = "ok", data = new { rows, total } });
     }
@@ -29,6 +33,11 @@ public class ContractController(ContractService contractService, CrmDbContext db
     {
         var contract = await contractService.GetByIdAsync(id);
         if (contract == null) return Ok(new { code = 404, msg = "合同不存在", data = (object?)null });
+
+        var boundId = await portalIdentity.GetCustomerIdAsync(GetCurrentUserId());
+        if (boundId.HasValue && contract.CustomerId != boundId.Value)
+            return Ok(new { code = 404, msg = "合同不存在", data = (object?)null });
+
         return Ok(new { code = 200, msg = "ok", data = contract });
     }
 

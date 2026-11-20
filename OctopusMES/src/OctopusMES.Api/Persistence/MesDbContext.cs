@@ -71,6 +71,8 @@ public class MesDbContext : DbContext
         b.Entity<MesSyncUser>().HasKey(x => x.Id);
         b.Entity<MesSyncUser>().Property(x => x.Id).ValueGeneratedOnAdd();
         b.Entity<MesSyncUser>().HasIndex(x => x.UmcUserId).IsUnique();
+        // P16：一个 UMC 用户最多绑定一个供应商（null 不受唯一约束限制）
+        b.Entity<MesSupplier>().HasIndex(x => x.UmcUserId).IsUnique();
 
         b.Entity<MesSupplier>().HasKey(x => x.SupplierId);
         b.Entity<MesSupplier>().Property(x => x.SupplierId).ValueGeneratedOnAdd();
