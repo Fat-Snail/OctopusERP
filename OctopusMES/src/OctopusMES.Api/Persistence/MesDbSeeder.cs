@@ -39,6 +39,58 @@ public static class MesDbSeeder
 
         // P16：幂等绑定演示供应商到 UMC 用户（sub 2/3），供供应商门户"仅本人"过滤
         BindPortalSuppliers(db);
+        // P16：供应商门户报价/资质演示种子（幂等）
+        SeedPortalContent(db);
+    }
+
+    /// <summary>供应商门户询价/资质种子（幂等，以各表 Count==0 为 gate）。</summary>
+    private static void SeedPortalContent(MesDbContext db)
+    {
+        var now = DateTime.UtcNow;
+        var bound = db.Suppliers.Where(s => s.UmcUserId.HasValue)
+            .Select(s => s.SupplierId).ToList();
+
+        if (!db.SupplierQuotes.Any())
+        {
+            foreach (var sid in bound)
+            {
+                db.SupplierQuotes.AddRange(
+                    new MesSupplierQuote
+                    {
+                        SupplierId = sid, Code = $"RFQ-P{sid}-001", ProductName = "涤纶尼龙面料（210T）",
+                        Sku = "SKU-FT210-BLK", Quantity = 12000, Unit = "米",
+                        Deadline = now.AddDays(3), Status = "pending",
+                    },
+                    new MesSupplierQuote
+                    {
+                        SupplierId = sid, Code = $"RFQ-P{sid}-002", ProductName = "针织罗纹袖口（2×2）",
+                        Sku = "SKU-RB202-WHT", Quantity = 8000, Unit = "对",
+                        Deadline = now.AddDays(1), Status = "responded",
+                        UnitPrice = 2.98m, DeliveryDays = 10, QuoteRemark = "含 13% 增值税，50% 预付款",
+                        QuotedAt = now.AddDays(-2), QuoteStatus = "under_review",
+                    });
+            }
+        }
+        if (!db.SupplierQualifications.Any())
+        {
+            foreach (var sid in bound)
+            {
+                db.SupplierQualifications.AddRange(
+                    new MesSupplierQualification
+                    {
+                        SupplierId = sid, Title = "营业执照", Category = "基础资质",
+                        FileName = $"license-{sid}.pdf", FileSize = "1.2 MB",
+                        Status = "approved", UploadedAt = now.AddDays(-100), ValidUntil = now.AddYears(3),
+                    },
+                    new MesSupplierQualification
+                    {
+                        SupplierId = sid, Title = "ISO 9001 质量体系认证", Category = "质量认证",
+                        FileName = $"iso9001-{sid}.pdf", FileSize = "0.8 MB",
+                        Status = "pending", UploadedAt = now.AddDays(-5),
+                    });
+            }
+        }
+        db.SaveChanges();
     }
 
     /// <summary>
@@ -481,6 +533,54 @@ public static class MesDbSeeder
                 {
                     Console.WriteLine($"[MesDbSeeder] ALTER TABLE 失败 {table}.{col}：{ex.Message}");
                 }
+            }
+
+            // P16 供应商门户新表（旧库 EnsureCreated 不会增量建表）
+            if (!TableExists(conn, "mes_supplier_quote"))
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"
+CREATE TABLE IF NOT EXISTS mes_supplier_quote (
+    QuoteId INTEGER PRIMARY KEY AUTOINCREMENT,
+    SupplierId INTEGER NOT NULL,
+    Code TEXT NOT NULL,
+    ProductName TEXT NOT NULL,
+    Sku TEXT NOT NULL,
+    Quantity REAL NOT NULL,
+    Unit TEXT NOT NULL,
+    Deadline TEXT NOT NULL,
+    Status TEXT NOT NULL,
+    UnitPrice REAL NULL,
+    DeliveryDays INTEGER NULL,
+    QuoteRemark TEXT NULL,
+    QuotedAt TEXT NULL,
+    QuoteStatus TEXT NULL
+);
+CREATE TABLE IF NOT EXISTS mes_supplier_shipment (
+    ShipmentId INTEGER PRIMARY KEY AUTOINCREMENT,
+    SupplierId INTEGER NOT NULL,
+    PurchaseId INTEGER NOT NULL,
+    OrderCode TEXT NOT NULL,
+    TrackingNo TEXT NOT NULL,
+    Carrier TEXT NOT NULL,
+    ShippedAt TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS mes_supplier_qualification (
+    QualificationId INTEGER PRIMARY KEY AUTOINCREMENT,
+    SupplierId INTEGER NOT NULL,
+    Title TEXT NOT NULL,
+    Category TEXT NOT NULL,
+    FileName TEXT NOT NULL,
+    FileSize TEXT NOT NULL,
+    Status TEXT NOT NULL,
+    UploadedAt TEXT NOT NULL,
+    ValidUntil TEXT NULL
+);
+CREATE INDEX IF NOT EXISTS IX_mes_supplier_quote_supplier ON mes_supplier_quote(SupplierId);
+CREATE INDEX IF NOT EXISTS IX_mes_supplier_shipment_supplier ON mes_supplier_shipment(SupplierId);
+CREATE INDEX IF NOT EXISTS IX_mes_supplier_qualification_supplier ON mes_supplier_qualification(SupplierId);";
+                cmd.ExecuteNonQuery();
+                Console.WriteLine("[MesDbSeeder] P16 供应商门户表已补齐");
             }
 
             if (!TableExists(conn, "mes_manufacturing_snapshot"))

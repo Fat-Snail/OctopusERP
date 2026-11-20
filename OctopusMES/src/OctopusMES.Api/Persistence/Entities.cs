@@ -570,3 +570,50 @@ public class MesGarmentSchedule
     public MesGarmentTeam? Team { get; set; }
     public MesGarmentOrder? Order { get; set; }
 }
+
+// ── P16 供应商门户轻量数据 ──────────────────────────────────────────
+
+/// <summary>供应商门户询价响应单：供应商收到的询价 + 在线报价回填。所有字段以 SupplierId 隔离。</summary>
+public class MesSupplierQuote
+{
+    public long QuoteId { get; set; }
+    public long SupplierId { get; set; }
+    public string Code { get; set; } = string.Empty;
+    public string ProductName { get; set; } = string.Empty;
+    public string Sku { get; set; } = string.Empty;
+    public decimal Quantity { get; set; }
+    public string Unit { get; set; } = string.Empty;
+    public DateTime Deadline { get; set; }
+    public string Status { get; set; } = "pending";          // pending / responded / closed
+    public decimal? UnitPrice { get; set; }
+    public int? DeliveryDays { get; set; }
+    public string? QuoteRemark { get; set; }
+    public DateTime? QuotedAt { get; set; }
+    public string? QuoteStatus { get; set; }                 // under_review / accepted / rejected
+}
+
+/// <summary>供应商门户发货登记：供应商对采购单登记运单。</summary>
+public class MesSupplierShipment
+{
+    public long ShipmentId { get; set; }
+    public long SupplierId { get; set; }
+    public long PurchaseId { get; set; }
+    public string OrderCode { get; set; } = string.Empty;
+    public string TrackingNo { get; set; } = string.Empty;
+    public string Carrier { get; set; } = string.Empty;
+    public DateTime ShippedAt { get; set; }
+}
+
+/// <summary>供应商门户资质档案。</summary>
+public class MesSupplierQualification
+{
+    public long QualificationId { get; set; }
+    public long SupplierId { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
+    public string FileName { get; set; } = string.Empty;
+    public string FileSize { get; set; } = string.Empty;
+    public string Status { get; set; } = "pending";          // approved / pending / expired
+    public DateTime UploadedAt { get; set; }
+    public DateTime? ValidUntil { get; set; }
+}

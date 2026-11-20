@@ -8,6 +8,9 @@ public class MesDbContext : DbContext
 
     public DbSet<MesSyncUser> SyncUsers => Set<MesSyncUser>();
     public DbSet<MesSupplier> Suppliers => Set<MesSupplier>();
+    public DbSet<MesSupplierQuote> SupplierQuotes => Set<MesSupplierQuote>();
+    public DbSet<MesSupplierShipment> SupplierShipments => Set<MesSupplierShipment>();
+    public DbSet<MesSupplierQualification> SupplierQualifications => Set<MesSupplierQualification>();
     public DbSet<MesPurchaseOrder> PurchaseOrders => Set<MesPurchaseOrder>();
     public DbSet<MesPurchaseItem> PurchaseItems => Set<MesPurchaseItem>();
     public DbSet<MesWorkOrder> WorkOrders => Set<MesWorkOrder>();
@@ -41,6 +44,9 @@ public class MesDbContext : DbContext
     {
         b.Entity<MesSyncUser>().ToTable("mes_sync_user");
         b.Entity<MesSupplier>().ToTable("mes_supplier");
+        b.Entity<MesSupplierQuote>().ToTable("mes_supplier_quote");
+        b.Entity<MesSupplierShipment>().ToTable("mes_supplier_shipment");
+        b.Entity<MesSupplierQualification>().ToTable("mes_supplier_qualification");
         b.Entity<MesPurchaseOrder>().ToTable("mes_purchase_order");
         b.Entity<MesPurchaseItem>().ToTable("mes_purchase_item");
         b.Entity<MesWorkOrder>().ToTable("mes_work_order");
@@ -76,6 +82,12 @@ public class MesDbContext : DbContext
 
         b.Entity<MesSupplier>().HasKey(x => x.SupplierId);
         b.Entity<MesSupplier>().Property(x => x.SupplierId).ValueGeneratedOnAdd();
+        b.Entity<MesSupplierQuote>().HasKey(x => x.QuoteId);
+        b.Entity<MesSupplierQuote>().Property(x => x.QuoteId).ValueGeneratedOnAdd();
+        b.Entity<MesSupplierShipment>().HasKey(x => x.ShipmentId);
+        b.Entity<MesSupplierShipment>().Property(x => x.ShipmentId).ValueGeneratedOnAdd();
+        b.Entity<MesSupplierQualification>().HasKey(x => x.QualificationId);
+        b.Entity<MesSupplierQualification>().Property(x => x.QualificationId).ValueGeneratedOnAdd();
 
         b.Entity<MesPurchaseOrder>().HasKey(x => x.PurchaseId);
         b.Entity<MesPurchaseOrder>().Property(x => x.PurchaseId).ValueGeneratedOnAdd();
