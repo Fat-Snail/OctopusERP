@@ -432,6 +432,8 @@ public class ApprovalSlaWorker : BackgroundService
 
 ### 数据库迁移（SQLite → MySQL）
 
+> **优先级：最低（排最后）**。2026-11-21 定：其他所有待办（Redis 缓存、真实电商平台对接、BPM 拖拽设计器等）完成之前不启动本项。当前继续以 SQLite 为持久化方案。
+
 ```bash
 # 每个系统单独执行
 cd OctopusXXX/src/OctopusXXX.Api

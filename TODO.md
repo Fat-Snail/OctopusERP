@@ -83,8 +83,8 @@
 
 - ✅ P5 H5 — OA H5 全功能（首页/审批/考勤/公告/通讯录/会议室/个人中心）+ UMC H5 完成
 - ✅ P16 门户前端 — Customer / Supplier Portal Vite 项目（Mock 版，2026-11-17）
-- ⬜ P18+ MySQL 迁移路径（EF Migrations 启用、自愈守卫加 `Sqlite` 判断）
 - ⬜ Redis 缓存 / 真实电商平台对接 / BPM 拖拽设计器
+- ⬜ P18+ MySQL 迁移路径（EF Migrations 启用、自愈守卫加 `Sqlite` 判断）— **最低优先级，排最后**（2026-11-21 定：其他待办全部完成后再启动）
 
 ---
 
