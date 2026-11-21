@@ -82,14 +82,14 @@
 ### 2026-11-21 P17 BPM 高级特性（分 3 批推进）
 
 - ✅ **批次1 表单高级字段**：FormField 契约扩展（visibleWhen 联动 / formula 公式 / subform 明细表 / optionsFrom 关联下拉），FormDesigner 配置 UI + DynamicForm 运行时，新增 `lib/formExpr.ts` 表达式求值器（对齐后端 + 算术，19 断言全绿）；`vue-tsc` + `vite build` 双通过
-- ⬜ 批次2 条件分支可视化构建器 + 流程模板库
+- ✅ **批次2 条件构建器 + 模板库**：ConditionBuilder（字段+运算符+值多行拼表达式，实时校验，往返解析+高级文本兜底）接入设计器连线配置；流程模板库内置请假/报销/采购(条件分支示例)/合同/离职 5 模板，sessionStorage 草稿载入设计器；vue-tsc+build 双通过
 - ⬜ 批次3 委托/加签 + 驳回指定节点（图流程引擎侧，前后端）
 
 ### 待落地（按优先级）
 
 - ✅ P5 H5 — OA H5 全功能（首页/审批/考勤/公告/通讯录/会议室/个人中心）+ UMC H5 完成
 - ✅ P16 门户前端 — Customer / Supplier Portal（2026-11-20 已全量接真实网关 API + 身份绑定行级隔离）
-- 🔶 P17 BPM 高级特性 — 批次1 表单高级字段完成，批次2/3 待推
+- 🔶 P17 BPM 高级特性 — 批次1 表单高级字段 + 批次2 条件构建器/模板库完成，批次3 待推
 - ⬜ Redis 缓存 / 真实电商平台对接
 - ⬜ P18+ MySQL 迁移路径（EF Migrations 启用、自愈守卫加 `Sqlite` 判断）— **最低优先级，排最后**（2026-11-21 定：其他待办全部完成后再启动）
 
@@ -887,7 +887,7 @@ public class WebhookSender(IHttpClientFactory factory, IConfiguration config, IL
 - [x] 引入 Elsa Workflows 或自研 BPMN 简化引擎（自研 `FlowEngine` 图流程引擎）
 - [x] 流程设计器（拖拽节点：开始/审批/会签/或签/条件分支/并行/服务任务/结束）
 - [x] 条件分支后端求值（`ExpressionEvaluator`，边 condition 表达式）
-- [ ] 条件分支可视化构建器（前端字段选择 + 运算符 + 值，替代裸文本）— 批次2
+- [x] 条件分支可视化构建器（ConditionBuilder：字段 + 运算符 + 值多行拼接 + 实时校验 + 高级文本兜底）
 - [ ] 委托/转交/加签节点（图流程 `FlowEngine` 侧）— 批次3
 - [ ] 自由跳转（驳回到指定节点而非起点）— 批次3
 - [x] 表单设计器升级（2026-11-21，批次1）：
@@ -896,7 +896,7 @@ public class WebhookSender(IHttpClientFactory factory, IConfiguration config, IL
   - [x] 明细表（subform 一对多子表，增删行）
   - [x] 关联数据下拉（optionsFrom：dict: 字典 / /api/ 接口异步加载）
   - 配套 `lib/formExpr.ts` 前端表达式求值器（对齐后端语法 + 算术），19 断言全绿
-- [ ] 流程模板库（请假/报销/采购/合同/调岗/离职/资产领用/入职…）— 批次2
+- [x] 流程模板库（flowTemplates：请假/报销/采购/合同/离职 5 模板，含条件分支与公式示例，sessionStorage 草稿载入设计器）
 
 ---
 

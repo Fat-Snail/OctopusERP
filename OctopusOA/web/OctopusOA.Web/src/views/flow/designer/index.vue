@@ -6,9 +6,12 @@ import PageHeader from '@/components/app/PageHeader.vue'
 import { toast } from '@/components/ui/toast'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import FormDesigner from '../components/FormDesigner.vue'
+import ConditionBuilder from '../components/ConditionBuilder.vue'
 import { getFlowDefinition, saveFlowDefinition } from '@/api/flow'
 import { layoutGraph, edgePath as buildEdgePath } from '../flowLayout'
 import type { FlowGraph, FlowGraphEdge, FlowGraphNode, FlowNodeConfig } from '@/api/flow/types'
+import type { FormField, FormSchema } from '@/api/approval/types'
+import { FLOW_TEMPLATE_DRAFT_KEY, type FlowTemplateDraft } from '../flowTemplates'
 
 interface DesignNode extends FlowGraphNode {
   x: number
@@ -40,13 +43,14 @@ const category = ref('')
 const businessKey = ref('')
 const formSchema = ref('{"fields":[]}')
 const formDesignerOpen = ref(false)
-const formFieldCount = computed(() => {
+const parsedFormFields = computed<FormField[]>(() => {
   try {
-    return (JSON.parse(formSchema.value) as { fields?: unknown[] }).fields?.length ?? 0
+    return (JSON.parse(formSchema.value) as FormSchema).fields ?? []
   } catch {
-    return 0
+    return []
   }
 })
+const formFieldCount = computed(() => parsedFormFields.value.length)
 
 const nodes = ref<DesignNode[]>([])
 const edges = ref<FlowGraphEdge[]>([])
@@ -261,6 +265,24 @@ function autoLayout() {
 
 // ── 加载 / 保存 ─────────────────────────────────────
 function initNew() {
+  // 模板草稿：从模板库新建时载入（读完即消费，避免污染后续新建）
+  const raw = sessionStorage.getItem(FLOW_TEMPLATE_DRAFT_KEY)
+  if (raw) {
+    try {
+      const draft = JSON.parse(raw) as FlowTemplateDraft
+      const g = JSON.parse(draft.graphJson) as FlowGraph
+      nodes.value = g.nodes.map(n => ({ ...n, x: n.x ?? 300, y: n.y ?? 120 }))
+      edges.value = g.edges.map(e => ({ ...e }))
+      name.value = draft.name
+      code.value = draft.code
+      category.value = draft.category ?? ''
+      formSchema.value = draft.formSchema
+      sessionStorage.removeItem(FLOW_TEMPLATE_DRAFT_KEY)
+      return
+    } catch {
+      sessionStorage.removeItem(FLOW_TEMPLATE_DRAFT_KEY)
+    }
+  }
   nodes.value = [
     { id: 'start', type: 'start', name: '开始', x: 300, y: 80 },
     { id: 'end', type: 'end', name: '结束', x: 300, y: 320 },
@@ -489,9 +511,13 @@ onBeforeUnmount(() => {
 
           <template v-else-if="selectedEdge">
             <div class="text-[12px] font-semibold mb-2">连线条件</div>
-            <div class="text-[11px] text-muted-foreground mb-1">{{ selectedEdge.from }} → {{ selectedEdge.to }}</div>
-            <input v-model="editCondition" @input="applyToEdge" placeholder="如 amount >= 100000（空为默认）"
-              class="w-full h-[28px] px-2 mb-2 border border-input rounded-[var(--radius)] bg-card text-[12px] focus:outline-none focus:ring-1 focus:ring-ring" />
+            <div class="text-[11px] text-muted-foreground mb-2">{{ selectedEdge.from }} → {{ selectedEdge.to }}</div>
+            <ConditionBuilder
+              :model-value="selectedEdge.condition ?? ''"
+              :fields="parsedFormFields"
+              @update:model-value="v => { editCondition = v; applyToEdge() }"
+            />
+            <p class="text-[10px] text-muted-foreground mt-1.5">排他网关按连线顺序取第一个满足的条件；留空为默认分支。</p>
           </template>
 
           <div v-else class="text-[11px] text-muted-foreground flex items-center gap-1">
