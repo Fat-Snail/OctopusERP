@@ -79,11 +79,18 @@
 - ✅ **`/octopus/diagnostics`**：运行时快照（版本/环境/.NET/运行时长/路由与集群拓扑/限流参数），脱敏不输出任何密钥
 - 📈 网关测试 5 → 9（新增 4 个可观测性用例：全绿/部分降级/全挂/诊断脱敏）
 
+### 2026-11-21 P17 BPM 高级特性（分 3 批推进）
+
+- ✅ **批次1 表单高级字段**：FormField 契约扩展（visibleWhen 联动 / formula 公式 / subform 明细表 / optionsFrom 关联下拉），FormDesigner 配置 UI + DynamicForm 运行时，新增 `lib/formExpr.ts` 表达式求值器（对齐后端 + 算术，19 断言全绿）；`vue-tsc` + `vite build` 双通过
+- ⬜ 批次2 条件分支可视化构建器 + 流程模板库
+- ⬜ 批次3 委托/加签 + 驳回指定节点（图流程引擎侧，前后端）
+
 ### 待落地（按优先级）
 
 - ✅ P5 H5 — OA H5 全功能（首页/审批/考勤/公告/通讯录/会议室/个人中心）+ UMC H5 完成
-- ✅ P16 门户前端 — Customer / Supplier Portal Vite 项目（Mock 版，2026-11-17）
-- ⬜ Redis 缓存 / 真实电商平台对接 / BPM 拖拽设计器
+- ✅ P16 门户前端 — Customer / Supplier Portal（2026-11-20 已全量接真实网关 API + 身份绑定行级隔离）
+- 🔶 P17 BPM 高级特性 — 批次1 表单高级字段完成，批次2/3 待推
+- ⬜ Redis 缓存 / 真实电商平台对接
 - ⬜ P18+ MySQL 迁移路径（EF Migrations 启用、自愈守卫加 `Sqlite` 判断）— **最低优先级，排最后**（2026-11-21 定：其他待办全部完成后再启动）
 
 ---
@@ -872,22 +879,24 @@ public class WebhookSender(IHttpClientFactory factory, IConfiguration config, IL
 
 ---
 
-### ✅ P17：低代码 BPM（OA 工作流升级）— 引擎层已完成，设计器待建
+### 🔶 P17：低代码 BPM（OA 工作流升级）— 图流程引擎 + 拖拽设计器已建成，高级特性推进中
 
-> 已完成：`WorkflowNode.SkipCondition`（表达式跳过：`amount < 1000`）+ `CcUsersJson`（抄送）+ `ApprovalDelegate` 转交表 + `ApprovalService.Delegate / EvaluateCondition / NotifyCcUsers`。5 个 BpmExtensionTests 全绿。
-> 待做：拖拽流程设计器（前端）+ 表单设计器升级（字段联动 / 公式 / 明细表 / 关联下拉）。
+> 已完成：① 旧 approval 引擎 `WorkflowNode.SkipCondition` + `CcUsersJson` + `ApprovalDelegate` 转交表 + `ApprovalService.Delegate/EvaluateCondition/NotifyCcUsers`（5 个 BpmExtensionTests 全绿）；② 新图流程引擎 `FlowEngine`（10 节点类型，approve/reject/并行网关/排他网关条件求值/服务任务）+ 拖拽设计器 `flow/designer/index.vue`（525 行，8 类型调色板 + 连线 + 自动布局 + 表单设计器）。
+> 推进中（2026-11-21 起分 3 批）：① 表单高级字段；② 条件分支可视化构建器 + 模板库；③ 委托加签 + 驳回指定节点（图流程引擎侧）。
 
-- [ ] 引入 Elsa Workflows 或自研 BPMN 简化引擎
-- [ ] 流程设计器（拖拽节点：开始/审批/抄送/分支/并行/结束）
-- [ ] 条件分支（表单字段表达式：`金额 > 100000`）
-- [ ] 委托/转交/加签节点
-- [ ] 自由跳转（驳回到指定节点而非起点）
-- [ ] 表单设计器升级：
-  - [ ] 字段联动（A 变 → B 显示/必填切换）
-  - [ ] 公式字段（`总金额 = 数量 × 单价`）
-  - [ ] 明细表（一对多子表）
-  - [ ] 关联数据下拉（实时查接口）
-- [ ] 流程模板库（请假/报销/采购/合同/调岗/离职/资产领用/入职…）
+- [x] 引入 Elsa Workflows 或自研 BPMN 简化引擎（自研 `FlowEngine` 图流程引擎）
+- [x] 流程设计器（拖拽节点：开始/审批/会签/或签/条件分支/并行/服务任务/结束）
+- [x] 条件分支后端求值（`ExpressionEvaluator`，边 condition 表达式）
+- [ ] 条件分支可视化构建器（前端字段选择 + 运算符 + 值，替代裸文本）— 批次2
+- [ ] 委托/转交/加签节点（图流程 `FlowEngine` 侧）— 批次3
+- [ ] 自由跳转（驳回到指定节点而非起点）— 批次3
+- [x] 表单设计器升级（2026-11-21，批次1）：
+  - [x] 字段联动（visibleWhen：A 变 → B 显示/隐藏）
+  - [x] 公式字段（formula，支持 + - * / % 算术，自动写回）
+  - [x] 明细表（subform 一对多子表，增删行）
+  - [x] 关联数据下拉（optionsFrom：dict: 字典 / /api/ 接口异步加载）
+  - 配套 `lib/formExpr.ts` 前端表达式求值器（对齐后端语法 + 算术），19 断言全绿
+- [ ] 流程模板库（请假/报销/采购/合同/调岗/离职/资产领用/入职…）— 批次2
 
 ---
 

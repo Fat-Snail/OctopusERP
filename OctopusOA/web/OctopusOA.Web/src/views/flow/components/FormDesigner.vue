@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { Plus, Trash2, ArrowUp, ArrowDown, Braces } from '@lucide/vue'
-import type { FormExtension, FormField } from '@/api/approval/types'
+import { Plus, Trash2, ArrowUp, ArrowDown, Braces, Link2, Sigma, Table2 } from '@lucide/vue'
+import type { FormExtension, FormField, SubField } from '@/api/approval/types'
+import { validateExpression } from '@/lib/formExpr'
 
 const props = defineProps<{ modelValue: string }>()
 const emit = defineEmits<{ (e: 'update:modelValue', value: string): void }>()
@@ -13,6 +14,14 @@ const FIELD_TYPES: { type: FormField['type']; label: string }[] = [
   { type: 'select', label: '下拉选择' },
   { type: 'date', label: '日期' },
   { type: 'file', label: '文件' },
+  { type: 'subform', label: '明细表' },
+]
+
+const SUBFIELD_TYPES: { type: SubField['type']; label: string }[] = [
+  { type: 'text', label: '文本' },
+  { type: 'number', label: '数字' },
+  { type: 'date', label: '日期' },
+  { type: 'select', label: '下拉' },
 ]
 
 interface ParsedSchema { fields: FormField[]; extensions: FormExtension[] }
@@ -24,6 +33,7 @@ function parse(value: string): ParsedSchema {
       fields: (parsed.fields ?? []).map(f => ({
         ...f,
         options: f.options ? f.options.map(o => ({ ...o })) : undefined,
+        subFields: f.subFields ? f.subFields.map(s => ({ ...s, options: s.options ? s.options.map(o => ({ ...o })) : undefined })) : undefined,
       })),
       extensions: (parsed.extensions ?? []).map(e => ({ ...e })),
     }
@@ -62,7 +72,11 @@ function addField(type: FormField['type']) {
     label: `${meta?.label ?? '字段'}${n}`,
     type,
     required: false,
-    ...(type === 'select' ? { options: [{ label: '选项1', value: 'option1' }] } : {}),
+    ...(type === 'select' ? { options: [{ label: '选项1', value: 'option1' }], optionsFrom: { source: '', labelField: 'label', valueField: 'value' } } : {}),
+    ...(type === 'subform' ? { subFields: [
+      { key: 'name', label: '名称', type: 'text' },
+      { key: 'qty', label: '数量', type: 'number' },
+    ] } : {}),
   }
   fields.value.push(field)
   selected.value = fields.value.length - 1
@@ -94,6 +108,42 @@ function addOption() {
 
 function removeOption(index: number) {
   selectedField.value?.options?.splice(index, 1)
+  sync()
+}
+
+// ── 高级特性：表达式校验 / 明细表列 / 关联下拉 ──
+const visibleWhenError = computed(() =>
+  selectedField.value?.visibleWhen ? validateExpression(selectedField.value.visibleWhen) : null
+)
+const formulaError = computed(() =>
+  selectedField.value?.formula ? validateExpression(selectedField.value.formula) : null
+)
+
+function addSubField() {
+  const f = selectedField.value
+  if (!f) return
+  f.subFields = [...(f.subFields ?? []), { key: `col${(f.subFields?.length ?? 0) + 1}`, label: `列${(f.subFields?.length ?? 0) + 1}`, type: 'text' }]
+  sync()
+}
+
+function removeSubField(index: number) {
+  selectedField.value?.subFields?.splice(index, 1)
+  sync()
+}
+
+function addSubOption(sf: SubField) {
+  sf.options = [...(sf.options ?? []), { label: '选项', value: `option${(sf.options?.length ?? 0) + 1}` }]
+  sync()
+}
+
+function toggleOptionsFrom() {
+  const f = selectedField.value
+  if (!f) return
+  if (f.optionsFrom) {
+    delete f.optionsFrom
+  } else {
+    f.optionsFrom = { source: '', labelField: 'label', valueField: 'value' }
+  }
   sync()
 }
 
@@ -223,6 +273,73 @@ function typeLabel(type: string) {
               <input v-model="opt.value" @input="sync" placeholder="值"
                 class="w-[110px] h-[26px] px-2 border border-input rounded-[var(--radius)] bg-card text-[12px] font-mono" />
               <button class="text-danger border-0 bg-transparent cursor-pointer" @click="removeOption(oi)"><Trash2 :size="11" /></button>
+            </div>
+          </div>
+
+          <!-- 关联数据下拉（type=select） -->
+          <div v-if="selectedField.type === 'select'" class="mt-3 pt-3 border-t border-border">
+            <div class="flex items-center justify-between mb-1">
+              <span class="flex items-center gap-1 text-[11px] text-muted-foreground"><Link2 :size="11" />关联数据下拉</span>
+              <button class="text-[11px] text-primary hover:underline border-0 bg-transparent cursor-pointer" @click="toggleOptionsFrom">
+                {{ selectedField.optionsFrom ? '移除数据源' : '使用数据源' }}
+              </button>
+            </div>
+            <template v-if="selectedField.optionsFrom">
+              <input v-model="selectedField.optionsFrom.source" @input="sync" placeholder="dict:order_status 或 /api/xxx/options"
+                class="w-full h-[26px] px-2 border border-input rounded-[var(--radius)] bg-card text-[12px] font-mono mb-1" />
+              <div class="flex items-center gap-1.5">
+                <input v-model="selectedField.optionsFrom.labelField" @input="sync" placeholder="标签字段名 label"
+                  class="flex-1 h-[26px] px-2 border border-input rounded-[var(--radius)] bg-card text-[11px]" />
+                <input v-model="selectedField.optionsFrom.valueField" @input="sync" placeholder="值字段名 value"
+                  class="flex-1 h-[26px] px-2 border border-input rounded-[var(--radius)] bg-card text-[11px]" />
+              </div>
+              <p class="text-[10px] text-muted-foreground mt-0.5">dict: 走系统字典；/api/ 走带认证接口，需返回数组或 {code,data}。</p>
+            </template>
+          </div>
+
+          <!-- 字段联动（visibleWhen） -->
+          <div class="mt-3 pt-3 border-t border-border">
+            <label class="flex items-center gap-1 text-[11px] text-muted-foreground mb-1"><Link2 :size="11" />显示条件（联动）</label>
+            <input v-model="selectedField.visibleWhen" @input="sync" placeholder="留空始终显示，如：amount > 1000 && type == 'buy'"
+              class="w-full h-[26px] px-2 border border-input rounded-[var(--radius)] bg-card text-[12px] font-mono" />
+            <p v-if="visibleWhenError" class="text-[10px] text-danger mt-0.5">{{ visibleWhenError }}</p>
+            <p v-else class="text-[10px] text-muted-foreground mt-0.5">表达式为真时显示该字段；支持字段引用、比较、&& || ! 与括号。</p>
+          </div>
+
+          <!-- 公式字段（formula） -->
+          <div class="mt-3 pt-3 border-t border-border">
+            <label class="flex items-center gap-1 text-[11px] text-muted-foreground mb-1"><Sigma :size="11" />计算公式（只读）</label>
+            <input v-model="selectedField.formula" @input="sync" placeholder="留空非公式，如：quantity * price"
+              class="w-full h-[26px] px-2 border border-input rounded-[var(--radius)] bg-card text-[12px] font-mono" />
+            <p v-if="formulaError" class="text-[10px] text-danger mt-0.5">{{ formulaError }}</p>
+            <p v-else class="text-[10px] text-muted-foreground mt-0.5">额外支持 + - * / % 算术；结果自动写入字段，填写时只读。</p>
+          </div>
+
+          <!-- 明细表列（type=subform） -->
+          <div v-if="selectedField.type === 'subform'" class="mt-3 pt-3 border-t border-border">
+            <div class="flex items-center justify-between mb-1">
+              <span class="flex items-center gap-1 text-[11px] text-muted-foreground"><Table2 :size="11" />明细表列</span>
+              <button class="text-[11px] text-primary hover:underline border-0 bg-transparent cursor-pointer" @click="addSubField">
+                <Plus :size="10" />添加列
+              </button>
+            </div>
+            <div v-for="(sf, si) in selectedField.subFields ?? []" :key="si" class="mb-1.5 p-1.5 rounded-[var(--radius)] border border-border">
+              <div class="flex items-center gap-1.5 mb-1">
+                <input v-model="sf.label" @input="sync" placeholder="列标题"
+                  class="w-[80px] h-[24px] px-1.5 border border-input rounded-[var(--radius)] bg-card text-[11px]" />
+                <input v-model="sf.key" @input="sync" placeholder="键"
+                  class="w-[70px] h-[24px] px-1.5 border border-input rounded-[var(--radius)] bg-card text-[11px] font-mono" />
+                <select v-model="sf.type" @change="sync" class="h-[24px] px-1 border border-input rounded-[var(--radius)] bg-card text-[11px]">
+                  <option v-for="st in SUBFIELD_TYPES" :key="st.type" :value="st.type">{{ st.label }}</option>
+                </select>
+                <button class="text-danger border-0 bg-transparent cursor-pointer" @click="removeSubField(si)"><Trash2 :size="11" /></button>
+              </div>
+              <div v-if="sf.type === 'select'" class="flex flex-wrap items-center gap-1">
+                <button class="text-[10px] text-primary hover:underline border-0 bg-transparent cursor-pointer" @click="addSubOption(sf)">+ 选项</button>
+                <span v-for="(so, soi) in sf.options ?? []" :key="soi" class="text-[10px] text-muted-foreground">
+                  {{ so.label }}<button class="text-danger border-0 bg-transparent cursor-pointer" @click="sf.options?.splice(soi, 1); sync()">×</button>
+                </span>
+              </div>
             </div>
           </div>
         </template>
