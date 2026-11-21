@@ -83,13 +83,13 @@
 
 - ✅ **批次1 表单高级字段**：FormField 契约扩展（visibleWhen 联动 / formula 公式 / subform 明细表 / optionsFrom 关联下拉），FormDesigner 配置 UI + DynamicForm 运行时，新增 `lib/formExpr.ts` 表达式求值器（对齐后端 + 算术，19 断言全绿）；`vue-tsc` + `vite build` 双通过
 - ✅ **批次2 条件构建器 + 模板库**：ConditionBuilder（字段+运算符+值多行拼表达式，实时校验，往返解析+高级文本兜底）接入设计器连线配置；流程模板库内置请假/报销/采购(条件分支示例)/合同/离职 5 模板，sessionStorage 草稿载入设计器；vue-tsc+build 双通过
-- ⬜ 批次3 委托/加签 + 驳回指定节点（图流程引擎侧，前后端）
+- ✅ **批次3 委托/加签/驳回指定节点**：FlowEngine 新增 DelegateTask（转交不推进流程）/AddSignTask（复制任务 TaskKind=add_sign，IsNodeSatisfied 等待全部加签人）/RejectTo（取消尾部令牌+目标节点重放），Controller 3 接口 + rejectable-nodes 查询，待办页「更多」菜单接入；FlowTask 加 TaskKind 字段（ADR-007 自愈自动补列）。引擎测试 6 + Controller 端到端 1 全绿，OA 137→144
 
 ### 待落地（按优先级）
 
 - ✅ P5 H5 — OA H5 全功能（首页/审批/考勤/公告/通讯录/会议室/个人中心）+ UMC H5 完成
 - ✅ P16 门户前端 — Customer / Supplier Portal（2026-11-20 已全量接真实网关 API + 身份绑定行级隔离）
-- 🔶 P17 BPM 高级特性 — 批次1 表单高级字段 + 批次2 条件构建器/模板库完成，批次3 待推
+- ✅ P17 BPM 高级特性 — 批次1/2/3 全部完成（表单高级字段 + 条件构建器/模板库 + 委托加签/驳回指定节点）
 - ⬜ Redis 缓存 / 真实电商平台对接
 - ⬜ P18+ MySQL 迁移路径（EF Migrations 启用、自愈守卫加 `Sqlite` 判断）— **最低优先级，排最后**（2026-11-21 定：其他待办全部完成后再启动）
 
@@ -879,7 +879,7 @@ public class WebhookSender(IHttpClientFactory factory, IConfiguration config, IL
 
 ---
 
-### 🔶 P17：低代码 BPM（OA 工作流升级）— 图流程引擎 + 拖拽设计器已建成，高级特性推进中
+### ✅ P17：低代码 BPM（OA 工作流升级）— 图流程引擎 + 拖拽设计器 + 全部高级特性已完成（2026-11-21）
 
 > 已完成：① 旧 approval 引擎 `WorkflowNode.SkipCondition` + `CcUsersJson` + `ApprovalDelegate` 转交表 + `ApprovalService.Delegate/EvaluateCondition/NotifyCcUsers`（5 个 BpmExtensionTests 全绿）；② 新图流程引擎 `FlowEngine`（10 节点类型，approve/reject/并行网关/排他网关条件求值/服务任务）+ 拖拽设计器 `flow/designer/index.vue`（525 行，8 类型调色板 + 连线 + 自动布局 + 表单设计器）。
 > 推进中（2026-11-21 起分 3 批）：① 表单高级字段；② 条件分支可视化构建器 + 模板库；③ 委托加签 + 驳回指定节点（图流程引擎侧）。
@@ -888,8 +888,8 @@ public class WebhookSender(IHttpClientFactory factory, IConfiguration config, IL
 - [x] 流程设计器（拖拽节点：开始/审批/会签/或签/条件分支/并行/服务任务/结束）
 - [x] 条件分支后端求值（`ExpressionEvaluator`，边 condition 表达式）
 - [x] 条件分支可视化构建器（ConditionBuilder：字段 + 运算符 + 值多行拼接 + 实时校验 + 高级文本兜底）
-- [ ] 委托/转交/加签节点（图流程 `FlowEngine` 侧）— 批次3
-- [ ] 自由跳转（驳回到指定节点而非起点）— 批次3
+- [x] 委托/转交/加签节点（`FlowEngine.DelegateTask/AddSignTask` + Controller + 待办页操作）
+- [x] 自由跳转（驳回到指定节点而非起点，`FlowEngine.RejectTo` + rejectable-nodes 查询）
 - [x] 表单设计器升级（2026-11-21，批次1）：
   - [x] 字段联动（visibleWhen：A 变 → B 显示/隐藏）
   - [x] 公式字段（formula，支持 + - * / % 算术，自动写回）

@@ -64,3 +64,23 @@ export async function rejectFlowTask(taskId: number, comment?: string): Promise<
 export async function cancelFlow(instanceId: number): Promise<void> {
   unwrap(await http.put<ApiResponse<null>>(`/${instanceId}/cancel`, {}))
 }
+
+/// <summary>委托/转交任务给指定 UMC 用户</summary>
+export async function delegateFlowTask(taskId: number, toUserId: number, toUserName: string, comment?: string): Promise<void> {
+  unwrap(await http.put<ApiResponse<null>>(`/task/${taskId}/delegate`, { toUserId, toUserName, comment }))
+}
+
+/// <summary>加签：追加协办人</summary>
+export async function addSignFlowTask(taskId: number, toUserId: number, toUserName: string, comment?: string): Promise<void> {
+  unwrap(await http.put<ApiResponse<null>>(`/task/${taskId}/add-sign`, { toUserId, toUserName, comment }))
+}
+
+/// <summary>获取可驳回的节点列表</summary>
+export async function getRejectableNodes(taskId: number): Promise<{ nodeId: string; nodeName: string }[]> {
+  return unwrap(await http.get<ApiResponse<{ nodeId: string; nodeName: string }[]>>(`/task/${taskId}/rejectable-nodes`))
+}
+
+/// <summary>驳回到指定节点</summary>
+export async function rejectFlowTaskTo(taskId: number, targetNodeId: string, comment?: string): Promise<void> {
+  unwrap(await http.put<ApiResponse<null>>(`/task/${taskId}/reject-to`, { targetNodeId, comment }))
+}

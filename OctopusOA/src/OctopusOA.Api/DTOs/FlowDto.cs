@@ -18,6 +18,21 @@ public class FlowTaskRequest
     public string? Comment { get; set; }
 }
 
+/// <summary>委托/加签请求：toUserId 目标用户，toUserName 显示名</summary>
+public class FlowDelegateRequest
+{
+    public long ToUserId { get; set; }
+    public string ToUserName { get; set; } = "";
+    public string? Comment { get; set; }
+}
+
+/// <summary>驳回到指定节点请求</summary>
+public class FlowRejectToRequest
+{
+    public string TargetNodeId { get; set; } = "";
+    public string? Comment { get; set; }
+}
+
 public class FlowDefinitionResponse
 {
     public long Id { get; set; }

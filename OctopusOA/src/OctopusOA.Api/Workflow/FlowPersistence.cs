@@ -68,6 +68,8 @@ public class FlowTask
     public string Status { get; set; } = "pending";  // pending/approved/rejected/cancelled
     public string? Action { get; set; }
     public string? Comment { get; set; }
+    /// <summary>任务来源：null/"" 普通；add_sign 加签产生（用于节点完成判定：加签任务需一并处理）</summary>
+    public string? TaskKind { get; set; }
     public DateTime? Deadline { get; set; }
     public DateTime? ActionTime { get; set; }
     public DateTime CreateTime { get; set; } = DateTime.UtcNow;

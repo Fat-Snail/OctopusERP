@@ -164,6 +164,69 @@ public class FlowController : ControllerBase
         return Ok(new { code = 200, msg = "已驳回" });
     }
 
+    /// <summary>委托/转交：把任务转给他人</summary>
+    [HttpPut("task/{taskId:long}/delegate")]
+    [OperationLog("流程任务转交")]
+    public IActionResult Delegate(long taskId, [FromBody] FlowDelegateRequest req)
+    {
+        var (userId, userName) = GetCurrentUser();
+        var (toId, toName) = ResolveUser(req.ToUserId, req.ToUserName);
+        var error = _engine.DelegateTask(taskId, userId, userName, toId, toName, req.Comment);
+        if (error != null) return Ok(new { code = error.Contains("无权") ? 403 : 500, msg = error });
+        return Ok(new { code = 200, msg = $"已转交给 {toName}" });
+    }
+
+    /// <summary>加签：追加协办人</summary>
+    [HttpPut("task/{taskId:long}/add-sign")]
+    [OperationLog("流程任务加签")]
+    public IActionResult AddSign(long taskId, [FromBody] FlowDelegateRequest req)
+    {
+        var (userId, userName) = GetCurrentUser();
+        var (toId, toName) = ResolveUser(req.ToUserId, req.ToUserName);
+        var error = _engine.AddSignTask(taskId, userId, userName, toId, toName, req.Comment);
+        if (error != null) return Ok(new { code = error.Contains("无权") ? 403 : 500, msg = error });
+        return Ok(new { code = 200, msg = $"已加签 {toName}" });
+    }
+
+    /// <summary>驳回到指定节点</summary>
+    [HttpPut("task/{taskId:long}/reject-to")]
+    [OperationLog("流程驳回至指定节点")]
+    public IActionResult RejectTo(long taskId, [FromBody] FlowRejectToRequest req)
+    {
+        var (userId, userName) = GetCurrentUser();
+        if (string.IsNullOrWhiteSpace(req.TargetNodeId)) return Ok(new { code = 400, msg = "缺少目标节点" });
+        var error = _engine.RejectTo(taskId, userId, userName, req.TargetNodeId, req.Comment);
+        if (error != null) return Ok(new { code = error.Contains("无权") ? 403 : 500, msg = error });
+        return Ok(new { code = 200, msg = "已驳回至指定节点" });
+    }
+
+    /// <summary>获取可驳回的节点（当前节点之前的审批节点，按图顺序）</summary>
+    [HttpGet("task/{taskId:long}/rejectable-nodes")]
+    public IActionResult RejectableNodes(long taskId)
+    {
+        var task = _db.FlowTasks.FirstOrDefault(t => t.Id == taskId);
+        if (task == null) return Ok(new { code = 404, msg = "任务不存在" });
+        var instance = _db.FlowInstances.FirstOrDefault(i => i.Id == task.InstanceId);
+        var def = instance != null ? _db.FlowDefinitions.FirstOrDefault(d => d.Id == instance.DefinitionId) : null;
+        if (def == null) return Ok(new { code = 200, msg = "ok", data = Array.Empty<object>() });
+
+        var graph = FlowGraph.FromJson(def.GraphJson);
+        var currentIndex = graph.Nodes.FindIndex(n => n.Id == task.NodeId);
+        var nodes = graph.Nodes
+            .Take(Math.Max(0, currentIndex))
+            .Where(n => n.Type is not (FlowNodeTypes.Start or FlowNodeTypes.End))
+            .Select(n => new { nodeId = n.Id, nodeName = n.Name })
+            .ToList();
+        return Ok(new { code = 200, msg = "ok", data = nodes });
+    }
+
+    /// <summary>按 UMC userId 解析真实用户显示名（防前端伪造姓名）</summary>
+    private (long id, string name) ResolveUser(long userId, string fallbackName)
+    {
+        var name = _db.SyncUsers.FirstOrDefault(u => u.UmcUserId == userId)?.NickName;
+        return (userId, string.IsNullOrWhiteSpace(name) ? (string.IsNullOrWhiteSpace(fallbackName) ? userId.ToString() : fallbackName) : name!);
+    }
+
     /// <summary>申请人撤回</summary>
     [HttpPut("{id:long}/cancel")]
     public IActionResult Cancel(long id)
