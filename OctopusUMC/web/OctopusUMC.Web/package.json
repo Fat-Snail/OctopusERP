@@ -37,5 +37,10 @@
     "workerDirectory": [
       "public"
     ]
+  },
+  "overrides": {
+    "@emnapi/core": "2.0.0-beta.2",
+    "@emnapi/runtime": "2.0.0-beta.2",
+    "@emnapi/wasi-threads": "2.2.0"
   }
 }

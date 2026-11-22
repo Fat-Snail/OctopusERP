@@ -25,5 +25,10 @@
     "typescript": "~5.9.3",
     "vite": "^8.3.4",
     "vue-tsc": "^3.3.13"
+  },
+  "overrides": {
+    "@emnapi/core": "2.0.0-beta.2",
+    "@emnapi/runtime": "2.0.0-beta.2",
+    "@emnapi/wasi-threads": "2.2.0"
   }
 }
