@@ -93,9 +93,9 @@
 ### 下一步清单（2026-11-21 整理，按优先级）
 
 **P0 工程收尾（先做，解锁后续）**
-- [ ] Aspire 全量启动冒烟（.NET 11 迁移遗留，验证 9 个后端 + 各前端全部起来）
+- [x] Aspire 全量启动冒烟（.NET 11 迁移遗留，验证 9 个后端 + 各前端全部起来）— **2026-11-22 完成**：UMC/OA/PLM/CRM/WMS/MES/FIN/HRM/OMS + Gateway + Keycloak(https) + KC management 全部健康；Retail/MiniappTodo 在 WaitFor(keycloakDb) 修复后首次全量启动成功（此前被扩展假 Unhealthy 卡死）
 - [ ] 门户真实 API 端到端验证（`VITE_PORTAL_LIVE=1` + 网关 :5100 + UMC JWT，确认限流/行级隔离生效）
-- [ ] 工作区 8 个 `package-lock.json` 改动处置（确认后提交或还原）
+- [x] 工作区 8 个 `package-lock.json` 改动处置（已随 `c4dd3dd` 提交）
 
 **P1 Redis 缓存（P8 生产就绪）**
 - [ ] docker-compose 加 `redis:7-alpine`，各系统注册 `AddStackExchangeRedisCache`
