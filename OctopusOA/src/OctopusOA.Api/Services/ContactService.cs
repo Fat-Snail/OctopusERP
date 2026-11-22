@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Caching.Distributed;
 using OctopusOA.Api.DTOs;
 using OctopusOA.Api.Persistence;
 
@@ -7,8 +8,13 @@ namespace OctopusOA.Api.Services;
 public class ContactService
 {
     private readonly OaDbContext _db;
+    private readonly IDistributedCache _cache;
 
-    public ContactService(OaDbContext db) => _db = db;
+    public ContactService(OaDbContext db, IDistributedCache cache)
+    {
+        _db = db;
+        _cache = cache;
+    }
 
     /// <summary>获取部门树（带每个节点的用户数）</summary>
     public List<ContactDeptNode> GetDeptTree()
@@ -131,6 +137,8 @@ public class ContactService
             {
                 _db.OaDepts.Remove(existing);
                 _db.SaveChanges();
+                // P1：部门数据变更后主动失效部门树缓存
+                _cache.Remove("oa:dept:tree");
             }
             return;
         }
@@ -156,5 +164,7 @@ public class ContactService
             });
         }
         _db.SaveChanges();
+        // P1：部门新增/更新后主动失效部门树缓存
+        _cache.Remove("oa:dept:tree");
     }
 }

@@ -2,11 +2,14 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 using OctopusUMC.Api.DTOs;
 using OctopusUMC.Api.Services;
 using OctopusUMC.Infrastructure.Persistence;
 using System.Security.Claims;
+using System.Text.Json;
 
 namespace OctopusUMC.Api.Controllers;
 
@@ -18,12 +21,14 @@ public class AccountController : ControllerBase
     private readonly ApplicationDbContext _context;
     private readonly IEmailService _email;
     private readonly IMemoryCache _cache;
+    private readonly IDistributedCache _distributedCache;
 
-    public AccountController(ApplicationDbContext context, IEmailService email, IMemoryCache cache)
+    public AccountController(ApplicationDbContext context, IEmailService email, IMemoryCache cache, IDistributedCache distributedCache)
     {
         _context = context;
         _email = email;
         _cache = cache;
+        _distributedCache = distributedCache;
     }
 
     /// <summary>登录（颁发 Cookie）</summary>
@@ -156,18 +161,26 @@ public class AccountController : ControllerBase
         return ApiResponse<object?>.Success(null, "密码已重置");
     }
 
-    /// <summary>获取当前登录用户信息</summary>
+    /// <summary>获取当前登录用户信息（P1 热点缓存：umc:user:perms:{userId}，TTL 5 分钟，角色变更主动失效）</summary>
     [HttpGet("me")]
     [Authorize]
-    public ApiResponse<LoginResponse> Me()
+    public async Task<ApiResponse<LoginResponse>> Me()
     {
         var userId = long.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "0");
-        var user = _context.Users.FirstOrDefault(u => u.UserId == userId);
+        var cacheKey = $"umc:user:perms:{userId}";
+        var cached = await _distributedCache.GetStringAsync(cacheKey);
+        if (!string.IsNullOrEmpty(cached))
+        {
+            var hit = JsonSerializer.Deserialize<LoginResponse>(cached);
+            if (hit != null) return ApiResponse<LoginResponse>.Success(hit);
+        }
+
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.UserId == userId);
         if (user == null) return ApiResponse<LoginResponse>.Fail("用户不存在", 404);
 
         // 通过 UserRole 关联表查询角色
-        var roleIds = _context.UserRoles.Where(ur => ur.UserId == user.UserId).Select(ur => ur.RoleId).ToList();
-        var userRoles = _context.Roles.Where(r => roleIds.Contains(r.RoleId)).ToList();
+        var roleIds = await _context.UserRoles.Where(ur => ur.UserId == user.UserId).Select(ur => ur.RoleId).ToListAsync();
+        var userRoles = await _context.Roles.Where(r => roleIds.Contains(r.RoleId)).ToListAsync();
 
         var permissions = new List<string>();
         if (userRoles.Any(r => r.RoleKey == "admin"))
@@ -177,17 +190,15 @@ public class AccountController : ControllerBase
         else
         {
             var roleIdList = userRoles.Select(r => r.RoleId).ToList();
-            var menuIds = _context.RoleMenus
+            var menuIds = await _context.RoleMenus
                 .Where(rm => roleIdList.Contains(rm.RoleId))
-                .Select(rm => rm.MenuId)
-                .Distinct()
-                .ToList();
-            permissions = _context.Menus
+                .Select(rm => rm.MenuId).Distinct().ToListAsync();
+            permissions = await _context.Menus
                 .Where(m => menuIds.Contains(m.MenuId) && m.MenuType == "F" && m.Permission != null && m.Permission != "")
-                .Select(m => m.Permission!).Distinct().ToList();
+                .Select(m => m.Permission!).Distinct().ToListAsync();
         }
 
-        return ApiResponse<LoginResponse>.Success(new LoginResponse
+        var response = new LoginResponse
         {
             UserId = user.UserId,
             UserName = user.UserName,
@@ -195,6 +206,14 @@ public class AccountController : ControllerBase
             Avatar = user.Avatar,
             Roles = userRoles.Select(r => r.RoleKey).ToList(),
             Permissions = permissions,
-        });
+        };
+        await _distributedCache.SetStringAsync(cacheKey, JsonSerializer.Serialize(response),
+            new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5) });
+
+        return ApiResponse<LoginResponse>.Success(response);
     }
+
+    /// <summary>失效指定用户的权限缓存（P1：用户角色分配 / 角色菜单变更时调用）</summary>
+    public static void InvalidateUserPermsCache(IDistributedCache cache, long userId)
+        => cache.Remove($"umc:user:perms:{userId}");
 }

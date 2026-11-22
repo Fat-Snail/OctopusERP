@@ -1,5 +1,6 @@
 using ClosedXML.Excel;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Distributed;
 using OctopusUMC.Api.Attributes;
 using OctopusUMC.Api.DTOs;
 using OctopusUMC.Api.Services;
@@ -17,12 +18,14 @@ public class UserController : ControllerBase
     private readonly UserSyncService _syncService;
     private readonly KeycloakSyncService _keycloak;
     private readonly RetailProfileSyncService _retailProfile;
-    public UserController(ApplicationDbContext context, UserSyncService syncService, KeycloakSyncService keycloak, RetailProfileSyncService retailProfile)
+    private readonly IDistributedCache _cache;
+    public UserController(ApplicationDbContext context, UserSyncService syncService, KeycloakSyncService keycloak, RetailProfileSyncService retailProfile, IDistributedCache cache)
     {
         _context = context;
         _syncService = syncService;
         _keycloak = keycloak;
         _retailProfile = retailProfile;
+        _cache = cache;
     }
 
     private async Task SyncUserToOAAsync(User user)
@@ -184,6 +187,9 @@ public class UserController : ControllerBase
         }
         _context.SaveChanges();
 
+        // P1：新用户分配角色后失效权限缓存（冷缓存下亦无副作用）
+        AccountController.InvalidateUserPermsCache(_cache, user.UserId);
+
         _ = SyncUserToOAAsync(user);
         SyncUserToKeycloak(user);
         return ApiResponse<UserResponse>.Success(MapUser(user), "新增成功");
@@ -225,6 +231,8 @@ public class UserController : ControllerBase
             _context.UserRoles.Add(new UserRole { UserId = u.UserId, RoleId = roleId });
 
         _context.SaveChanges();
+        // P1：用户角色变更后主动失效权限缓存
+        AccountController.InvalidateUserPermsCache(_cache, u.UserId);
         _ = SyncUserToOAAsync(u);
         SyncUserToKeycloak(u);
         // 客户的手机号/姓名可能被改过：回推零售域，避免成员列表长期显示旧值

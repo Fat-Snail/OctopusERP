@@ -29,9 +29,9 @@
          （13.3 引入了 ExecutableResource 构造函数新参数，旧 JavaScript 包调用会崩） -->
     <PackageReference Include="Aspire.Hosting.AppHost"    Version="13.6.1" />
     <PackageReference Include="Aspire.Hosting.JavaScript" Version="13.6.1" />
-    <!-- 小程序平台基础设施：Keycloak（IdP）+ PostgreSQL（Keycloak/小程序后端 DB） -->
     <PackageReference Include="Aspire.Hosting.Keycloak"   Version="13.6.1-preview.1.26506.6" />
     <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.6.1" />
+    <PackageReference Include="Aspire.Hosting.Redis"      Version="13.6.1" />
   </ItemGroup>
 
   <ItemGroup>

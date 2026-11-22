@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Distributed;
 using OctopusUMC.Api.Attributes;
 using OctopusUMC.Api.DTOs;
 using OctopusUMC.Core.Domain.Entities;
@@ -12,7 +13,12 @@ namespace OctopusUMC.Api.Controllers;
 public class RoleController : ControllerBase
 {
     private readonly ApplicationDbContext _context;
-    public RoleController(ApplicationDbContext context) => _context = context;
+    private readonly IDistributedCache _cache;
+    public RoleController(ApplicationDbContext context, IDistributedCache cache)
+    {
+        _context = context;
+        _cache = cache;
+    }
 
     private RoleResponse MapRole(Role r) => new()
     {
@@ -114,6 +120,12 @@ public class RoleController : ControllerBase
             _context.RoleMenus.Add(new RoleMenu { RoleId = r.RoleId, MenuId = menuId });
 
         _context.SaveChanges();
+
+        // P1：角色菜单变更影响该角色下所有用户的权限缓存，批量失效
+        var userIds = _context.UserRoles.Where(ur => ur.RoleId == req.RoleId).Select(ur => ur.UserId).ToList();
+        foreach (var uid in userIds)
+            AccountController.InvalidateUserPermsCache(_cache, uid);
+
         return ApiResponse<RoleResponse>.Success(MapRole(r), "修改成功");
     }
 
@@ -128,12 +140,18 @@ public class RoleController : ControllerBase
         if (items.Count == 0)
             return ApiResponse<object?>.Fail("角色不存在", 404);
 
+        // P1：删除角色影响其名下所有用户的权限缓存（先查受影响用户再删关联）
+        var affectedUserIds = _context.UserRoles
+            .Where(ur => idList.Contains(ur.RoleId)).Select(ur => ur.UserId).Distinct().ToList();
+
         // 先删除关联表
         _context.RoleMenus.RemoveRange(_context.RoleMenus.Where(rm => idList.Contains(rm.RoleId)));
         _context.RoleDepts.RemoveRange(_context.RoleDepts.Where(rd => idList.Contains(rd.RoleId)));
         _context.UserRoles.RemoveRange(_context.UserRoles.Where(ur => idList.Contains(ur.RoleId)));
         _context.Roles.RemoveRange(items);
         _context.SaveChanges();
+        foreach (var uid in affectedUserIds)
+            AccountController.InvalidateUserPermsCache(_cache, uid);
         return ApiResponse<object?>.Success(null, "删除成功");
     }
 

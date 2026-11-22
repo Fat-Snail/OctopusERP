@@ -8,6 +8,21 @@ var builder = WebApplication.CreateBuilder(args);
 // Serilog
 builder.Host.UseSerilog((ctx, cfg) => cfg.WriteTo.Console());
 
+// 分布式缓存：Redis（生产）或内存（开发/测试）——P1 热点缓存（plm:category:tree）
+var redisConn = builder.Configuration["Redis:Connection"];
+if (!string.IsNullOrWhiteSpace(redisConn))
+{
+    builder.Services.AddStackExchangeRedisCache(o =>
+    {
+        o.Configuration = redisConn;
+        o.InstanceName = builder.Configuration["Redis:InstanceName"] ?? "plm:";
+    });
+}
+else
+{
+    builder.Services.AddDistributedMemoryCache();
+}
+
 builder.Services.AddControllers()
     .AddJsonOptions(opt =>
         opt.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles);

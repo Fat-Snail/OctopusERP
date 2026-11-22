@@ -29,13 +29,17 @@ var builder = DistributedApplication.CreateBuilder(args);
 // 2. 子系统后端 WaitFor(umcApi) — UMC 必须先就绪（OIDC 鉴权依赖）
 // 3. Web 前端 WaitFor 各自后端 — 启动顺序确定
 
+// ── Redis 分布式缓存（P1 热点缓存）────────────────────────────────
+// 4 类热点：umc:menu:tree / umc:user:perms:{userId} / oa:dept:tree / plm:category:tree
+// 各系统读取 Redis__Connection（未配置时降级为内存缓存，开发/测试无感）
+var redis = builder.AddRedis("redis");
+
 // ── 小程序平台基础设施：Keycloak + Postgres ─────────────────────────
 // 用途：小程序平台（独立域名 + 独立容器 + 不读 UMC DB）的统一 IdP
 // 详情见根目录 MINIAPP-PLATFORM.md
 //
 // 开发环境一键启动；生产环境用独立 docker-compose / k8s 部署，Aspire 不参与
 // Realm 自动导入：keycloak/realms/octopus-realm.json
-//
 // 端口约定：8088（避开 .NET app 5001-5009 段）
 // 管理员账号：admin / admin（仅开发；生产用 Secrets）
 
@@ -73,6 +77,8 @@ var keycloak = builder.AddKeycloak("keycloak", adminPassword: kcAdminPwd, port: 
 // （Keycloak 第一次启动要拉 400MB 镜像，2-5 分钟）。
 // KeycloakSyncService 调用时如果 Keycloak 还没就绪会失败重试，不阻塞 UMC 启动
 var umcApi = builder.AddProject<Projects.OctopusUMC_Api>("umc-api")
+    .WithEnvironment("Redis__Connection", redis.Resource.ConnectionStringExpression)
+    .WithEnvironment("Redis__Connection", redis.Resource.ConnectionStringExpression)
     .WithEndpoint("http", e => e.Port = 5001)
     .WithReference(keycloak)
     // 打开 UMC → Keycloak 单向同步。
@@ -95,6 +101,7 @@ builder.AddViteApp("umc-web", "../../OctopusUMC/web/OctopusUMC.Web")
 
 // ── OA 办公自动化 ──────────────────────────────────────────────
 var oaApi = builder.AddProject<Projects.OctopusOA_Api>("oa-api")
+    .WithEnvironment("Redis__Connection", redis.Resource.ConnectionStringExpression)
     .WithEndpoint("http", e => e.Port = 5002)
     .WithReplicas(1)
     .WaitFor(umcApi);
@@ -106,6 +113,7 @@ builder.AddViteApp("oa-web", "../../OctopusOA/web/OctopusOA.Web")
 
 // ── PLM 商品生命周期管理 ────────────────────────────────────────
 var plmApi = builder.AddProject<Projects.OctopusPLM_Api>("plm-api")
+    .WithEnvironment("Redis__Connection", redis.Resource.ConnectionStringExpression)
     .WithEndpoint("http", e => e.Port = 5003)
     .WithReplicas(1)
     .WaitFor(umcApi);
@@ -117,6 +125,7 @@ builder.AddViteApp("plm-web", "../../OctopusPLM/web/OctopusPLM.Web")
 
 // ── CRM 客户关系管理 ────────────────────────────────────────────
 var crmApi = builder.AddProject<Projects.OctopusCRM_Api>("crm-api")
+    .WithEnvironment("Redis__Connection", redis.Resource.ConnectionStringExpression)
     .WithEndpoint("http", e => e.Port = 5004)
     .WithReplicas(1)
     .WaitFor(umcApi);
@@ -128,6 +137,7 @@ builder.AddViteApp("crm-web", "../../OctopusCRM/web/OctopusCRM.Web")
 
 // ── WMS 仓储管理 ────────────────────────────────────────────────
 var wmsApi = builder.AddProject<Projects.OctopusWMS_Api>("wms-api")
+    .WithEnvironment("Redis__Connection", redis.Resource.ConnectionStringExpression)
     .WithEndpoint("http", e => e.Port = 5005)
     .WithReplicas(1)
     .WaitFor(umcApi);
@@ -139,6 +149,7 @@ builder.AddViteApp("wms-web", "../../OctopusWMS/web/OctopusWMS.Web")
 
 // ── MES 生产与采购 ───────────────────────────────────────────────
 var mesApi = builder.AddProject<Projects.OctopusMES_Api>("mes-api")
+    .WithEnvironment("Redis__Connection", redis.Resource.ConnectionStringExpression)
     .WithEndpoint("http", e => e.Port = 5006)
     .WithReplicas(1)
     .WaitFor(umcApi);
@@ -161,6 +172,7 @@ builder.AddViteApp("oa-h5", "../../OctopusOA/web/OctopusOA.H5")
 
 // ── FIN 财务（P13）────────────────────────────────────────────────
 var finApi = builder.AddProject<Projects.OctopusFIN_Api>("fin-api")
+    .WithEnvironment("Redis__Connection", redis.Resource.ConnectionStringExpression)
     .WithEndpoint("http", e => e.Port = 5007)
     .WithReplicas(1)
     .WaitFor(umcApi);
@@ -168,6 +180,7 @@ _ = finApi;
 
 // ── HRM 人力资源（P14）─────────────────────────────────────────────
 var hrmApi = builder.AddProject<Projects.OctopusHRM_Api>("hrm-api")
+    .WithEnvironment("Redis__Connection", redis.Resource.ConnectionStringExpression)
     .WithEndpoint("http", e => e.Port = 5008)
     .WithReplicas(1)
     .WaitFor(umcApi);
@@ -175,6 +188,7 @@ _ = hrmApi;
 
 // ── OMS 订单中台（P15）─────────────────────────────────────────────
 var omsApi = builder.AddProject<Projects.OctopusOMS_Api>("oms-api")
+    .WithEnvironment("Redis__Connection", redis.Resource.ConnectionStringExpression)
     .WithEndpoint("http", e => e.Port = 5009)
     .WithReplicas(1)
     .WaitFor(umcApi);
@@ -207,6 +221,7 @@ _ = miniappTodo;
 // WaitFor(keycloak) 是必须的，原因同 miniapp-todo：
 // JwtBearer + OIDC handler 启动时拉 discovery 文档，KC 未就绪会导致首次登录 500（IDX20803）。
 var retailApi = builder.AddProject<Projects.OctopusRetail_Api>("retail-api")
+    .WithEnvironment("Redis__Connection", redis.Resource.ConnectionStringExpression)
     .WithEndpoint("http", e => e.Port = 5010)
     .WithReference(keycloak)
     // 开启 Keycloak Admin 调用（受控建号 + group 双写对账）。
@@ -231,6 +246,7 @@ builder.AddViteApp("retail-web", "../../OctopusRetail/web/OctopusRetail.Web")
 // 按用户限流 + 请求日志）。路由配置见 OctopusGateway.Api/appsettings.json。
 // 不 WaitFor 下游业务系统：下游未就绪时网关转发返回 502/503，不影响网关启动。
 var gatewayApi = builder.AddProject<Projects.OctopusGateway_Api>("gateway-api")
+    .WithEnvironment("Redis__Connection", redis.Resource.ConnectionStringExpression)
     .WithEndpoint("http", e => e.Port = 5100)
     .WithReplicas(1)
     .WaitFor(umcApi);

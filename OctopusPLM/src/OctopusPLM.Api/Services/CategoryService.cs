@@ -1,21 +1,47 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
 using OctopusPLM.Api.DTOs;
 using OctopusPLM.Infrastructure.Persistence;
+using System.Text.Json;
 
 namespace OctopusPLM.Api.Services;
 
 public class CategoryService
 {
     private readonly PlmDbContext _db;
+    private readonly IDistributedCache _cache;
 
-    public CategoryService(PlmDbContext db) => _db = db;
+    // P1 热点缓存：类目树（TTL 5 分钟，CRUD 主动失效）
+    private const string TreeCacheKey = "plm:category:tree";
+    private static readonly DistributedCacheEntryOptions TreeCacheOptions = new()
+    {
+        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5),
+    };
 
-    /// <summary>递归构建类目树</summary>
+    public CategoryService(PlmDbContext db, IDistributedCache cache)
+    {
+        _db = db;
+        _cache = cache;
+    }
+
+    /// <summary>递归构建类目树（缓存读路径）</summary>
     public async Task<List<CategoryTreeNode>> GetTreeAsync()
     {
+        var cached = await _cache.GetStringAsync(TreeCacheKey);
+        if (!string.IsNullOrEmpty(cached))
+        {
+            var hit = JsonSerializer.Deserialize<List<CategoryTreeNode>>(cached);
+            if (hit != null) return hit;
+        }
+
         var all = await _db.Categories.OrderBy(c => c.OrderNum).ToListAsync();
-        return BuildTree(all, null);
+        var tree = BuildTree(all, null);
+        await _cache.SetStringAsync(TreeCacheKey, JsonSerializer.Serialize(tree), TreeCacheOptions);
+        return tree;
     }
+
+    /// <summary>失效类目树缓存（CRUD 内部调用）</summary>
+    private void InvalidateTreeCache() => _cache.Remove(TreeCacheKey);
 
     private static List<CategoryTreeNode> BuildTree(List<Core.Entities.Category> all, long? parentId)
     {
@@ -250,6 +276,8 @@ public class CategoryService
         };
         _db.Categories.Add(cat);
         await _db.SaveChangesAsync();
+        // P1：类目变更后主动失效树缓存
+        InvalidateTreeCache();
         return (cat, null);
     }
 
@@ -264,6 +292,7 @@ public class CategoryService
         cat.Name = name;
         cat.OrderNum = orderNum;
         await _db.SaveChangesAsync();
+        InvalidateTreeCache();
         return null;
     }
 
@@ -282,6 +311,7 @@ public class CategoryService
         _db.CategoryBomTemplates.RemoveRange(templates);
         _db.Categories.Remove(cat);
         await _db.SaveChangesAsync();
+        InvalidateTreeCache();
         return null;
     }
 

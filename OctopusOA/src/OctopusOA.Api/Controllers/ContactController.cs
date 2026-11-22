@@ -1,6 +1,9 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Caching.Distributed;
+using OctopusOA.Api.DTOs;
 using OctopusOA.Api.Services;
+using System.Text.Json;
 
 namespace OctopusOA.Api.Controllers;
 
@@ -11,13 +14,35 @@ namespace OctopusOA.Api.Controllers;
 public class ContactController : ControllerBase
 {
     private readonly ContactService _service;
-    public ContactController(ContactService service) => _service = service;
+    private readonly IDistributedCache _cache;
 
-    /// <summary>部门树（含每个节点的用户数）</summary>
-    [HttpGet("dept/tree")]
-    public IActionResult GetDeptTree()
+    // P1 热点缓存：部门树（TTL 5 分钟；UMC 同步 SyncDept 时主动失效）
+    private const string DeptTreeCacheKey = "oa:dept:tree";
+    private static readonly DistributedCacheEntryOptions DeptTreeCacheOptions = new()
     {
-        return Ok(new { code = 200, msg = "ok", data = _service.GetDeptTree() });
+        AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5),
+    };
+
+    public ContactController(ContactService service, IDistributedCache cache)
+    {
+        _service = service;
+        _cache = cache;
+    }
+
+    /// <summary>部门树（含每个节点的用户数，缓存读路径）</summary>
+    [HttpGet("dept/tree")]
+    public async Task<IActionResult> GetDeptTree()
+    {
+        var cached = await _cache.GetStringAsync(DeptTreeCacheKey);
+        if (!string.IsNullOrEmpty(cached))
+        {
+            var hit = JsonSerializer.Deserialize<List<ContactDeptNode>>(cached);
+            if (hit != null) return Ok(new { code = 200, msg = "ok", data = hit });
+        }
+
+        var tree = _service.GetDeptTree();
+        await _cache.SetStringAsync(DeptTreeCacheKey, JsonSerializer.Serialize(tree), DeptTreeCacheOptions);
+        return Ok(new { code = 200, msg = "ok", data = tree });
     }
 
     /// <summary>员工列表（可按部门 ID 筛选 + 关键字搜索）</summary>
