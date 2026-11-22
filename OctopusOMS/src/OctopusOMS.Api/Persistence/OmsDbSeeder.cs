@@ -13,7 +13,8 @@ public static class OmsDbSeeder
             new OmsChannel { ChannelId = 3, ChannelCode = "PDD",     ChannelName = "拼多多",       ChannelType = "marketplace", Status = "active", CreatedAt = now },
             new OmsChannel { ChannelId = 4, ChannelCode = "DOUYIN",  ChannelName = "抖音小店",     ChannelType = "marketplace", Status = "active", CreatedAt = now },
             new OmsChannel { ChannelId = 5, ChannelCode = "SHOPIFY", ChannelName = "Shopify 独立站", ChannelType = "self_built",  Status = "active", CreatedAt = now },
-            new OmsChannel { ChannelId = 6, ChannelCode = "AMAZON",  ChannelName = "Amazon 跨境",  ChannelType = "marketplace", Status = "active", CreatedAt = now }
+            new OmsChannel { ChannelId = 6, ChannelCode = "AMAZON",  ChannelName = "Amazon 跨境",  ChannelType = "marketplace", Status = "active", CreatedAt = now },
+            new OmsChannel { ChannelId = 7, ChannelCode = "MOCK",    ChannelName = "Mock 沙箱渠道", ChannelType = "marketplace", Status = "active", CreatedAt = now, Remark = "P2 渠道适配层沙箱（MockChannelAdapter）" }
         );
 
         db.Shops.AddRange(
@@ -21,7 +22,8 @@ public static class OmsDbSeeder
             new OmsShop { ShopId = 2, ChannelId = 1, ShopCode = "TM-OFFICIAL", ShopName = "章鱼天猫官方",   Region = "国内",   Currency = "CNY", Status = "active", CreatedAt = now },
             new OmsShop { ShopId = 3, ChannelId = 2, ShopCode = "JD-FLAGSHIP", ShopName = "章鱼京东自营",   Region = "国内",   Currency = "CNY", Status = "active", CreatedAt = now },
             new OmsShop { ShopId = 4, ChannelId = 4, ShopCode = "DY-OFFICIAL", ShopName = "章鱼抖音官方",   Region = "国内",   Currency = "CNY", Status = "active", CreatedAt = now },
-            new OmsShop { ShopId = 5, ChannelId = 6, ShopCode = "AMZ-US",      ShopName = "Octopus Amazon US", Region = "海外", Currency = "USD", Status = "active", CreatedAt = now }
+            new OmsShop { ShopId = 5, ChannelId = 6, ShopCode = "AMZ-US",      ShopName = "Octopus Amazon US", Region = "海外", Currency = "USD", Status = "active", CreatedAt = now },
+            new OmsShop { ShopId = 6, ChannelId = 7, ShopCode = "MOCK-SANDBOX", ShopName = "Mock 沙箱店铺",     Region = "国内", Currency = "CNY", Status = "active", CreatedAt = now }
         );
 
         db.SkuMappings.AddRange(

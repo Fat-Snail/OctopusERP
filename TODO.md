@@ -103,7 +103,8 @@
 - [ ] 对应 CRUD 主动失效 key
 
 **P2 真实电商平台对接（OMS 渠道深化）**
-- [ ] 淘宝/天猫开放平台（★★★）
+- [x] **渠道适配层已落地（2026-11-22）**：`OctopusOMS.Api/Channels/`——`IChannelAdapter` 契约（拉单/发货回传/库存回写）+ `MockChannelAdapter` 确定性沙箱 + `ChannelAdapterFactory`（按 ChannelCode 解析）+ `ChannelSyncService`（幂等拉单入库 + 发货回传状态机）+ 端点 `/api/channel-sync/**`；seed 增 MOCK 沙箱渠道/店铺；沙箱全链路测试 5 项全绿
+- [ ] 淘宝/天猫开放平台（★★★）——按 `IChannelAdapter` 契约实现 `TaobaoAdapter`，凭证到位后注册即接入
 - [ ] 京东 JOS（★★★）
 - [ ] 拼多多 / 抖音小店（★★）
 - [ ] Shopify / Amazon SP-API（★）

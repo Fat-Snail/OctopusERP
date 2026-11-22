@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using OctopusOMS.Api.Channels;
 using OctopusOMS.Api.Persistence;
 using OctopusOMS.Api.Services;
 using System.Threading.RateLimiting;
@@ -67,6 +68,12 @@ builder.Services.AddRateLimiter(o =>
 builder.Services.AddScoped<OrderService>();
 builder.Services.AddScoped<CatalogService>();
 builder.Services.AddScoped<AfterSaleService>();
+
+// ── P2 渠道适配层：Mock 沙箱先行，真实平台凭证到位后按 IChannelAdapter 契约注册 ──
+builder.Services.AddSingleton<MockChannelAdapter>();
+builder.Services.AddSingleton<IChannelAdapter>(sp => sp.GetRequiredService<MockChannelAdapter>());
+builder.Services.AddSingleton<ChannelAdapterFactory>();
+builder.Services.AddScoped<ChannelSyncService>();
 
 var app = builder.Build();
 
