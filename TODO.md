@@ -90,8 +90,36 @@
 - ✅ P5 H5 — OA H5 全功能（首页/审批/考勤/公告/通讯录/会议室/个人中心）+ UMC H5 完成
 - ✅ P16 门户前端 — Customer / Supplier Portal（2026-11-20 已全量接真实网关 API + 身份绑定行级隔离）
 - ✅ P17 BPM 高级特性 — 批次1/2/3 全部完成（表单高级字段 + 条件构建器/模板库 + 委托加签/驳回指定节点）
-- ⬜ Redis 缓存 / 真实电商平台对接
-- ⬜ P18+ MySQL 迁移路径（EF Migrations 启用、自愈守卫加 `Sqlite` 判断）— **最低优先级，排最后**（2026-11-21 定：其他待办全部完成后再启动）
+### 下一步清单（2026-11-21 整理，按优先级）
+
+**P0 工程收尾（先做，解锁后续）**
+- [ ] Aspire 全量启动冒烟（.NET 11 迁移遗留，验证 9 个后端 + 各前端全部起来）
+- [ ] 门户真实 API 端到端验证（`VITE_PORTAL_LIVE=1` + 网关 :5100 + UMC JWT，确认限流/行级隔离生效）
+- [ ] 工作区 8 个 `package-lock.json` 改动处置（确认后提交或还原）
+
+**P1 Redis 缓存（P8 生产就绪）**
+- [ ] docker-compose 加 `redis:7-alpine`，各系统注册 `AddStackExchangeRedisCache`
+- [ ] 4 类热点缓存：`umc:menu-tree` / `umc:user-perms:{userId}` / `oa:dept-tree` / `plm:category-tree`（TTL 5 分钟）
+- [ ] 对应 CRUD 主动失效 key
+
+**P2 真实电商平台对接（OMS 渠道深化）**
+- [ ] 淘宝/天猫开放平台（★★★）
+- [ ] 京东 JOS（★★★）
+- [ ] 拼多多 / 抖音小店（★★）
+- [ ] Shopify / Amazon SP-API（★）
+
+**P3 生产安全加固（P8 剩余）**
+- [ ] OpenIddict 生产证书 `.pfx` 替换（UMC）
+- [ ] 生产环境强制 HTTPS（`UseHttpsRedirection` + `UseHsts`）
+- [ ] 外网请求收口走网关（生产域名/证书就位后）
+
+**P4 长期愿景（L1–L4）**
+- [ ] 多租户 SaaS 化 / 移动原生 App（Capacitor）/ AI 赋能 / 国际化 + 跨境
+
+**P99 P18 MySQL 迁移（最低优先级，排最后）**
+- [ ] EF Migrations 启用（当前 `EnsureCreated` 无迁移历史）
+- [ ] ADR-007 自愈守卫加 `Sqlite` 判断，生产切 MySQL 连接串
+- [ ] 测试保持 SQLite `:memory:` 双轨
 
 ---
 
