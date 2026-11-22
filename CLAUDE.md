@@ -102,7 +102,7 @@
 | 层次 | 技术 | 说明 |
 |---|---|---|
 | 后端运行时 | .NET 11 | 全部 10 个子系统 + OctopusCommon 统一 net11.0（SDK 11.0.100） |
-| 编排平台 | Aspire 17.0.0 | 2026-11-22 从 13.6.1 升级。Keycloak 扩展无 stable，用 `17.0.0-preview.1.26567.5`（须与主版本一致）。最低要求 .NET 10。旧 `AddProject<Projects.*>` + `IsAspireProjectResource` 模型在 17 仍兼容（deprecated not removed），12 处 ProjectReference 暂未迁移 |
+| 编排平台 | Aspire 17.0.0 | 2026-11-22 从 13.6.1 升级，11-23 迁移到路径式项目模型。Keycloak 扩展无 stable，用 `17.0.0-preview.1.26567.5`（须与主版本一致）。最低要求 .NET 10。已用 `AddDotnetProject(name, path)` 替代 `AddProject<Projects.*>`，csproj 移除全部 ProjectReference + `IsAspireProjectResource`，新增 `Aspire.Hosting.Dotnet` 包 |
 | 认证框架 | OpenIddict 7.8 | OIDC/OAuth2 服务端，MIT 协议 |
 | ORM | EF Core 11 + SQLite | 开发用 SQLite 文件；生产切换 MySQL（`MySql.EntityFrameworkCore` 仍为 10.0.12，见 README「版本基线与上游阻塞项」） |
 | 实时通信 | SignalR | 在线用户、公告推送 |
@@ -162,10 +162,11 @@ dotnet run
 
 **关键配置要点（AppHost.csproj）**：
 - `TargetFramework`：`net11.0`（历史备注：早期 net10.0 有过 DCP TLS 兼容问题，现已可用）
-- ProjectReference 上加 `<IsAspireProjectResource>true</IsAspireProjectResource>`
-- `AddProject<T>` 后用 `.WithEndpoint("http", e => e.Port = N)` 覆盖端口（不能再调 `WithHttpEndpoint`）
+- 项目注册用 `builder.AddDotnetProject("name", "../../相对路径/App.csproj")`（Aspire 17 路径式模型，**不用** ProjectReference + `IsAspireProjectResource`）
+- `AddDotnetProject` 后用 `.WithEndpoint("http", e => e.Port = N)` 覆盖端口（不能再调 `WithHttpEndpoint`）
 - `AddViteApp(name, path)`（Aspire 13.x/17.x，不是 `AddNpmApp`）
-- **Aspire 17 升级 (2026-11-22)**：所有 Aspire 包统一 `17.0.0`，Keycloak 扩展 `17.0.0-preview.1.26567.5`（无 stable）。全量 `dotnet build` 0 错误，NuGet 漏洞警告 NU1903/1904 随之消失。旧 `AddProject<Projects.*>` 模型 deprecated 但仍可用，待后续迁 `AddDotnetProject`（需加 `Aspire.Hosting.Dotnet` 包）。回滚：用 `/tmp/AppHost.csproj.bak-20261122-220144` 覆盖 csproj 后 restore
+- **Aspire 17 升级 (2026-11-22)**：所有 Aspire 包统一 `17.0.0`，Keycloak 扩展 `17.0.0-preview.1.26567.5`（无 stable）。全量 `dotnet build` 0 错误，NuGet 漏洞警告 NU1903/1904 随之消失。
+- **路径式项目模型迁移 (2026-11-23)**：`AddProject<Projects.X>("name")` → `AddDotnetProject("name", "../../相对路径/App.csproj")`，12 处全部迁移；csproj 删除全部 ProjectReference + `IsAspireProjectResource`，新增 `Aspire.Hosting.Dotnet` 17.0.0 包。`WithReference`/`WaitFor`/`WithEndpoint`/`WithReplicas` 链式配置原样保留、完全兼容。clean rebuild 0 警告 0 错误。不再生成 `Projects.*` 生成类型。回滚：用 `/tmp/*bak-pathmigration-20261123-070515` 覆盖 Program.cs + csproj 后 restore
 
 **launchSettings.json 必须设置**：
 - `HTTPS_PROXY=""` / `HTTP_PROXY=""`：清空代理，防 DCP TLS EOF

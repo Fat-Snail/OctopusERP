@@ -76,7 +76,7 @@ var keycloak = builder.AddKeycloak("keycloak", adminPassword: kcAdminPwd, port: 
 // 注意：故意不 WaitFor(keycloak)。UMC 启动不依赖 Keycloak 真正就绪
 // （Keycloak 第一次启动要拉 400MB 镜像，2-5 分钟）。
 // KeycloakSyncService 调用时如果 Keycloak 还没就绪会失败重试，不阻塞 UMC 启动
-var umcApi = builder.AddProject<Projects.OctopusUMC_Api>("umc-api")
+var umcApi = builder.AddDotnetProject("umc-api", "../../OctopusUMC/src/OctopusUMC.Api/OctopusUMC.Api.csproj")
     .WithEnvironment("Redis__Connection", redis.Resource.ConnectionStringExpression)
     .WithEnvironment("Redis__Connection", redis.Resource.ConnectionStringExpression)
     .WithEndpoint("http", e => e.Port = 5001)
@@ -100,7 +100,7 @@ builder.AddViteApp("umc-web", "../../OctopusUMC/web/OctopusUMC.Web")
     .WaitFor(umcApi);
 
 // ── OA 办公自动化 ──────────────────────────────────────────────
-var oaApi = builder.AddProject<Projects.OctopusOA_Api>("oa-api")
+var oaApi = builder.AddDotnetProject("oa-api", "../../OctopusOA/src/OctopusOA.Api/OctopusOA.Api.csproj")
     .WithEnvironment("Redis__Connection", redis.Resource.ConnectionStringExpression)
     .WithEndpoint("http", e => e.Port = 5002)
     .WithReplicas(1)
@@ -112,7 +112,7 @@ builder.AddViteApp("oa-web", "../../OctopusOA/web/OctopusOA.Web")
     .WaitFor(oaApi);
 
 // ── PLM 商品生命周期管理 ────────────────────────────────────────
-var plmApi = builder.AddProject<Projects.OctopusPLM_Api>("plm-api")
+var plmApi = builder.AddDotnetProject("plm-api", "../../OctopusPLM/src/OctopusPLM.Api/OctopusPLM.Api.csproj")
     .WithEnvironment("Redis__Connection", redis.Resource.ConnectionStringExpression)
     .WithEndpoint("http", e => e.Port = 5003)
     .WithReplicas(1)
@@ -124,7 +124,7 @@ builder.AddViteApp("plm-web", "../../OctopusPLM/web/OctopusPLM.Web")
     .WaitFor(plmApi);
 
 // ── CRM 客户关系管理 ────────────────────────────────────────────
-var crmApi = builder.AddProject<Projects.OctopusCRM_Api>("crm-api")
+var crmApi = builder.AddDotnetProject("crm-api", "../../OctopusCRM/src/OctopusCRM.Api/OctopusCRM.Api.csproj")
     .WithEnvironment("Redis__Connection", redis.Resource.ConnectionStringExpression)
     .WithEndpoint("http", e => e.Port = 5004)
     .WithReplicas(1)
@@ -136,7 +136,7 @@ builder.AddViteApp("crm-web", "../../OctopusCRM/web/OctopusCRM.Web")
     .WaitFor(crmApi);
 
 // ── WMS 仓储管理 ────────────────────────────────────────────────
-var wmsApi = builder.AddProject<Projects.OctopusWMS_Api>("wms-api")
+var wmsApi = builder.AddDotnetProject("wms-api", "../../OctopusWMS/src/OctopusWMS.Api/OctopusWMS.Api.csproj")
     .WithEnvironment("Redis__Connection", redis.Resource.ConnectionStringExpression)
     .WithEndpoint("http", e => e.Port = 5005)
     .WithReplicas(1)
@@ -148,7 +148,7 @@ builder.AddViteApp("wms-web", "../../OctopusWMS/web/OctopusWMS.Web")
     .WaitFor(wmsApi);
 
 // ── MES 生产与采购 ───────────────────────────────────────────────
-var mesApi = builder.AddProject<Projects.OctopusMES_Api>("mes-api")
+var mesApi = builder.AddDotnetProject("mes-api", "../../OctopusMES/src/OctopusMES.Api/OctopusMES.Api.csproj")
     .WithEnvironment("Redis__Connection", redis.Resource.ConnectionStringExpression)
     .WithEndpoint("http", e => e.Port = 5006)
     .WithReplicas(1)
@@ -171,7 +171,7 @@ builder.AddViteApp("oa-h5", "../../OctopusOA/web/OctopusOA.H5")
     .WaitFor(oaApi);
 
 // ── FIN 财务（P13）────────────────────────────────────────────────
-var finApi = builder.AddProject<Projects.OctopusFIN_Api>("fin-api")
+var finApi = builder.AddDotnetProject("fin-api", "../../OctopusFIN/src/OctopusFIN.Api/OctopusFIN.Api.csproj")
     .WithEnvironment("Redis__Connection", redis.Resource.ConnectionStringExpression)
     .WithEndpoint("http", e => e.Port = 5007)
     .WithReplicas(1)
@@ -179,7 +179,7 @@ var finApi = builder.AddProject<Projects.OctopusFIN_Api>("fin-api")
 _ = finApi;
 
 // ── HRM 人力资源（P14）─────────────────────────────────────────────
-var hrmApi = builder.AddProject<Projects.OctopusHRM_Api>("hrm-api")
+var hrmApi = builder.AddDotnetProject("hrm-api", "../../OctopusHRM/src/OctopusHRM.Api/OctopusHRM.Api.csproj")
     .WithEnvironment("Redis__Connection", redis.Resource.ConnectionStringExpression)
     .WithEndpoint("http", e => e.Port = 5008)
     .WithReplicas(1)
@@ -187,7 +187,7 @@ var hrmApi = builder.AddProject<Projects.OctopusHRM_Api>("hrm-api")
 _ = hrmApi;
 
 // ── OMS 订单中台（P15）─────────────────────────────────────────────
-var omsApi = builder.AddProject<Projects.OctopusOMS_Api>("oms-api")
+var omsApi = builder.AddDotnetProject("oms-api", "../../OctopusOMS/src/OctopusOMS.Api/OctopusOMS.Api.csproj")
     .WithEnvironment("Redis__Connection", redis.Resource.ConnectionStringExpression)
     .WithEndpoint("http", e => e.Port = 5009)
     .WithReplicas(1)
@@ -201,7 +201,7 @@ _ = omsApi;
 // WaitFor(keycloak) 是必须的：JwtBearer + OIDC handler 启动时会拉 discovery
 // 文档（/.well-known/openid-configuration）；KC 未就绪时拉取失败会被
 // ConfigurationManager 缓存，导致首次登录 500（IDX20803）。
-var miniappTodo = builder.AddProject<Projects.MiniappTodo_Api>("miniapp-todo")
+var miniappTodo = builder.AddDotnetProject("miniapp-todo", "../../miniapps/todo/src/MiniappTodo.Api/MiniappTodo.Api.csproj")
     .WithEndpoint("http", e => e.Port = 5201)
     .WithReference(keycloak)
     // 2026-11-19：改为等 keycloak-db。扩展 Aspire.Hosting.Keycloak 13.6.1-preview 的
@@ -220,7 +220,7 @@ _ = miniappTodo;
 //
 // WaitFor(keycloak) 是必须的，原因同 miniapp-todo：
 // JwtBearer + OIDC handler 启动时拉 discovery 文档，KC 未就绪会导致首次登录 500（IDX20803）。
-var retailApi = builder.AddProject<Projects.OctopusRetail_Api>("retail-api")
+var retailApi = builder.AddDotnetProject("retail-api", "../../OctopusRetail/src/OctopusRetail.Api/OctopusRetail.Api.csproj")
     .WithEnvironment("Redis__Connection", redis.Resource.ConnectionStringExpression)
     .WithEndpoint("http", e => e.Port = 5010)
     .WithReference(keycloak)
@@ -245,7 +245,7 @@ builder.AddViteApp("retail-web", "../../OctopusRetail/web/OctopusRetail.Web")
 // 端口 5100；/gw/{system}/** → 各子系统（YARP 转发 + UMC JWT 验签 +
 // 按用户限流 + 请求日志）。路由配置见 OctopusGateway.Api/appsettings.json。
 // 不 WaitFor 下游业务系统：下游未就绪时网关转发返回 502/503，不影响网关启动。
-var gatewayApi = builder.AddProject<Projects.OctopusGateway_Api>("gateway-api")
+var gatewayApi = builder.AddDotnetProject("gateway-api", "../../OctopusGateway/src/OctopusGateway.Api/OctopusGateway.Api.csproj")
     .WithEnvironment("Redis__Connection", redis.Resource.ConnectionStringExpression)
     .WithEndpoint("http", e => e.Port = 5100)
     .WithReplicas(1)
