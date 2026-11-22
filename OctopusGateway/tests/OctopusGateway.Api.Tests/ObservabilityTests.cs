@@ -19,12 +19,16 @@ public class ObservabilityTests : IClassFixture<GatewayTestFactory>
     [Fact]
     public async Task HealthFull_AllDownstreamsUp_Returns200Healthy()
     {
-        // 所有集群指向健康的 stub，且探测路径命中 stub 的 /health
+        // 所有集群（crm/wms/mes/fin/self）全部指向健康的 stub，且探测路径命中 stub 的 /health。
+        // 注意：必须覆盖全部集群——CI/容器环境里没有真实下游（localhost:5004 等），
+        // 未覆盖的集群探测会失败，导致 /health/full 返回 degraded 而非 healthy。
         var client = _factory.WithWebHostBuilder(b => b.ConfigureAppConfiguration((_, cfg) =>
             cfg.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ReverseProxy:Clusters:crm:Destinations:d1:Address"] = _factory.StubUrl + "/",
                 ["ReverseProxy:Clusters:wms:Destinations:d1:Address"] = _factory.StubUrl + "/",
+                ["ReverseProxy:Clusters:mes:Destinations:d1:Address"] = _factory.StubUrl + "/",
+                ["ReverseProxy:Clusters:fin:Destinations:d1:Address"] = _factory.StubUrl + "/",
                 ["HealthCheck:TimeoutMs"] = "1500",
             }))).CreateClient();
 
