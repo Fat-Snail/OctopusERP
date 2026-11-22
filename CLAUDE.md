@@ -102,6 +102,7 @@
 | 层次 | 技术 | 说明 |
 |---|---|---|
 | 后端运行时 | .NET 11 | 全部 10 个子系统 + OctopusCommon 统一 net11.0（SDK 11.0.100） |
+| 编排平台 | Aspire 17.0.0 | 2026-11-22 从 13.6.1 升级。Keycloak 扩展无 stable，用 `17.0.0-preview.1.26567.5`（须与主版本一致）。最低要求 .NET 10。旧 `AddProject<Projects.*>` + `IsAspireProjectResource` 模型在 17 仍兼容（deprecated not removed），12 处 ProjectReference 暂未迁移 |
 | 认证框架 | OpenIddict 7.8 | OIDC/OAuth2 服务端，MIT 协议 |
 | ORM | EF Core 11 + SQLite | 开发用 SQLite 文件；生产切换 MySQL（`MySql.EntityFrameworkCore` 仍为 10.0.12，见 README「版本基线与上游阻塞项」） |
 | 实时通信 | SignalR | 在线用户、公告推送 |
@@ -163,7 +164,8 @@ dotnet run
 - `TargetFramework`：`net11.0`（历史备注：早期 net10.0 有过 DCP TLS 兼容问题，现已可用）
 - ProjectReference 上加 `<IsAspireProjectResource>true</IsAspireProjectResource>`
 - `AddProject<T>` 后用 `.WithEndpoint("http", e => e.Port = N)` 覆盖端口（不能再调 `WithHttpEndpoint`）
-- `AddViteApp(name, path)`（Aspire 13.x，不是 `AddNpmApp`）
+- `AddViteApp(name, path)`（Aspire 13.x/17.x，不是 `AddNpmApp`）
+- **Aspire 17 升级 (2026-11-22)**：所有 Aspire 包统一 `17.0.0`，Keycloak 扩展 `17.0.0-preview.1.26567.5`（无 stable）。全量 `dotnet build` 0 错误，NuGet 漏洞警告 NU1903/1904 随之消失。旧 `AddProject<Projects.*>` 模型 deprecated 但仍可用，待后续迁 `AddDotnetProject`（需加 `Aspire.Hosting.Dotnet` 包）。回滚：用 `/tmp/AppHost.csproj.bak-20261122-220144` 覆盖 csproj 后 restore
 
 **launchSettings.json 必须设置**：
 - `HTTPS_PROXY=""` / `HTTP_PROXY=""`：清空代理，防 DCP TLS EOF
@@ -611,6 +613,10 @@ public async Task Login_WithCorrectCredentials_SetsCookieAndReturns200() { }
 | **Aspire 里 keycloak/keycloak-db 显示「未知」，retail-web 报 `Failed to fetch`** | Docker Desktop 未运行，`docker.sock` 不存在，DCP 建不出容器 | `open -a Docker` 启动引擎，确认镜像 `keycloak:26.0`/`postgres:17.6` 在本地，再重启 Aspire；排查入口是 DCP 临时目录的 `*_starterr_*` |
 | **curl 能取到 discovery JSON，但浏览器仍 `Failed to fetch`** | 长期运行的 Chrome 进程缓存了陈旧的证书信任判定，`fetch()` 不重新校验（地址栏导航会） | 完全退出浏览器（Cmd+Q）后重开；自查命令用 `curl -sk`（自签证书需 `-k`） |
 | **Keycloak demo 证书过期导致 HTTPS 全挂** | `keycloak:26.0` 内置自签证书 `CN=localhost`，`notAfter` 固定（当前为 2026-11-20 08:40 UTC），每台机器相同 | 到期前更换正式证书或重新签发；`openssl s_client -connect localhost:8088 \| openssl x509 -noout -dates` 查有效期 |
+| **网关 5100 端口 LISTEN 但请求全部超时（000）** | 新增的 `OctopusGateway.Api` 缺 `Properties/launchSettings.json` → Aspire/DCP 未注入 Development 环境和动态端口，应用回落到默认 `5000` + Production 模式，而 DCP 代理转发到分配的动态端口（如 27419），两边对不上 → `connection refused`。**其余服务都有该文件所以正常** | 补 `Properties/launchSettings.json`（`ASPNETCORE_ENVIRONMENT=Development` + applicationUrl），与其他服务一致；重建+重启后网关监听动态端口、5100 恢复。自查：`grep -rh 'Now listening' <DCP目录>/*_out`，若网关是 5000 而其他是 124xx/27xxx 即为此问题 |
+| **`restart.sh` 后 Dashboard（:15256）打不开，看着像全栈启动失败** | `~/.aspire/dashboard/runs`、`~/.docker/buildx/activity` 带 `com.apple.provenance` 扩展属性受 macOS TCC 保护；从工具沙箱启动的 `dotnet run` 无权写入 → Dashboard SQLite `disk I/O error`、buildx `operation not permitted`。**实际 11 个后端 + 前端全部健康**（`/health` 200），只是 Dashboard 挂了 | **手动在终端跑 `./restart.sh`**（有 TCC 授权）即可；若目录已损坏，`mv ~/.aspire/dashboard/runs ~/.aspire/dashboard/runs.bak-$(date +%Y%m%d-%H%M%S)`（buildx activity 同理）后重启让其重建。**判断服务死活用 `curl :5001/health`，别用 Dashboard 打不开做判断** |
+| **服务隔一会儿突然全停，所有端口 000** | 用 AI 工具/后台任务跑 `restart.sh`，会话轮次结束时系统发 SIGKILL（exit 137），连带把整个 DCP 进程树一起杀掉 | **必须在自己的终端前台跑 `./restart.sh`**，终端进程不受工具会话清理影响，稳定常驻。不要用工具后台任务长期托管 Aspire |
+| **Dashboard 里 keycloak 显示 `Running (Unhealthy)`，但登录/下游都正常** | Aspire.Hosting.Keycloak 13.6.1-preview 扩展默认注册对"管理端点 /health/ready"的健康检查，但容器以 dev/HTTP 模式跑（8088→8080、管理口 9000），扩展的 HTTPS 端点订阅（`SubscribeHttpsEndpointsUpdate`）与实际端口不匹配 → 探不通 → Unhealthy。**服务本身完全正常** | 先实测证伪：`curl -s http://localhost:8088/realms/octopus/.well-known/openid-configuration` 应 200；管理口 `curl -s http://localhost:10450/health/ready`（端口看 `docker port`）应返回 `{"status":"UP"}`。**若两者都 200 即为误报，可忽略**。真实依赖已用 `WaitFor(keycloakDb)` 规避。不要贸然覆盖健康检查——有 issue 报告改法会导致 BeforeStartEvent 重复端点崩溃（aspire#16979） |
 
 ---
 
