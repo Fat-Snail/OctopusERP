@@ -39,6 +39,8 @@ builder.Services.AddDbContext<HrmDbContext>(opt =>
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o =>
     {
+        // 保留原始 claim 名，避免 sub 被映射成 ClaimTypes.NameIdentifier 导致 FindFirst("sub") 失效。
+        o.MapInboundClaims = false;
         o.Authority = builder.Configuration["Jwt:Authority"] ?? "http://localhost:5001";
         o.Audience = builder.Configuration["Jwt:Audience"] ?? "octopus-hrm-web";
         o.RequireHttpsMetadata = false;

@@ -45,6 +45,10 @@ builder.Services.AddDbContext<CrmDbContext>(opt =>
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o =>
     {
+        // 保留原始 claim 名（sub/role/name），否则 JwtBearer 默认把 sub 映射成
+        // ClaimTypes.NameIdentifier，导致 FindFirst("sub") 返回 null → userId=0，
+        // 门户身份解析（PortalIdentityService）与行级隔离失效。与 Retail/Miniapp 一致。
+        o.MapInboundClaims = false;
         o.Authority = builder.Configuration["Jwt:Authority"] ?? "http://localhost:5001";
         o.Audience = builder.Configuration["Jwt:Audience"] ?? "octopus-crm-web";
         o.RequireHttpsMetadata = false;

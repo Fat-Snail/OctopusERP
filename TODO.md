@@ -94,13 +94,13 @@
 
 **P0 工程收尾（先做，解锁后续）**
 - [x] Aspire 全量启动冒烟（.NET 11 迁移遗留，验证 9 个后端 + 各前端全部起来）— **2026-11-22 完成**：UMC/OA/PLM/CRM/WMS/MES/FIN/HRM/OMS + Gateway + Keycloak(https) + KC management 全部健康；Retail/MiniappTodo 在 WaitFor(keycloakDb) 修复后首次全量启动成功（此前被扩展假 Unhealthy 卡死）
-- [ ] 门户真实 API 端到端验证（`VITE_PORTAL_LIVE=1` + 网关 :5100 + UMC JWT，确认限流/行级隔离生效）
+- [x] 门户真实 API 端到端验证（`VITE_PORTAL_LIVE=1` + 网关 :5100 + UMC JWT，确认限流/行级隔离生效）— **2026-11-26 完成**。走完整 OIDC 授权码+PKCE 拿真实 token（iss=localhost:5001），实测：无 token→401；admin(未绑定)→bound=false；zhangsan(sub=2,绑定客户1)→bound=true + summary 真实数据；越权访问他人询盘→404；供应商门户 summary 正常；150 请求触发 55×200 + 95×429（阈值120/10s）；两门户 `VITE_PORTAL_LIVE=1 npm run build` 双通过。**过程中发现并修复重大 JWT bug**：8 个系统（CRM/MES/WMS/FIN/HRM/OMS + OA/PLM）的 JwtBearer 未设 `MapInboundClaims=false`，.NET 默认把 `sub` 映射成 ClaimTypes.NameIdentifier，导致 `FindFirst("sub")` 返回 null → userId=0 → 门户身份/行级隔离从端到端看全部失效（单测因直接注入 sub claim 绕过了映射所以全绿没发现）。已在 8 个 Program.cs 统一加 `MapInboundClaims = false`，8 系统编译全过，重启后实测 userId 0→2 修复。
 - [x] 工作区 8 个 `package-lock.json` 改动处置（已随 `c4dd3dd` 提交）
 
-**P1 Redis 缓存（P8 生产就绪）**
-- [ ] docker-compose 加 `redis:7-alpine`，各系统注册 `AddStackExchangeRedisCache`
-- [ ] 4 类热点缓存：`umc:menu-tree` / `umc:user-perms:{userId}` / `oa:dept-tree` / `plm:category-tree`（TTL 5 分钟）
-- [ ] 对应 CRUD 主动失效 key
+**P1 Redis 缓存（P8 生产就绪）— 2026-11-26 核实已全部落地，标记同步**
+- [x] docker-compose 加 `redis:7-alpine`，9 个系统注册 `AddStackExchangeRedisCache`（commit `56dd472`）
+- [x] 4 类热点缓存：`umc:menu-tree` / `umc:user-perms:{userId}` / `oa:dept-tree` / `plm:category-tree`（TTL 5 分钟，含 4 套缓存测试）
+- [x] 对应 CRUD 主动失效 key（Account/Role/User/Contact/Category Controller 已接失效）
 
 **P2 真实电商平台对接（OMS 渠道深化）**
 - [x] **渠道适配层已落地（2026-11-22）**：`OctopusOMS.Api/Channels/`——`IChannelAdapter` 契约（拉单/发货回传/库存回写）+ `MockChannelAdapter` 确定性沙箱 + `ChannelAdapterFactory`（按 ChannelCode 解析）+ `ChannelSyncService`（幂等拉单入库 + 发货回传状态机）+ 端点 `/api/channel-sync/**`；seed 增 MOCK 沙箱渠道/店铺；沙箱全链路测试 5 项全绿

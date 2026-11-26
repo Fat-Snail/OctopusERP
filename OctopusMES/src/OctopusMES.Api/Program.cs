@@ -47,6 +47,9 @@ builder.Services.AddDbContext<MesDbContext>(opt =>
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(o =>
     {
+        // 保留原始 claim 名（sub/role/name），避免 sub 被映射成 ClaimTypes.NameIdentifier
+        // 导致 FindFirst("sub") 返回 null、供应商门户身份解析与行级隔离失效。
+        o.MapInboundClaims = false;
         o.Authority = builder.Configuration["Jwt:Authority"] ?? "http://localhost:5001";
         o.Audience = builder.Configuration["Jwt:Audience"] ?? "octopus-mes-web";
         o.RequireHttpsMetadata = false;

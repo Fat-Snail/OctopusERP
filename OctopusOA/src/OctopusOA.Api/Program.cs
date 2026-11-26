@@ -54,6 +54,9 @@ builder.Services.AddCors(options =>
 builder.Services.AddAuthentication("Bearer")
     .AddJwtBearer("Bearer", options =>
     {
+        // 保留原始 claim 名（sub/role/name），与全平台一致；控制器已有 NameIdentifier fallback，
+        // 此处统一配置避免后续新增控制器直接用 FindFirst("sub") 时拿到 null。
+        options.MapInboundClaims = false;
         options.Authority = builder.Configuration["Oidc:Authority"] ?? "http://localhost:5001";
         options.Audience = "octopus-oa-web";
         options.RequireHttpsMetadata = false;
