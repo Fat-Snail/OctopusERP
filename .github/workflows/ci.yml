@@ -76,6 +76,12 @@ jobs:
             path: OctopusPortal.Customer
           - name: OctopusPortal.Supplier
             path: OctopusPortal.Supplier
+          - name: OctopusFIN.Web
+            path: OctopusFIN/web/OctopusFIN.Web
+          - name: OctopusHRM.Web
+            path: OctopusHRM/web/OctopusHRM.Web
+          - name: OctopusOMS.Web
+            path: OctopusOMS/web/OctopusOMS.Web
     steps:
       - uses: actions/checkout@v4
 

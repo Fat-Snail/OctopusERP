@@ -92,6 +92,12 @@
 - ✅ P17 BPM 高级特性 — 批次1/2/3 全部完成（表单高级字段 + 条件构建器/模板库 + 委托加签/驳回指定节点）
 ### 下一步清单（2026-11-21 整理，按优先级）
 
+**管理前端补齐（FEATURE_GAPS FR-01~03，2026-11-26 完成）**
+- [x] FR-01 OMS 渠道管理前端 — 新建 `OctopusOMS/web/OctopusOMS.Web`（:5183），渠道/店铺、手动拉单、适配器诊断、订单、SKU 映射、售后 6 页面
+- [x] FR-02 FIN 财务管理前端 — 新建 `OctopusFIN/web/OctopusFIN.Web`（:5181），凭证（多分录）、科目、应收应付、期间月结、报表 5 页面；补种 OIDC `octopus-fin-web` 客户端（原缺失）
+- [x] FR-03 HRM 人力资源管理前端 — 新建 `OctopusHRM/web/OctopusHRM.Web`（:5182），员工档案、薪资核算、请假/KPI 3 页面
+- 三个前端均接入 Aspire（AddViteApp）+ 统一 OIDC + CI 前端矩阵；`npm run build` 全通过，浏览器实测 0 控制台错误，经 Vite proxy 调后端 API 200；改动**尚未提交**（待用户手动确认）
+
 **P0 工程收尾（先做，解锁后续）**
 - [x] Aspire 全量启动冒烟（.NET 11 迁移遗留，验证 9 个后端 + 各前端全部起来）— **2026-11-22 完成**：UMC/OA/PLM/CRM/WMS/MES/FIN/HRM/OMS + Gateway + Keycloak(https) + KC management 全部健康；Retail/MiniappTodo 在 WaitFor(keycloakDb) 修复后首次全量启动成功（此前被扩展假 Unhealthy 卡死）
 - [x] 门户真实 API 端到端验证（`VITE_PORTAL_LIVE=1` + 网关 :5100 + UMC JWT，确认限流/行级隔离生效）— **2026-11-26 完成**。走完整 OIDC 授权码+PKCE 拿真实 token（iss=localhost:5001），实测：无 token→401；admin(未绑定)→bound=false；zhangsan(sub=2,绑定客户1)→bound=true + summary 真实数据；越权访问他人询盘→404；供应商门户 summary 正常；150 请求触发 55×200 + 95×429（阈值120/10s）；两门户 `VITE_PORTAL_LIVE=1 npm run build` 双通过。**过程中发现并修复重大 JWT bug**：8 个系统（CRM/MES/WMS/FIN/HRM/OMS + OA/PLM）的 JwtBearer 未设 `MapInboundClaims=false`，.NET 默认把 `sub` 映射成 ClaimTypes.NameIdentifier，导致 `FindFirst("sub")` 返回 null → userId=0 → 门户身份/行级隔离从端到端看全部失效（单测因直接注入 sub claim 绕过了映射所以全绿没发现）。已在 8 个 Program.cs 统一加 `MapInboundClaims = false`，8 系统编译全过，重启后实测 userId 0→2 修复。

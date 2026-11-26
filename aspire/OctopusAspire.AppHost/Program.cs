@@ -16,6 +16,9 @@
 //   mes-web  → http://localhost:5178  (MES 前端 Vite dev server)
 //   umc-h5   → http://localhost:5179  (UMC H5 移动端)
 //   oa-h5    → http://localhost:5180  (OA H5 移动端)
+//   fin-web  → http://localhost:5181  (FIN 财务前端 Vite dev server)
+//   hrm-web  → http://localhost:5182  (HRM 人力前端 Vite dev server)
+//   oms-web  → http://localhost:5183  (OMS 订单中台前端 Vite dev server)
 //
 // Aspire Dashboard → http://localhost:15256（自动打开，显示所有服务状态和日志）
 //
@@ -176,7 +179,11 @@ var finApi = builder.AddDotnetProject("fin-api", "../../OctopusFIN/src/OctopusFI
     .WithEndpoint("http", e => e.Port = 5007)
     .WithReplicas(1)
     .WaitFor(umcApi);
-_ = finApi;
+
+builder.AddViteApp("fin-web", "../../OctopusFIN/web/OctopusFIN.Web")
+    .WithEndpoint("http", e => e.Port = 5181)
+    .WithEnvironment("PORT", "5181")
+    .WaitFor(finApi);
 
 // ── HRM 人力资源（P14）─────────────────────────────────────────────
 var hrmApi = builder.AddDotnetProject("hrm-api", "../../OctopusHRM/src/OctopusHRM.Api/OctopusHRM.Api.csproj")
@@ -184,7 +191,11 @@ var hrmApi = builder.AddDotnetProject("hrm-api", "../../OctopusHRM/src/OctopusHR
     .WithEndpoint("http", e => e.Port = 5008)
     .WithReplicas(1)
     .WaitFor(umcApi);
-_ = hrmApi;
+
+builder.AddViteApp("hrm-web", "../../OctopusHRM/web/OctopusHRM.Web")
+    .WithEndpoint("http", e => e.Port = 5182)
+    .WithEnvironment("PORT", "5182")
+    .WaitFor(hrmApi);
 
 // ── OMS 订单中台（P15）─────────────────────────────────────────────
 var omsApi = builder.AddDotnetProject("oms-api", "../../OctopusOMS/src/OctopusOMS.Api/OctopusOMS.Api.csproj")
@@ -192,7 +203,11 @@ var omsApi = builder.AddDotnetProject("oms-api", "../../OctopusOMS/src/OctopusOM
     .WithEndpoint("http", e => e.Port = 5009)
     .WithReplicas(1)
     .WaitFor(umcApi);
-_ = omsApi;
+
+builder.AddViteApp("oms-web", "../../OctopusOMS/web/OctopusOMS.Web")
+    .WithEndpoint("http", e => e.Port = 5183)
+    .WithEnvironment("PORT", "5183")
+    .WaitFor(omsApi);
 
 // ── 小程序平台 demo: miniapp-todo ─────────────────────────────────
 // 端口 5201，独立容器/独立 DB，仅信任 Keycloak JWT

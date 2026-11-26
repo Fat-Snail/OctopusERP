@@ -402,6 +402,34 @@ using (var scope = app.Services.CreateScope())
         });
     }
 
+    // FR-02：FIN 财务 Web 客户端（端口 5181）
+    if (await manager.FindByClientIdAsync("octopus-fin-web") is null)
+    {
+        await manager.CreateAsync(new OpenIddictApplicationDescriptor
+        {
+            ClientId = "octopus-fin-web",
+            ClientType = OpenIddictConstants.ClientTypes.Public,
+            DisplayName = "OctopusFIN Web",
+            RedirectUris          = { new Uri("http://localhost:5181/callback") },
+            PostLogoutRedirectUris = { new Uri("http://localhost:5181") },
+            Permissions =
+            {
+                OpenIddictConstants.Permissions.Endpoints.Authorization,
+                OpenIddictConstants.Permissions.Endpoints.Token,
+                OpenIddictConstants.Permissions.Endpoints.EndSession,
+                OpenIddictConstants.Permissions.GrantTypes.AuthorizationCode,
+                OpenIddictConstants.Permissions.GrantTypes.RefreshToken,
+                OpenIddictConstants.Permissions.ResponseTypes.Code,
+                OpenIddictConstants.Permissions.Scopes.Email,
+                OpenIddictConstants.Permissions.Scopes.Profile,
+                OpenIddictConstants.Permissions.Scopes.Roles,
+                OpenIddictConstants.Permissions.Prefixes.Scope + "offline_access",
+                OpenIddictConstants.Permissions.Prefixes.Scope + "roles",
+            },
+            Requirements = { OpenIddictConstants.Requirements.Features.ProofKeyForCodeExchange },
+        });
+    }
+
     // P16：HRM Web 客户端（端口 5182）
     if (await manager.FindByClientIdAsync("octopus-hrm-web") is null)
     {
