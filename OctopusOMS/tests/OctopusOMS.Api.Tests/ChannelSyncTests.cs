@@ -2,6 +2,7 @@ using FluentAssertions;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using OctopusOMS.Api.Channels;
 using OctopusOMS.Api.Persistence;
 using System.Net;
 using System.Net.Http.Json;
@@ -133,17 +134,83 @@ public class ChannelSyncTests : IClassFixture<OmsTestFactory>
     [Fact]
     public async Task Sync_ShopOnUnsupportedChannel_ReturnsFriendlyError()
     {
-        // 给 TAOBAO（无适配器实现）挂一个临时店铺，验证未知渠道的明确报错
+        // JD 尚无适配器实现，验证未知渠道的明确报错
         using var scope = _factory.Services.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<OmsDbContext>();
-        var taobaoShopId = await db.Shops.Where(s => s.Channel!.ChannelCode == "TAOBAO")
+        var jdShopId = await db.Shops.Where(s => s.Channel!.ChannelCode == "JD")
             .Select(s => s.ShopId).FirstAsync();
 
-        var resp = await _client.PostAsync($"/api/channel-sync/sync/{taobaoShopId}", null);
+        var resp = await _client.PostAsync($"/api/channel-sync/sync/{jdShopId}", null);
         resp.StatusCode.Should().Be(HttpStatusCode.OK);
         var doc = await resp.Content.ReadFromJsonAsync<JsonDocument>(_json);
         doc!.RootElement.GetProperty("code").GetInt32().Should().Be(400);
-        doc.RootElement.GetProperty("msg").GetString().Should().Contain("TAOBAO");
+        doc.RootElement.GetProperty("msg").GetString().Should().Contain("JD");
         doc.RootElement.GetProperty("msg").GetString().Should().Contain("适配器");
+    }
+
+    [Fact]
+    public async Task Sync_TaobaoShop_SimulatedMode_CreatesOrdersAndIsIdempotent()
+    {
+        // 淘宝适配器在无开放平台凭证时自动进入仿真模式（确定性订单）
+        using (var cleanup = _factory.Services.CreateScope())
+        {
+            var db0 = cleanup.ServiceProvider.GetRequiredService<OmsDbContext>();
+            db0.Orders.RemoveRange(db0.Orders.Where(o => o.ShopId == 1));
+            db0.SaveChanges();
+        }
+
+        var first = await _client.PostAsync("/api/channel-sync/sync/1", null);
+        var doc = await first.Content.ReadFromJsonAsync<JsonDocument>(_json);
+        doc!.RootElement.GetProperty("code").GetInt32().Should().Be(200);
+        var data = doc.RootElement.GetProperty("data");
+        data.GetProperty("channelCode").GetString().Should().Be("TAOBAO");
+        data.GetProperty("fetched").GetInt32().Should().Be(3);
+        data.GetProperty("created").GetInt32().Should().Be(3);
+
+        var second = await _client.PostAsync("/api/channel-sync/sync/1", null);
+        var doc2 = await second.Content.ReadFromJsonAsync<JsonDocument>(_json);
+        doc2!.RootElement.GetProperty("data").GetProperty("skipped").GetInt32().Should().Be(3);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<OmsDbContext>();
+        var paid = await db.Orders.Include(o => o.Items)
+            .SingleAsync(o => o.ShopId == 1 && o.ExternalOrderNo == "SIMTB-2026-0001");
+        paid.Status.Should().Be("paid");
+        paid.OrderNo.Should().StartWith("OMS-TB-FLAGSHIP-");
+        paid.Items.Should().ContainSingle(i => i.ChannelSkuCode == "TB-SKU-001");
+    }
+
+    [Fact]
+    public async Task PushShipment_TaobaoSimulated_RecordsPlatformPush()
+    {
+        await _client.PostAsync("/api/channel-sync/sync/1", null);
+
+        using var scope = _factory.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<OmsDbContext>();
+        var order = await db.Orders.SingleAsync(o => o.ShopId == 1 && o.ExternalOrderNo == "SIMTB-2026-0001");
+
+        var resp = await _client.PostAsJsonAsync($"/api/channel-sync/shipment/{order.OrderId}", new
+        {
+            trackingNo = "SF777888",
+            carrier = "顺丰速运",
+        });
+        var doc = await resp.Content.ReadFromJsonAsync<JsonDocument>(_json);
+        doc!.RootElement.GetProperty("data").GetProperty("status").GetString().Should().Be("shipped");
+
+        var taobao = _factory.Services.GetRequiredService<TaobaoAdapter>();
+        taobao.PushedShipments.Should().ContainKey("SIMTB-2026-0001")
+            .WhoseValue.TrackingNo.Should().Be("SF777888");
+    }
+
+    [Fact]
+    public async Task Adapters_Endpoint_ReportsTaobaoSimulatedMode()
+    {
+        var resp = await _client.GetAsync("/api/channel-sync/adapters");
+        var doc = await resp.Content.ReadFromJsonAsync<JsonDocument>(_json);
+        var items = doc!.RootElement.GetProperty("data").EnumerateArray().ToList();
+
+        var taobao = items.Single(i => i.GetProperty("channelCode").GetString() == "TAOBAO");
+        taobao.GetProperty("mode").GetString().Should().Be("simulated");
+        items.Should().Contain(i => i.GetProperty("channelCode").GetString() == "MOCK");
     }
 }

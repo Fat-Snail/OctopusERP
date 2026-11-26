@@ -67,6 +67,21 @@ public class ChannelSyncController(ChannelSyncService syncService, ChannelAdapte
         }
     }
 
+    /// <summary>已注册渠道适配器及其运行模式（live / simulated / sandbox），用于接入诊断</summary>
+    [HttpGet("adapters")]
+    public IActionResult ListAdapters()
+    {
+        var data = factory.GetAll().Select(a => new
+        {
+            channelCode = a.ChannelCode,
+            mode = a is TaobaoAdapter taobao ? taobao.Mode : "sandbox",
+            description = a is TaobaoAdapter t
+                ? (t.IsSimulated ? "未配置开放平台凭证，使用确定性仿真订单" : "已连接淘宝开放平台 TOP API")
+                : "本地沙箱适配器",
+        }).ToList();
+        return Ok(new { code = 200, msg = "ok", data });
+    }
+
     /// <summary>Mock 沙箱：已回传的发货记录（测试/演示用）</summary>
     [HttpGet("mock/pushed-shipments")]
     public IActionResult MockPushedShipments()

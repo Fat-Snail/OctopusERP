@@ -55,6 +55,9 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 builder.Services.AddAuthorization();
 
 builder.Services.AddHttpClient();
+// 淘宝开放平台（TOP）：凭证缺失时自动仿真；填入 AppKey/AppSecret/Session 即切换真实 API
+builder.Services.AddHttpClient(nameof(TaobaoAdapter), c => c.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.Configure<TaobaoOptions>(builder.Configuration.GetSection("Taobao"));
 builder.Services.AddRateLimiter(o =>
 {
     o.RejectionStatusCode = 429;
@@ -74,6 +77,8 @@ builder.Services.AddScoped<AfterSaleService>();
 // ── P2 渠道适配层：Mock 沙箱先行，真实平台凭证到位后按 IChannelAdapter 契约注册 ──
 builder.Services.AddSingleton<MockChannelAdapter>();
 builder.Services.AddSingleton<IChannelAdapter>(sp => sp.GetRequiredService<MockChannelAdapter>());
+builder.Services.AddSingleton<TaobaoAdapter>();
+builder.Services.AddSingleton<IChannelAdapter>(sp => sp.GetRequiredService<TaobaoAdapter>());
 builder.Services.AddSingleton<ChannelAdapterFactory>();
 builder.Services.AddScoped<ChannelSyncService>();
 

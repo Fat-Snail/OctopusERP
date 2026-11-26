@@ -104,7 +104,7 @@
 
 **P2 真实电商平台对接（OMS 渠道深化）**
 - [x] **渠道适配层已落地（2026-11-22）**：`OctopusOMS.Api/Channels/`——`IChannelAdapter` 契约（拉单/发货回传/库存回写）+ `MockChannelAdapter` 确定性沙箱 + `ChannelAdapterFactory`（按 ChannelCode 解析）+ `ChannelSyncService`（幂等拉单入库 + 发货回传状态机）+ 端点 `/api/channel-sync/**`；seed 增 MOCK 沙箱渠道/店铺；沙箱全链路测试 5 项全绿
-- [ ] 淘宝/天猫开放平台（★★★）——按 `IChannelAdapter` 契约实现 `TaobaoAdapter`，凭证到位后注册即接入
+- [x] 淘宝/天猫开放平台（★★★）——`TaobaoAdapter` 已落地：TOP MD5 签名 + `trades.sold.get` 7 天分片/分页拉单（姓名手机号脱敏、状态归一化、跨窗口去重）+ `logistics.offline.send` 物流公司编码映射 + `item.quantity.update` 库存回写 + 错误码/限流重试；无凭证时自动进入确定性仿真模式，全链路已实测。凭证到位后只需在 `appsettings.json` 的 `Taobao` 段填 `AppKey`/`AppSecret`/`Session`（或环境变量 `Taobao__AppKey` 等）即切换真实 API，无需改代码；`GET /api/channel-sync/adapters` 可查看当前模式
 - [ ] 京东 JOS（★★★）
 - [ ] 拼多多 / 抖音小店（★★）
 - [ ] Shopify / Amazon SP-API（★）
