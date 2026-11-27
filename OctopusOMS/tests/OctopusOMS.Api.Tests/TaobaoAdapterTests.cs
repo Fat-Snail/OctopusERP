@@ -117,7 +117,8 @@ public class TaobaoAdapterTests
             """));
         var adapter = Create(LiveOptions(), handler);
 
-        var act = async () => await adapter.FetchOrdersAsync(new ChannelFetchQuery(1, DateTime.UtcNow));
+        // 固定用过去时间作 since，避免 since≈now 时窗口为空导致偶发不调用 API
+        var act = async () => await adapter.FetchOrdersAsync(new ChannelFetchQuery(1, DateTime.UtcNow.AddDays(-1)));
 
         (await act.Should().ThrowAsync<TaobaoApiException>())
             .Which.Message.Should().Contain("没有权限访问该API");
@@ -138,7 +139,8 @@ public class TaobaoAdapterTests
         opts.RetryDelayMs = 1;
         var adapter = Create(opts, handler);
 
-        var orders = await adapter.FetchOrdersAsync(new ChannelFetchQuery(1, DateTime.UtcNow));
+        // 固定用过去时间作 since，避免 since≈now 时窗口为空导致偶发返回空列表
+        var orders = await adapter.FetchOrdersAsync(new ChannelFetchQuery(1, DateTime.UtcNow.AddDays(-1)));
 
         orders.Should().ContainSingle().Which.ExternalOrderNo.Should().Be("TBREAL003");
         calls.Should().Be(2, "限流错误应重试一次");

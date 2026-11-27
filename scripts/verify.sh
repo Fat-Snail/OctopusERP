@@ -56,6 +56,9 @@ FRONTEND_DIRS=(
   "OctopusRetail/web/OctopusRetail.Web"
   "OctopusPortal.Customer"
   "OctopusPortal.Supplier"
+  "OctopusFIN/web/OctopusFIN.Web"
+  "OctopusHRM/web/OctopusHRM.Web"
+  "OctopusOMS/web/OctopusOMS.Web"
 )
 
 echo "━━━ 1/2 后端全平台测试（11 套件，失败自动重试一次容忍并行瞬态）━━━"
@@ -67,13 +70,15 @@ for sln in "${BACKEND_SOLUTIONS[@]}"; do
   fi
 done
 
-echo "━━━ 2/2 前端 npm ci + tsc（lock 同步门禁，11 项目）━━━━"
+echo "━━━ 2/2 前端 npm ci + tsc（lock 同步门禁，14 项目）━━━━"
 # HUSKY=0：husky 的 prepare 脚本在仓库子目录找不到 .git 会退出（CI 上靠 CI=true
 # 自动跳过，本地验证须显式禁用），git hooks 已由 core.hooksPath=.githooks 统一管理
 export HUSKY=0
 for d in "${FRONTEND_DIRS[@]}"; do
   echo "▶ npm ci + tsc $d"
-  (cd "$d" && npm ci --silent && npx tsc --noEmit) || FAILED=1
+  # --prefer-offline/--no-audit/--no-fund：本地门禁只校验 lock 同步与类型，
+  # 跳过审计与资助请求，避免每次 npm ci 因网络等待拖到 10 分钟以上。
+  (cd "$d" && npm ci --silent --prefer-offline --no-audit --no-fund && npx tsc --noEmit) || FAILED=1
 done
 
 # ── full：Linux 容器复验（CI ubuntu 同构，无宿主下游服务）─────────────
