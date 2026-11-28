@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import {
   LayoutDashboard, Users, Briefcase, Package, Warehouse,
-  Factory, UserCircle, Settings
+  Factory, TrendingUp, Wallet, UsersRound, ShoppingCart, Settings
 } from '@lucide/vue'
 import { cn } from '@/lib/utils'
 
@@ -14,13 +14,16 @@ const emit = defineEmits<{
 }>()
 
 const modules = [
-  { id: 'workbench', icon: LayoutDashboard, label: '工作台', href: null, disabled: true },
-  { id: 'user',     icon: Users,            label: '用户中心', href: 'http://localhost:5173', disabled: false },
-  { id: 'oa',       icon: Briefcase,        label: 'OA 协同',  href: 'http://localhost:5174', disabled: false },
-  { id: 'plm',      icon: Package,          label: 'PLM',       href: 'http://localhost:5175', disabled: false },
-  { id: 'wms',      icon: Warehouse,        label: 'WMS',       href: 'http://localhost:5177', disabled: false },
-  { id: 'mes',      icon: Factory,          label: 'MES',       href: 'http://localhost:5178', disabled: false },
-  { id: 'crm',      icon: UserCircle,       label: 'CRM',       href: 'http://localhost:5176', disabled: false },
+  { id: 'workbench', icon: LayoutDashboard, label: '工作台',   href: null,                    disabled: true },
+  { id: 'user',      icon: Users,           label: '用户中心', href: 'http://localhost:5173', disabled: false },
+  { id: 'oa',        icon: Briefcase,       label: 'OA 协同',  href: 'http://localhost:5174', disabled: false },
+  { id: 'plm',       icon: Package,         label: 'PLM',       href: 'http://localhost:5175', disabled: false },
+  { id: 'crm',       icon: TrendingUp,      label: 'CRM',       href: 'http://localhost:5176', disabled: false },
+  { id: 'wms',       icon: Warehouse,       label: 'WMS',       href: 'http://localhost:5177', disabled: false },
+  { id: 'mes',       icon: Factory,         label: 'MES',       href: 'http://localhost:5178', disabled: false },
+  { id: 'fin',       icon: Wallet,          label: 'FIN',       href: 'http://localhost:5181', disabled: false },
+  { id: 'hrm',       icon: UsersRound,      label: 'HRM',       href: 'http://localhost:5182', disabled: false },
+  { id: 'oms',       icon: ShoppingCart,    label: 'OMS',       href: 'http://localhost:5183', disabled: false },
 ]
 
 function handleClick(mod: typeof modules[0]) {
