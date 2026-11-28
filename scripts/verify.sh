@@ -66,7 +66,7 @@ for sln in "${BACKEND_SOLUTIONS[@]}"; do
   echo "▶ dotnet test $sln"
   if ! dotnet test "$sln" --verbosity minimal; then
     echo "  ⚠️ 首次失败，重试一次（并行瞬态容忍，如仍失败则为真实回归）..."
-    dotnet test "$sln" --verbosity minimal || FAILED=1
+    dotnet test "$sln" --verbosity minimal || { echo "  ❌ 失败：$sln"; FAILED=1; }
   fi
 done
 
@@ -78,7 +78,11 @@ for d in "${FRONTEND_DIRS[@]}"; do
   echo "▶ npm ci + tsc $d"
   # --prefer-offline/--no-audit/--no-fund：本地门禁只校验 lock 同步与类型，
   # 跳过审计与资助请求，避免每次 npm ci 因网络等待拖到 10 分钟以上。
-  (cd "$d" && npm ci --silent --prefer-offline --no-audit --no-fund && npx tsc --noEmit) || FAILED=1
+  # 不用 --silent：lock 漂移时 npm ci 的错误必须能被看到，并打印具体项目名。
+  if ! (cd "$d" && npm ci --prefer-offline --no-audit --no-fund && npx tsc --noEmit); then
+    echo "  ❌ 失败：$d（npm ci 或 tsc，详见上方输出）"
+    FAILED=1
+  fi
 done
 
 # ── full：Linux 容器复验（CI ubuntu 同构，无宿主下游服务）─────────────
