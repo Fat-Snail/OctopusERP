@@ -15,6 +15,13 @@ public class FinDbContext : DbContext
     public DbSet<FinApInvoice> ApInvoices => Set<FinApInvoice>();
     public DbSet<FinApPayment> ApPayments => Set<FinApPayment>();
     public DbSet<FinSyncUser> SyncUsers => Set<FinSyncUser>();
+    public DbSet<FinOrganization> Organizations => Set<FinOrganization>();
+    public DbSet<FinProfitCenter> ProfitCenters => Set<FinProfitCenter>();
+    public DbSet<FinInvoice> Invoices => Set<FinInvoice>();
+    public DbSet<FinInvoiceItem> InvoiceItems => Set<FinInvoiceItem>();
+    public DbSet<FinTaxReturn> TaxReturns => Set<FinTaxReturn>();
+    public DbSet<FinBankAccount> BankAccounts => Set<FinBankAccount>();
+    public DbSet<FinBankStatement> BankStatements => Set<FinBankStatement>();
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -27,6 +34,13 @@ public class FinDbContext : DbContext
         b.Entity<FinApInvoice>().ToTable("fin_ap_invoice");
         b.Entity<FinApPayment>().ToTable("fin_ap_payment");
         b.Entity<FinSyncUser>().ToTable("fin_sync_user");
+        b.Entity<FinOrganization>().ToTable("fin_organization");
+        b.Entity<FinProfitCenter>().ToTable("fin_profit_center");
+        b.Entity<FinInvoice>().ToTable("fin_invoice");
+        b.Entity<FinInvoiceItem>().ToTable("fin_invoice_item");
+        b.Entity<FinTaxReturn>().ToTable("fin_tax_return");
+        b.Entity<FinBankAccount>().ToTable("fin_bank_account");
+        b.Entity<FinBankStatement>().ToTable("fin_bank_statement");
 
         b.Entity<FinAccount>().HasKey(x => x.AccountId);
         b.Entity<FinAccount>().Property(x => x.AccountId).ValueGeneratedOnAdd();
@@ -76,5 +90,56 @@ public class FinDbContext : DbContext
         b.Entity<FinSyncUser>().HasKey(x => x.Id);
         b.Entity<FinSyncUser>().Property(x => x.Id).ValueGeneratedOnAdd();
         b.Entity<FinSyncUser>().HasIndex(x => x.UmcUserId).IsUnique();
+
+        b.Entity<FinOrganization>().HasKey(x => x.OrganizationId);
+        b.Entity<FinOrganization>().Property(x => x.OrganizationId).ValueGeneratedOnAdd();
+        b.Entity<FinOrganization>().HasIndex(x => x.OrgCode).IsUnique();
+
+        b.Entity<FinProfitCenter>().HasKey(x => x.ProfitCenterId);
+        b.Entity<FinProfitCenter>().Property(x => x.ProfitCenterId).ValueGeneratedOnAdd();
+        b.Entity<FinProfitCenter>().HasIndex(x => x.CenterCode).IsUnique();
+        b.Entity<FinProfitCenter>()
+            .HasOne(x => x.Organization)
+            .WithMany()
+            .HasForeignKey(x => x.OrganizationId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // 凭证维度：按组织建索引，加速多组织报表查询
+        b.Entity<FinVoucher>().HasIndex(x => x.OrganizationId);
+        // 分录维度：按利润中心建索引，加速阿米巴报表下钻
+        b.Entity<FinVoucherEntry>().HasIndex(x => x.ProfitCenterId);
+
+        b.Entity<FinInvoice>().HasKey(x => x.InvoiceId);
+        b.Entity<FinInvoice>().Property(x => x.InvoiceId).ValueGeneratedOnAdd();
+        b.Entity<FinInvoice>().HasIndex(x => x.InvoiceNo).IsUnique();
+        b.Entity<FinInvoice>().Property(x => x.Amount).HasColumnType("decimal(18,4)");
+        b.Entity<FinInvoice>().Property(x => x.TaxAmount).HasColumnType("decimal(18,4)");
+        b.Entity<FinInvoice>().Property(x => x.TotalAmount).HasColumnType("decimal(18,4)");
+        b.Entity<FinInvoice>()
+            .HasMany(x => x.Items)
+            .WithOne(x => x.Invoice)
+            .HasForeignKey(x => x.InvoiceId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        b.Entity<FinInvoiceItem>().HasKey(x => x.ItemId);
+        b.Entity<FinInvoiceItem>().Property(x => x.ItemId).ValueGeneratedOnAdd();
+        b.Entity<FinInvoiceItem>().Property(x => x.Amount).HasColumnType("decimal(18,4)");
+        b.Entity<FinInvoiceItem>().Property(x => x.TaxAmount).HasColumnType("decimal(18,4)");
+
+        b.Entity<FinTaxReturn>().HasKey(x => x.ReturnId);
+        b.Entity<FinTaxReturn>().Property(x => x.ReturnId).ValueGeneratedOnAdd();
+        b.Entity<FinTaxReturn>().Property(x => x.TaxableAmount).HasColumnType("decimal(18,4)");
+        b.Entity<FinTaxReturn>().Property(x => x.TaxPayable).HasColumnType("decimal(18,4)");
+        b.Entity<FinTaxReturn>().Property(x => x.TaxPaid).HasColumnType("decimal(18,4)");
+        b.Entity<FinTaxReturn>().Property(x => x.TaxRefund).HasColumnType("decimal(18,4)");
+
+        b.Entity<FinBankAccount>().HasKey(x => x.AccountId);
+        b.Entity<FinBankAccount>().Property(x => x.AccountId).ValueGeneratedOnAdd();
+        b.Entity<FinBankAccount>().HasIndex(x => x.AccountNo).IsUnique();
+
+        b.Entity<FinBankStatement>().HasKey(x => x.StatementId);
+        b.Entity<FinBankStatement>().Property(x => x.StatementId).ValueGeneratedOnAdd();
+        b.Entity<FinBankStatement>().HasIndex(x => x.ExternalTxnId);
+        b.Entity<FinBankStatement>().Property(x => x.Amount).HasColumnType("decimal(18,4)");
     }
 }

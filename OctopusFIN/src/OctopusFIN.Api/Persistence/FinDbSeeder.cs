@@ -53,6 +53,19 @@ public static class FinDbSeeder
             new FinSyncUser { Id = 3, UmcUserId = 3, UserName = "lisi", NickName = "李四", Email = "lisi@octopus.com", LastSyncAt = now }
         );
 
+        // 组织（映射 UMC 公司，多组织核算基础）
+        db.Organizations.AddRange(
+            new FinOrganization { OrganizationId = 1, OrgCode = "HQ", OrgName = "总部", UmcDeptId = 1, Status = "active", IsPrimary = true, CreatedAt = now },
+            new FinOrganization { OrganizationId = 2, OrgCode = "SOUTH", OrgName = "华南分公司", UmcDeptId = 10, Status = "active", IsPrimary = false, CreatedAt = now }
+        );
+
+        // 利润中心（阿米巴单元，归总部）
+        db.ProfitCenters.AddRange(
+            new FinProfitCenter { ProfitCenterId = 1, CenterCode = "PC-SALES", CenterName = "销售部", OrganizationId = 1, Status = "active", CreatedAt = now },
+            new FinProfitCenter { ProfitCenterId = 2, CenterCode = "PC-PROD", CenterName = "生产部", OrganizationId = 1, Status = "active", CreatedAt = now },
+            new FinProfitCenter { ProfitCenterId = 3, CenterCode = "PC-RND", CenterName = "研发部", OrganizationId = 1, Status = "active", CreatedAt = now }
+        );
+
         // 一条期初凭证：实收资本 100 万
         var openingVoucher = new FinVoucher
         {

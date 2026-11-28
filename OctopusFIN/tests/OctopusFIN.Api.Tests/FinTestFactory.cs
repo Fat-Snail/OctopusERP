@@ -26,8 +26,19 @@ public class FinTestFactory : WebApplicationFactory<Program>
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         // 测试环境清空 webhook 验签 secret，直接走"未配置即跳过"分支
+        // 同时清空 TaxCloud/ICBC 凭证，确保测试走 Mock 确定性仿真，不触发真实外部调用
         builder.ConfigureAppConfiguration(cfg => cfg.AddInMemoryCollection(
-            new Dictionary<string, string?> { ["Webhooks:FinSecret"] = "" }));
+            new Dictionary<string, string?>
+            {
+                ["Webhooks:FinSecret"] = "",
+                ["TaxCloud:MercNumber"] = "",
+                ["TaxCloud:MerchantKey"] = "",
+                ["TaxCloud:BaseUrl"] = "",
+                ["TaxCloud:TaxNo"] = "",
+                ["ICBC:AppId"] = "",
+                ["ICBC:AppSecret"] = "",
+                ["ICBC:BaseUrl"] = "",
+            }));
 
         builder.ConfigureServices(services =>
         {

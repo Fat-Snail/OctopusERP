@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 using OctopusFIN.Api.Persistence;
 using OctopusFIN.Api.Services;
+using OctopusFIN.Api.Tax;
+using OctopusFIN.Api.Bank;
 using System.Threading.RateLimiting;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -82,6 +84,35 @@ builder.Services.AddScoped<ClosingService>();
 builder.Services.AddScoped<ArService>();
 builder.Services.AddScoped<ApService>();
 builder.Services.AddScoped<ReportsService>();
+builder.Services.AddScoped<ProfitCenterService>();
+builder.Services.AddScoped<TaxService>();
+builder.Services.AddScoped<BankService>();
+
+// 税务平台适配器：凭证配置齐全走金税云真实 API，否则走 Mock 确定性仿真
+var taxCloudCfg = builder.Configuration["TaxCloud:MercNumber"];
+if (!string.IsNullOrWhiteSpace(taxCloudCfg)
+    && !string.IsNullOrWhiteSpace(builder.Configuration["TaxCloud:MerchantKey"])
+    && !string.IsNullOrWhiteSpace(builder.Configuration["TaxCloud:BaseUrl"]))
+{
+    builder.Services.AddSingleton<ITaxAdapter, RealTaxAdapter>();
+}
+else
+{
+    builder.Services.AddSingleton<ITaxAdapter, MockTaxAdapter>();
+}
+
+// 银行直连适配器：凭证配置齐全走工行真实 API，否则走 Mock 确定性仿真
+var icbcAppId = builder.Configuration["ICBC:AppId"];
+if (!string.IsNullOrWhiteSpace(icbcAppId)
+    && !string.IsNullOrWhiteSpace(builder.Configuration["ICBC:AppSecret"])
+    && !string.IsNullOrWhiteSpace(builder.Configuration["ICBC:BaseUrl"]))
+{
+    builder.Services.AddSingleton<IBankAdapter, RealBankAdapter>();
+}
+else
+{
+    builder.Services.AddSingleton<IBankAdapter, MockBankAdapter>();
+}
 
 var app = builder.Build();
 

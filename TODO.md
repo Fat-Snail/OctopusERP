@@ -72,6 +72,18 @@
 - 📈 测试基线：698 → **717**（FIN 29 / OA 137 / CRM 38 / MES 123，四系统全绿）
 - ⏳ 变更待提交（FIN/OA/CRM/MES 四系统 + 门户无关，建议按任务拆 4 个 commit）
 
+### 2026-11-28 阶段一·业财深化（四任务落地）
+
+> 演进 Roadmap 阶段一的四项 P1 任务全部完成，FIN 测试基线 29 → **50**。
+
+- ✅ **多组织/多利润中心切分**：新增 `fin_organization` / `fin_profit_center` 两表；`fin_voucher` 加 `OrganizationId`、`fin_voucher_entry` 加 `ProfitCenterId` 维度；`ProfitCenterService` + `ProfitCenterController` 提供组织/利润中心 CRUD（被引用的利润中心不可删除）；凭证录入支持指定组织和利润中心
+- ✅ **FIN 三大报表深化**：`ReportsService` 新增资产负债表 / 利润表 / 现金流量表 / 阿米巴经营报表，全部支持按 `organizationId` / `profitCenterId` 维度过滤下钻；试算平衡表同步扩展维度过滤
+- ✅ **FIN 税务与发票**：新增 `fin_invoice` / `fin_invoice_item` / `fin_tax_return` 三表；`ITaxAdapter` 契约（开票/查验/红冲/纳税申报）+ `MockTaxAdapter` 确定性沙箱 + **`RealTaxAdapter`（金税云）**真实适配器；`TaxService` + `TaxController` 提供发票全生命周期和纳税申报提交
+- ✅ **银企直连**：新增 `fin_bank_account` / `fin_bank_statement` 两表；`IBankAdapter` 契约（余额/对账单/收付款回写）+ `MockBankAdapter` 确定性沙箱 + **`RealBankAdapter`（工行）**真实适配器；`BankService` + `BankController` 提供账户管理、对账单拉取（幂等去重）、自动对账
+  - 2026-11-28 后续：`RealTaxAdapter` / `RealBankAdapter` 已落地，凭证未配时自动走确定性仿真（与 Mock 行为一致），凭证填入 `appsettings.json` 的 `TaxCloud` / `ICBC` 配置节即自动切换真实 API，无需改代码
+  - `appsettings.json` 已预留 `TaxCloud`（MercNumber/MerchantKey/BaseUrl/TaxNo）和 `ICBC`（AppId/AppSecret/BaseUrl）配置节，凭证到位后填空即可
+- 📈 测试：新增 `FinDimensionAndIntegrationTests` 18 个用例、`FinAdapterSwitchTests` 3 个用例，覆盖四任务全链路与配置驱动切换；FIN 总测试 **50/50** 全绿
+
 ### 2026-11-20 网关 + v1.5.5 可观测性
 
 - ✅ **OctopusGateway（YARP 网关，:5100）**：`/gw/{crm,wms,mes,fin}/**` 前缀剥离转发、UMC JWT FallbackPolicy 全局验签、按用户固定窗口限流、请求访问日志；5 集成测试。Aspire 编排 + CI matrix 已接入（commit `d9fe267`）

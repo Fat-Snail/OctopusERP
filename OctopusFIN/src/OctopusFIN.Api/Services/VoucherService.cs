@@ -55,6 +55,7 @@ public class VoucherService(FinDbContext db)
             Status = "draft",
             Source = input.Source ?? "manual",
             SourceRef = input.SourceRef,
+            OrganizationId = input.OrganizationId,
             CreatedBy = createdBy,
             CreatedAt = DateTime.UtcNow,
         };
@@ -73,6 +74,7 @@ public class VoucherService(FinDbContext db)
                 DebitAmount = e.DebitAmount,
                 CreditAmount = e.CreditAmount,
                 Currency = e.Currency ?? "CNY",
+                ProfitCenterId = e.ProfitCenterId,
             });
         }
 
@@ -144,11 +146,13 @@ public record VoucherInput(
     string? Summary,
     string? Source,
     string? SourceRef,
-    List<VoucherEntryInput> Entries);
+    List<VoucherEntryInput> Entries,
+    long? OrganizationId = null);
 
 public record VoucherEntryInput(
     long AccountId,
     string? Summary,
     decimal DebitAmount,
     decimal CreditAmount,
-    string? Currency);
+    string? Currency,
+    long? ProfitCenterId = null);
