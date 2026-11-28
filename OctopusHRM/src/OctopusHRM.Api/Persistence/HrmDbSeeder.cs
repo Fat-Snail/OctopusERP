@@ -1,8 +1,19 @@
+using System.Text.Json;
+using OctopusHRM.Api.Persistence;
+
 namespace OctopusHRM.Api.Persistence;
 
 public static class HrmDbSeeder
 {
     public static void Seed(HrmDbContext db)
+    {
+        SeedBaseIfEmpty(db);
+        SeedPayrollAndKpi(db); // 幂等：已有算薪/KPI 则跳过
+        db.SaveChanges();
+    }
+
+    // ============ 基础数据（仅首次建库）============
+    private static void SeedBaseIfEmpty(HrmDbContext db)
     {
         if (db.Employees.Any()) return;
         var now = DateTime.UtcNow;
@@ -36,5 +47,93 @@ public static class HrmDbSeeder
         );
 
         db.SaveChanges();
+    }
+
+    // ============ 薪酬 + 绩效模拟数据（幂等，供工资核算/绩效看板演示）============
+    public static void SeedPayrollAndKpi(HrmDbContext db)
+    {
+        if (!db.Employees.Any()) return;
+
+        var employees = db.Employees.Where(e => e.Status != "resigned").OrderBy(e => e.EmployeeId).ToList();
+
+        // 算薪批次（避开集成测试使用的 2026-11 / 2025-12 / 2027-01 期间）
+        if (!db.PayrollRuns.Any())
+        {
+            const decimal meal = 600m, traffic = 400m;
+
+            HrmPayrollDetail BuildDetail(HrmEmployee emp)
+            {
+                var baseSalary = emp.BaseSalary ?? 0m;
+                var earnings = baseSalary + meal + traffic;
+                var si = baseSalary * 0.105m;
+                var hf = baseSalary * 0.08m;
+                var taxable = baseSalary - si - hf - 5000m;
+                var tax = taxable > 0 ? Math.Round(taxable * 0.05m, 2) : 0m;
+                var deductions = si + hf + tax;
+                var net = earnings - deductions;
+
+                var items = new object[]
+                {
+                    new { code = "BASE", name = "基本工资", type = "earning", amount = baseSalary },
+                    new { code = "MEAL", name = "餐补", type = "earning", amount = meal },
+                    new { code = "TRAFFIC", name = "交通补贴", type = "earning", amount = traffic },
+                    new { code = "SI", name = "社保个人", type = "deduction", amount = Math.Round(si, 2) },
+                    new { code = "HF", name = "公积金个人", type = "deduction", amount = Math.Round(hf, 2) },
+                    new { code = "TAX", name = "个人所得税", type = "deduction", amount = tax },
+                };
+
+                return new HrmPayrollDetail
+                {
+                    EmployeeId = emp.EmployeeId,
+                    EmployeeNo = emp.EmployeeNo,
+                    EmployeeName = emp.FullName,
+                    AttendanceDays = 22,
+                    LeaveDays = 0,
+                    AbsentDays = 0,
+                    ItemsJson = JsonSerializer.Serialize(items),
+                    GrossPay = Math.Round(earnings, 2),
+                    Deductions = Math.Round(deductions, 2),
+                    NetPay = Math.Round(net, 2),
+                };
+            }
+
+            HrmPayrollRun BuildRun(string code, int year, int month, string status, DateTime? paidAt)
+            {
+                var run = new HrmPayrollRun
+                {
+                    PeriodCode = code,
+                    Year = year,
+                    Month = month,
+                    Status = status,
+                    CreatedBy = 1,
+                    CreatedAt = DateTime.UtcNow,
+                    PaidAt = paidAt,
+                };
+                foreach (var emp in employees) run.Details.Add(BuildDetail(emp));
+                run.EmployeeCount = run.Details.Count;
+                run.TotalGrossPay = Math.Round(run.Details.Sum(d => d.GrossPay), 2);
+                run.TotalNetPay = Math.Round(run.Details.Sum(d => d.NetPay), 2);
+                return run;
+            }
+
+            db.PayrollRuns.AddRange(
+                BuildRun("2026-09", 2026, 9, "paid", new DateTime(2026, 9, 30, 0, 0, 0, DateTimeKind.Utc)),
+                BuildRun("2026-10", 2026, 10, "calculated", null)
+            );
+        }
+
+        // KPI / 绩效评分（季度 + 月度）
+        if (!db.Kpis.Any())
+        {
+            var now = DateTime.UtcNow;
+            db.Kpis.AddRange(
+                new HrmKpi { EmployeeId = 1, Period = "2026-Q3", Title = "季度绩效考核", Score = 92m, Grade = "S", Comment = "战略目标达成，团队管理出色", ReviewerId = 1, Status = "approved", CreatedAt = now },
+                new HrmKpi { EmployeeId = 2, Period = "2026-Q3", Title = "季度绩效考核", Score = 85m, Grade = "A", Comment = "技术攻坚突出，交付质量高", ReviewerId = 1, Status = "approved", CreatedAt = now },
+                new HrmKpi { EmployeeId = 3, Period = "2026-Q3", Title = "季度绩效考核", Score = 78m, Grade = "B", Comment = "稳步推进，仍有提升空间", ReviewerId = 1, Status = "approved", CreatedAt = now },
+                new HrmKpi { EmployeeId = 1, Period = "2026-10", Title = "月度绩效", Score = 90m, Grade = "S", Comment = "本月目标超额完成", ReviewerId = 1, Status = "submitted", CreatedAt = now },
+                new HrmKpi { EmployeeId = 2, Period = "2026-10", Title = "月度绩效", Score = 88m, Grade = "A", Comment = "关键模块按时交付", ReviewerId = 1, Status = "submitted", CreatedAt = now },
+                new HrmKpi { EmployeeId = 3, Period = "2026-10", Title = "月度绩效", Score = 72m, Grade = "B", Comment = "完成基础任务", ReviewerId = 1, Status = "submitted", CreatedAt = now }
+            );
+        }
     }
 }

@@ -185,4 +185,26 @@ public class HrmTests : IClassFixture<HrmTestFactory>
         var doc2 = await resp2.Content.ReadFromJsonAsync<JsonDocument>(_json);
         doc2!.RootElement.GetProperty("code").GetInt32().Should().Be(200);
     }
+
+    [Fact]
+    public async Task SeededPayrollAndKpi_ArePresent()
+    {
+        var p = await _client.GetAsync("/api/payroll");
+        var pd = await p.Content.ReadFromJsonAsync<JsonDocument>(_json);
+        pd!.RootElement.GetProperty("code").GetInt32().Should().Be(200);
+        bool has09 = false, has10 = false;
+        foreach (var e in pd.RootElement.GetProperty("data").EnumerateArray())
+        {
+            var c = e.GetProperty("periodCode").GetString();
+            if (c == "2026-09") has09 = true;
+            if (c == "2026-10") has10 = true;
+        }
+        has09.Should().BeTrue();
+        has10.Should().BeTrue();
+
+        var k = await _client.GetAsync("/api/kpi/2");
+        var kd = await k.Content.ReadFromJsonAsync<JsonDocument>(_json);
+        kd!.RootElement.GetProperty("code").GetInt32().Should().Be(200);
+        kd.RootElement.GetProperty("data").GetArrayLength().Should().BeGreaterThanOrEqualTo(1);
+    }
 }
