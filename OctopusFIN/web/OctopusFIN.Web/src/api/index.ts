@@ -167,18 +167,44 @@ export async function registerPayment(id: number, data: { amount: number; paymen
 export interface TrialBalanceRow {
   accountCode: string
   accountName: string
-  beginDebit: number
-  beginCredit: number
-  periodDebit: number
-  periodCredit: number
-  endDebit: number
-  endCredit: number
+  direction: string
+  debitTotal: number
+  creditTotal: number
+  balance: number
 }
 
-export async function getTrialBalance(periodId?: number): Promise<TrialBalanceRow[]> {
-  return unwrap(await http.get<ApiResponse<TrialBalanceRow[]>>('/reports/trial-balance', { params: { periodId } }))
+export interface TrialBalanceResponse {
+  rows: TrialBalanceRow[]
+  totalDebit: number
+  totalCredit: number
+  isBalanced: boolean
 }
 
-export async function getMonthEndClosing(periodId: number): Promise<unknown> {
-  return unwrap(await http.get<ApiResponse<unknown>>(`/reports/month-end-closing/${periodId}`))
+export interface MonthEndClosingReport {
+  periodId: number
+  periodCode: string
+  periodStatus: string
+  closedAt: string | null
+  closedBy: number | null
+  voucherTotal: number
+  postedCount: number
+  draftCount: number
+  voidCount: number
+  postedDebit: number
+  postedCredit: number
+  revenueTotal: number
+  expenseTotal: number
+  netProfit: number
+  closingVoucherNo: string | null
+  closingAmount: number | null
+  balanceSnapshot: TrialBalanceRow[]
+  trialBalanceOk: boolean
+}
+
+export async function getTrialBalance(periodId?: number): Promise<TrialBalanceResponse> {
+  return unwrap(await http.get<ApiResponse<TrialBalanceResponse>>('/reports/trial-balance', { params: { periodId } }))
+}
+
+export async function getMonthEndClosing(periodId: number): Promise<MonthEndClosingReport> {
+  return unwrap(await http.get<ApiResponse<MonthEndClosingReport>>(`/reports/month-end-closing/${periodId}`))
 }

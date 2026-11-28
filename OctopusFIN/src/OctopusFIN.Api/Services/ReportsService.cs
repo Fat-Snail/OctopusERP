@@ -90,6 +90,7 @@ public class ReportsService(FinDbContext db)
         var assetRows = new List<BalanceSheetRow>();
         var liabilityRows = new List<BalanceSheetRow>();
         decimal assetTotal = 0, liabilityTotal = 0;
+        decimal revenueNet = 0, expenseNet = 0;
 
         foreach (var acct in accounts.OrderBy(a => a.AccountCode))
         {
@@ -103,16 +104,37 @@ public class ReportsService(FinDbContext db)
                 AccountName = acct.AccountName,
                 Balance = balance,
             };
-            if (acct.AccountType == "asset")
+            switch (acct.AccountType)
             {
-                assetTotal += balance;
-                assetRows.Add(row);
+                case "asset":
+                    assetTotal += balance;
+                    assetRows.Add(row);
+                    break;
+                case "liability":
+                case "equity":
+                    liabilityTotal += balance;
+                    liabilityRows.Add(row);
+                    break;
+                case "revenue":
+                    revenueNet += balance; // 贷方方向，正值
+                    break;
+                case "expense":
+                    expenseNet += balance; // 借方方向，正值
+                    break;
             }
-            else
+        }
+
+        // 未结转损益（收入 - 费用）计入本年利润，保证 资产 = 负债 + 权益
+        var retainedProfit = revenueNet - expenseNet;
+        if (retainedProfit != 0)
+        {
+            liabilityRows.Add(new BalanceSheetRow
             {
-                liabilityTotal += balance;
-                liabilityRows.Add(row);
-            }
+                AccountCode = "4103",
+                AccountName = "本年利润（未结转）",
+                Balance = retainedProfit,
+            });
+            liabilityTotal += retainedProfit;
         }
 
         return new BalanceSheetResponse

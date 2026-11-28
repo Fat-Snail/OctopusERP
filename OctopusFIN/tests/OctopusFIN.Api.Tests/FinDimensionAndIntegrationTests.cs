@@ -328,4 +328,30 @@ public class FinDimensionAndIntegrationTests : IClassFixture<FinTestFactory>
         recDoc!.RootElement.GetProperty("code").GetInt32().Should().Be(200);
         recDoc.RootElement.GetProperty("data").GetProperty("matched").GetInt32().Should().BeGreaterThanOrEqualTo(0);
     }
+
+    // 验证模拟业务数据已加载：资产负债表有业务数据且平衡、利润表净利润为正、阿米巴有收入
+    [Fact]
+    public async Task SeededBusinessData_ProducesMeaningfulReports()
+    {
+        // 资产负债表：资产合计 > 期初 100 万，且资产 = 负债 + 权益
+        var bs = await _client.GetAsync("/api/reports/balance-sheet");
+        var bsDoc = await bs.Content.ReadFromJsonAsync<JsonDocument>(_json);
+        var bsData = bsDoc!.RootElement.GetProperty("data");
+        bsData.GetProperty("isBalanced").GetBoolean().Should().BeTrue();
+        bsData.GetProperty("assetsTotal").GetDecimal().Should().BeGreaterThan(1_000_000m);
+        bsData.GetProperty("liabilitiesTotal").GetDecimal()
+            .Should().Be(bsData.GetProperty("assetsTotal").GetDecimal());
+
+        // 利润表：收入与净利润均为正
+        var isr = await _client.GetAsync("/api/reports/income-statement");
+        var isrDoc = await isr.Content.ReadFromJsonAsync<JsonDocument>(_json);
+        var isrData = isrDoc!.RootElement.GetProperty("data");
+        isrData.GetProperty("revenueTotal").GetDecimal().Should().BeGreaterThan(0);
+        isrData.GetProperty("netProfit").GetDecimal().Should().BeGreaterThan(0);
+
+        // 阿米巴：存在收入
+        var am = await _client.GetAsync("/api/reports/amoeba");
+        var amDoc = await am.Content.ReadFromJsonAsync<JsonDocument>(_json);
+        amDoc!.RootElement.GetProperty("data").GetProperty("totalRevenue").GetDecimal().Should().BeGreaterThan(0);
+    }
 }
